@@ -17,11 +17,54 @@ interface BlueprintSheetProps {
   language: 'id' | 'en';
 }
 
-const getSections = (content: string) => {
+type Section = {
+  index: number;
+  level: number;
+  heading: string;
+  content: string;
+};
+
+export const getSections = (content: string): Section[] => {
   if (!content) return [];
-  // Split by headings Level 1 or 2
-  const chunks = content.split(/(?=^#{1,2}\s)/gm);
-  return chunks.filter(c => c.trim().length > 0);
+  
+  const lines = content.split('\n');
+  const sections: Section[] = [];
+  
+  let currentContent: string[] = [];
+  let currentLevel = 0;
+  let currentHeading = '';
+
+  for (let i = 0; i < lines.length; i++) {
+    const line = lines[i];
+    const match = line.match(/^(#{1,2})\s+(.*)/);
+
+    if (match) {
+      if (currentContent.length > 0) {
+        sections.push({
+          index: sections.length,
+          level: currentLevel,
+          heading: currentHeading,
+          content: currentContent.join('\n')
+        });
+      }
+      currentLevel = match[1].length;
+      currentHeading = match[2];
+      currentContent = [line];
+    } else {
+      currentContent.push(line);
+    }
+  }
+
+  if (currentContent.length > 0) {
+    sections.push({
+      index: sections.length,
+      level: currentLevel,
+      heading: currentHeading,
+      content: currentContent.join('\n')
+    });
+  }
+
+  return sections.filter(s => s.content.trim().length > 0);
 };
 
 export function BlueprintSheet({ 
@@ -130,7 +173,7 @@ function SheetSection({
   isGenerating,
   language
 }: { 
-  section: string; 
+  section: Section; 
   comment: string; 
   onCommentChange: (text: string) => void;
   isGenerating?: boolean;
@@ -213,7 +256,7 @@ function SheetSection({
             }
           }}
         >
-          {section}
+          {section.content}
         </ReactMarkdown>
       </div>
 

@@ -2,7 +2,7 @@ import { useState, useEffect } from 'react';
 import { Header } from './components/Header';
 import { TerminalConsole } from './components/TerminalConsole';
 import { SystemSchematic } from './components/SystemSchematic';
-import { BlueprintSheet } from './components/BlueprintSheet';
+import { BlueprintSheet, getSections } from './components/BlueprintSheet';
 import { ApiKeyModal } from './components/ApiKeyModal';
 import { generatePRD } from './services/geminiService';
 import { ProductType, PRDVersion, PRDComment } from './types';
@@ -78,9 +78,9 @@ export default function App() {
       let sectionHeading = sectionId;
       const secIdx = parseInt(sectionId.split('_')[1], 10);
       if (!isNaN(secIdx)) {
-        const chunks = activeVersion.content.split(/(?=^#{1,2}\s)/gm).filter(c => c.trim().length > 0);
-        if (chunks[secIdx]) {
-          sectionHeading = chunks[secIdx].split('\n')[0].replace(/^#+\s/, '').substring(0, 60).trim();
+        const parsedSections = getSections(activeVersion.content);
+        if (parsedSections[secIdx] && parsedSections[secIdx].heading) {
+          sectionHeading = parsedSections[secIdx].heading.substring(0, 60).trim();
         }
       }
       revisionPrompt += `- **${language === 'en' ? 'Section' : 'Bagian'} "${sectionHeading}"**: ${comment}\n`;
