@@ -57,8 +57,8 @@ The generated document strictly adheres to an 11-chapter industry-standard struc
 
 1. **Clone the repository**
    ```bash
-   git clone https://github.com/yourusername/prd-architect.git
-   cd prd-architect
+   git clone https://github.com/TrygerZ/PRD-Architect.git
+   cd PRD-Architect
    ```
 
 2. **Install dependencies**
