@@ -12,6 +12,7 @@ export default function App() {
   const [customApiKey, setCustomApiKey] = useState('');
   const [isGenerating, setIsGenerating] = useState(false);
   const [productType, setProductType] = useState<ProductType>('Unknown');
+  const [language, setLanguage] = useState<'id' | 'en'>('id');
   
   const [versions, setVersions] = useState<PRDVersion[]>([]);
   const [activeVersionId, setActiveVersionId] = useState<string | null>(null);
@@ -49,13 +50,13 @@ export default function App() {
     setActiveVersionId(newVersionId);
 
     try {
-      await generatePRD(prompt, customApiKey, (chunk) => {
+      await generatePRD(prompt, customApiKey, language, (chunk) => {
         setVersions(prev => prev.map(v => 
           v.id === newVersionId ? { ...v, content: v.content + chunk } : v
         ));
       });
     } catch (err: any) {
-      setError(err.message || 'An unexpected error occurred during PRD generation.');
+      setError(err.message || (language === 'en' ? 'An unexpected error occurred during PRD generation.' : 'Terjadi kesalahan tidak terduga saat membuat PRD.'));
       console.error(err);
     } finally {
       setIsGenerating(false);
@@ -69,13 +70,16 @@ export default function App() {
     setError(null);
 
     // Build revision prompt
-    let revisionPrompt = `I want to revise the current PRD based on specific feedback for certain sections.\n\n`;
-    revisionPrompt += `### Current PRD:\n${activeVersion.content}\n\n`;
-    revisionPrompt += `### Revisions requested per section:\n`;
+    let revisionPrompt = language === 'en' 
+      ? `I want to revise the current PRD based on specific feedback for certain sections.\n\n### Current PRD:\n${activeVersion.content}\n\n### Revisions requested per section:\n`
+      : `Saya ingin merevisi PRD saat ini berdasarkan feedback spesifik untuk beberapa bagian.\n\n### PRD Saat Ini:\n${activeVersion.content}\n\n### Permintaan revisi per bagian:\n`;
+    
     Object.entries(comments).forEach(([sectionId, comment]) => {
-      revisionPrompt += `- **Section ${sectionId.substring(0, 30)}...**: ${comment}\n`;
+      revisionPrompt += `- **${language === 'en' ? 'Section' : 'Bagian'} ${sectionId.substring(0, 30)}...**: ${comment}\n`;
     });
-    revisionPrompt += `\nPlease generate a completely revised standard 11-chapter PRD reflecting these changes. Keep unchanged sections intact.`;
+    revisionPrompt += language === 'en'
+      ? `\nPlease generate a completely revised standard 11-chapter PRD reflecting these changes. Keep unchanged sections intact.`
+      : `\nTolong buat ulang PRD 11 bab standar secara utuh dengan menerapkan perubahan tersebut. Biarkan bagian yang tidak direvisi tetap seperti semula.`;
 
     const newVersionId = Date.now().toString();
     const newVersion: PRDVersion = {
@@ -90,7 +94,7 @@ export default function App() {
     setActiveVersionId(newVersionId);
 
     try {
-      await generatePRD(revisionPrompt, customApiKey, (chunk) => {
+      await generatePRD(revisionPrompt, customApiKey, language, (chunk) => {
         setVersions(prev => prev.map(v => 
           v.id === newVersionId ? { ...v, content: v.content + chunk } : v
         ));
@@ -98,7 +102,7 @@ export default function App() {
       // Clear comments after successful revision
       setComments({});
     } catch (err: any) {
-      setError(err.message || 'An unexpected error occurred during PRD revision.');
+      setError(err.message || (language === 'en' ? 'An unexpected error occurred during PRD revision.' : 'Terjadi kesalahan tidak terduga saat merevisi PRD.'));
       console.error(err);
     } finally {
       setIsGenerating(false);
@@ -119,7 +123,7 @@ export default function App() {
   const handleCopy = () => {
     if (!prdContent) return;
     navigator.clipboard.writeText(prdContent);
-    alert('PRD copied to clipboard!'); // Could replace with custom toast
+    alert(language === 'en' ? 'PRD copied to clipboard!' : 'PRD disalin ke clipboard!'); // Could replace with custom toast
   };
 
   const handlePrint = () => {
@@ -134,13 +138,16 @@ export default function App() {
         onCopy={handleCopy}
         onPrint={handlePrint}
         hasData={prdContent.length > 0}
+        language={language}
+        onToggleLanguage={() => setLanguage(lang => lang === 'id' ? 'en' : 'id')}
       />
       
       <div className="w-full relative z-10 flex flex-col items-center flex-grow">
         {(!activeVersionId || versions.length === 0) && (
           <TerminalConsole 
             onGenerate={handleGenerate} 
-            isGenerating={isGenerating} 
+            isGenerating={isGenerating}
+            language={language}
           />
         )}
         
@@ -172,6 +179,7 @@ export default function App() {
             onSwitchVersion={setActiveVersionId}
             onRevise={handleRevise}
             isGenerating={isGenerating}
+            language={language}
           />
         )}
       </div>
@@ -180,6 +188,7 @@ export default function App() {
         isOpen={isSettingsOpen} 
         onClose={() => setIsSettingsOpen(false)} 
         onSave={(key) => setCustomApiKey(key)}
+        language={language}
       />
       
       {/* Background Decor */}

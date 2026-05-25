@@ -11,11 +11,24 @@ const PORT = 3000;
 
 app.use(express.json());
 
-const PRD_SYSTEM_PROMPT = `
-You are a highly skilled Senior Product Manager and Architect. Your job is to generate a comprehensive, enterprise-grade Product Requirements Document (PRD) mapped exactly into 11 structured chapters, using Markdown format.
+function getSystemPrompt(language: string, extraPrompt: string) {
+  const isEn = language === 'en';
+  return `You are a highly skilled Senior Product Manager and Architect. Your job is to generate a comprehensive, enterprise-grade Product Requirements Document (PRD) mapped exactly into 11 structured chapters, using Markdown format.
 
 The chapters MUST be exactly these 11:
-1. Ringkasan Eksekutif (Executive Summary)
+${isEn ? 
+`1. Executive Summary
+2. Problem Definition & Market Analysis
+3. Solution Overview & Scope
+4. User Stories & Detailed Requirements
+5. UX Design & Flow
+6. Technical Specs & Architecture
+7. GTM Strategy & Pricing
+8. Risk Analysis & Mitigation
+9. Project Timeline & Roadmap
+10. Team Requirements & Budget
+11. AI Agent Implementation Guidelines` : 
+`1. Ringkasan Eksekutif (Executive Summary)
 2. Definisi Masalah & Analisis Pasar (Problem Definition & Market Analysis)
 3. Tinjauan Solusi & Ruang Lingkup (Solution Overview & Scope)
 4. User Story & Kebutuhan Detail (User Stories & Detailed Requirements)
@@ -25,22 +38,22 @@ The chapters MUST be exactly these 11:
 8. Analisis Risiko & Mitigasi (Risk Analysis & Mitigation)
 9. Linimasa Proyek & Roadmap (Project Timeline & Roadmap)
 10. Kebutuhan Tim & Anggaran (Team Requirements & Budget)
-11. AI Agent Implementation Guidelines (Instruksi Khusus untuk AI Coder)
+11. AI Agent Implementation Guidelines (Instruksi Khusus untuk AI Coder)`}
 
 Ensure to include:
 - MANDATORY FORMATTING FOR SPECIFIC CHAPTERS:
-  - Chapter 4: User Story & Kebutuhan Detail (DO NOT USE TABLES. Pisahkan setiap persona menggunakan Heading 3 (###) dan gunakan format list berikut:
-    ### Persona 1: [Nama/Persona]
-    - **Role/Pekerjaan:** [Peran]
-    - **Masalah:** [Masalah yang dihadapi]
-    - **Pain Point:** [Pain point utama]
-    - **Kebiasaan:** [Kebiasaan relevan]
+  - Chapter 4: User Story & Kebutuhan Detail (DO NOT USE TABLES. ${isEn ? `Separate each persona using Heading 3 (###) and use this list format:` : `Pisahkan setiap persona menggunakan Heading 3 (###) dan gunakan format list berikut (tetap pertahankan istilah bahasa inggris yang natural seperti Role, Pain Point, User Story):`}
+    ### Persona 1: [${isEn ? 'Name/Persona' : 'Nama/Persona'}]
+    - **Role:** [${isEn ? 'Role' : 'Peran'}]
+    - **${isEn ? 'Problem' : 'Masalah'}:** [${isEn ? 'Problem faced' : 'Masalah yang dihadapi'}]
+    - **Pain Point:** [${isEn ? 'Main pain point' : 'Pain point utama'}]
+    - **${isEn ? 'Habit' : 'Kebiasaan'}:** [${isEn ? 'Relevant habit' : 'Kebiasaan relevan'}]
     
-    **(Berikan deskripsi singkat User Story dalam format: "Sebagai [Role], saya ingin [Tujuan] agar [Manfaat]")**
+    ${isEn ? `**(Provide a short User Story in the format: "As a [Role], I want to [Goal] so that [Benefit]")**` : `**(Berikan deskripsi singkat User Story dalam format: "Sebagai [Role], saya ingin [Tujuan] agar [Manfaat]")**`}
   - Use clean, well-structured Markdown tables ONLY for the following sections:
     - Chapter 6: Spesifikasi Teknis & Arsitektur - API Design (Columns: Endpoint, Method, Description, Request, Response). Wrap HTTP methods in inline code (e.g. \`GET\`, \`POST\`).
-    - Chapter 8: Analisis Risiko & Mitigasi (Columns: Risiko, Dampak, Kemungkinan, Strategi Mitigasi). Wrap Dampak and Kemungkinan levels in inline code (\`Tinggi\`, \`Sedang\`).
-    - Chapter 10: Kebutuhan Tim & Anggaran (Columns: Peran/Komponen, Deskripsi, Estimasi Durasi, Estimasi Anggaran)
+    - Chapter 8: Analisis Risiko & Mitigasi (Columns: ${isEn ? 'Risk, Impact, Likelihood, Mitigation Strategy' : 'Risiko, Dampak, Kemungkinan, Strategi Mitigasi'}). Wrap Impact and Likelihood levels in inline code (${isEn ? 'High, Medium' : 'Tinggi, Sedang'}).
+    - Chapter 10: Kebutuhan Tim & Anggaran (Columns: ${isEn ? 'Role/Component, Description, Duration Estimate, Budget Estimate' : 'Peran/Komponen, Deskripsi, Estimasi Durasi, Estimasi Anggaran'})
   - Chapter 11 MUST explicitly contain:
     - Strict Tech Stack & Libraries rules (e.g. Tailwind, Lucide, Shadcn).
     - Expected Directory Structure (e.g. \`/src/pages\`, \`/src/components\`).
@@ -53,10 +66,9 @@ Ensure to include:
   - NEVER put multiple table rows on the same line.
 - BE CONCISE. Avoid repeating words or characters unnecessarily.
 - Markdown formatting exclusively.
-- Write in Indonesian as default unless requested otherwise.
+- ${isEn ? 'Write entirely in English.' : 'Write mainly in Indonesian, but keep standard industry terms in English (e.g., User Story, Role, Pain Point, GTM, API, Endpoint, etc.) to maintain a natural tone.'}${extraPrompt ? '\n\n' + extraPrompt : ''}
 `;
-
-const FINAL_SYSTEM_PROMPT = PRD_SYSTEM_PROMPT + (AI_CONFIG.SYSTEM_PROMPT_ADDITIONS ? "\n\n" + AI_CONFIG.SYSTEM_PROMPT_ADDITIONS : "");
+}
 
 app.post("/api/generate-prd", async (req, res) => {
   res.setHeader("Content-Type", "text/event-stream");
@@ -64,10 +76,10 @@ app.post("/api/generate-prd", async (req, res) => {
   res.setHeader("Connection", "keep-alive");
 
   try {
-    const { prompt, customApiKey } = req.body;
+    const { prompt, customApiKey, language = 'id' } = req.body;
     
     if (!prompt) {
-      res.write(`data: ${JSON.stringify({ error: "Prompt is required" })}\n\n`);
+      res.write(`data: ${JSON.stringify({ error: language === 'en' ? "Prompt is required" : "Prompt diperlukan" })}\n\n`);
       return res.end();
     }
 
@@ -75,13 +87,14 @@ app.post("/api/generate-prd", async (req, res) => {
     const customKey = customApiKey || process.env[apiKeyEnvName] || Object.entries(process.env).find(([k]) => k.toUpperCase().includes(apiKeyEnvName.split('_')[0]))?.[1];
     
     if (!customKey) {
-      res.write(`data: ${JSON.stringify({ error: "API KEY not found. Please provide a custom key or set " + apiKeyEnvName + " in .env/Settings" })}\n\n`);
+      res.write(`data: ${JSON.stringify({ error: (language === 'en' ? "API KEY not found. Please provide a custom key or set " : "API KEY tidak ditemukan. Pastikan ada custom key atau ") + apiKeyEnvName + " in .env/Settings" })}\n\n`);
       res.end();
       return;
     }
 
     const endpoint = AI_CONFIG.ENDPOINT_URL;
     const modelName = AI_CONFIG.MODEL_NAME;
+    const finalPrompt = getSystemPrompt(language, AI_CONFIG.SYSTEM_PROMPT_ADDITIONS);
 
     const response = await fetch(endpoint, {
       method: "POST",
@@ -92,7 +105,7 @@ app.post("/api/generate-prd", async (req, res) => {
       body: JSON.stringify({
         model: modelName,
         messages: [
-          { role: "system", content: FINAL_SYSTEM_PROMPT },
+          { role: "system", content: finalPrompt },
           { role: "user", content: prompt }
         ],
         stream: true,

@@ -5,9 +5,10 @@ import { ProductType } from '../types';
 interface TerminalConsoleProps {
   onGenerate: (prompt: string, type: ProductType) => void;
   isGenerating: boolean;
+  language: 'id' | 'en';
 }
 
-export function TerminalConsole({ onGenerate, isGenerating }: TerminalConsoleProps) {
+export function TerminalConsole({ onGenerate, isGenerating, language }: TerminalConsoleProps) {
   const [prompt, setPrompt] = useState('');
   const [detectedType, setDetectedType] = useState<ProductType>('Unknown');
 
@@ -56,7 +57,7 @@ export function TerminalConsole({ onGenerate, isGenerating }: TerminalConsolePro
           <textarea
             value={prompt}
             onChange={(e) => setPrompt(e.target.value)}
-            placeholder="Jelaskan produk yang ingin kamu bangun... (Cth: Sebuah aplikasi E-Commerce untuk menjual biji kopi...)"
+            placeholder={language === 'en' ? "Describe the product you want to build... (e.g., An E-Commerce app for local coffee beans...)" : "Jelaskan produk yang ingin kamu bangun... (Cth: Sebuah aplikasi E-Commerce untuk menjual biji kopi...)"}
             className="w-full bg-transparent text-cyber-text placeholder:text-cyber-border outline-none resize-none min-h-[120px] font-sans text-sm focus:ring-0 p-1 sm:p-2 mb-12 sm:mb-0"
             disabled={isGenerating}
           />

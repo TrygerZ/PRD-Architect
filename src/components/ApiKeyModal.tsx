@@ -6,9 +6,10 @@ interface ApiKeyModalProps {
   isOpen: boolean;
   onClose: () => void;
   onSave: (key: string) => void;
+  language: 'id' | 'en';
 }
 
-export function ApiKeyModal({ isOpen, onClose, onSave }: ApiKeyModalProps) {
+export function ApiKeyModal({ isOpen, onClose, onSave, language }: ApiKeyModalProps) {
   const [apiKey, setApiKey] = useState('');
   const [saved, setSaved] = useState(false);
 
@@ -70,7 +71,7 @@ export function ApiKeyModal({ isOpen, onClose, onSave }: ApiKeyModalProps) {
               <p className="mt-2 text-[10px] text-cyber-text-dim flex items-start gap-1">
                 <AlertTriangle size={12} className="shrink-0 mt-0.5 text-amber-500" />
                 <span>
-                  Provide the API Key for the model you configured in ai-config.ts. Overrides environment variables.
+                  {language === 'en' ? 'Provide the API Key for the model you configured in ai-config.ts. Overrides environment variables.' : 'Masukkan API Key untuk provider yang dikonfigurasi di ai-config.ts. Ini akan menimpa environment variable.'}
                 </span>
               </p>
             </div>
@@ -79,8 +80,9 @@ export function ApiKeyModal({ isOpen, onClose, onSave }: ApiKeyModalProps) {
               <button 
                 onClick={handleClear}
                 className="text-xs font-mono text-cyber-text-dim hover:text-red-400 transition-colors"
+                title={language === 'en' ? 'Clear Key' : 'Hapus Key'}
               >
-                [ CLEAR ]
+                [ {language === 'en' ? 'CLEAR' : 'HAPUS'} ]
               </button>
               
               <button 
@@ -88,7 +90,7 @@ export function ApiKeyModal({ isOpen, onClose, onSave }: ApiKeyModalProps) {
                 disabled={saved}
                 className="cyber-button"
               >
-                {saved ? <><Check size={16} /> SAVED</> : 'UPDATE_KEY'}
+                {saved ? <><Check size={16} /> {language === 'en' ? 'SAVED' : 'TERSIPAN'}</> : (language === 'en' ? 'UPDATE_KEY' : 'PERBARUI_KEY')}
               </button>
             </div>
           </motion.div>

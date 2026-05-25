@@ -14,6 +14,7 @@ interface BlueprintSheetProps {
   onSwitchVersion?: (versionId: string) => void;
   onRevise?: () => void;
   isGenerating?: boolean;
+  language: 'id' | 'en';
 }
 
 const getSections = (content: string) => {
@@ -31,7 +32,8 @@ export function BlueprintSheet({
   activeVersionId, 
   onSwitchVersion,
   onRevise,
-  isGenerating
+  isGenerating,
+  language
 }: BlueprintSheetProps) {
   
   const sections = getSections(content);
@@ -65,7 +67,7 @@ export function BlueprintSheet({
           <div className="flex items-center gap-4">
             <div className="text-sm text-cyber-text-dim flex items-center gap-2">
               <MessageSquare className="w-4 h-4" />
-              <span>{totalComments} Comments</span>
+              <span>{totalComments} {language === 'en' ? 'Comments' : 'Komentar'}</span>
             </div>
             
             <button
@@ -78,7 +80,7 @@ export function BlueprintSheet({
               ) : (
                 <RefreshCw className="w-4 h-4" />
               )}
-              Regenerate PRD
+              {language === 'en' ? 'Regenerate PRD' : 'Buat Ulang PRD'}
             </button>
           </div>
         </div>
@@ -104,6 +106,7 @@ export function BlueprintSheet({
                  comment={currentComment}
                  onCommentChange={(text) => onCommentChange?.(sectionId, text)}
                  isGenerating={isGenerating}
+                 language={language}
                />
              );
           })}
@@ -117,12 +120,14 @@ function SheetSection({
   section, 
   comment, 
   onCommentChange,
-  isGenerating
+  isGenerating,
+  language
 }: { 
   section: string; 
   comment: string; 
   onCommentChange: (text: string) => void;
   isGenerating?: boolean;
+  language: 'id' | 'en';
 }) {
   const [isEditing, setIsEditing] = useState(false);
   const [tempComment, setTempComment] = useState(comment);
@@ -208,7 +213,7 @@ function SheetSection({
       {/* Side Feedback Panel */}
       <div className="w-full lg:w-72 lg:shrink-0 bg-black/20 p-4 relative no-print flex flex-col group/feedback">
         <label className="text-xs font-mono text-cyber-text-dim uppercase tracking-wider mb-3 flex items-center gap-2">
-          <MessageSquare className="w-3.5 h-3.5" /> Revisi / Feedback
+          <MessageSquare className="w-3.5 h-3.5" /> {language === 'en' ? 'Revision / Feedback' : 'Revisi / Feedback'}
         </label>
         
         {isEditing ? (
@@ -219,20 +224,20 @@ function SheetSection({
               value={tempComment}
               onChange={(e) => setTempComment(e.target.value)}
               className="flex-grow min-h-[100px] w-full bg-black/50 border border-cyber-accent text-cyber-text text-sm p-3 rounded-lg focus:outline-none focus:ring-1 focus:ring-cyber-accent resize-y"
-              placeholder="Berikan feedback atau revisi untuk bagian ini..."
+              placeholder={language === 'en' ? 'Add feedback or revision for this section...' : 'Berikan feedback atau revisi untuk bagian ini...'}
             />
             <div className="flex gap-2 justify-end">
               <button 
                 onClick={() => { setIsEditing(false); setTempComment(comment); }}
                 className="px-3 py-1.5 text-xs text-cyber-text-dim hover:text-cyber-text"
               >
-                Cancel
+                {language === 'en' ? 'Cancel' : 'Batal'}
               </button>
               <button 
                 onClick={() => { setIsEditing(false); onCommentChange(tempComment); }}
                 className="px-3 py-1.5 text-xs bg-cyber-accent text-black font-semibold rounded hover:bg-cyber-accent/90 flex items-center gap-1"
               >
-                <Check className="w-3 h-3" /> Save
+                <Check className="w-3 h-3" /> {language === 'en' ? 'Save' : 'Simpan'}
               </button>
             </div>
           </div>
@@ -249,12 +254,12 @@ function SheetSection({
               </div>
             ) : (
               <div className="p-3 text-sm text-cyber-text-dim/50 flex-grow border border-dashed border-cyber-border/30 rounded-lg hover:border-cyber-border/70 hover:text-cyber-text-dim transition-all">
-                Klik untuk menambahkan catatan revisi pada bagian ini...
+                {language === 'en' ? 'Click to add revision notes for this section...' : 'Klik untuk menambahkan catatan revisi pada bagian ini...'}
               </div>
             )}
             {comment && !isGenerating && (
               <div className="absolute top-2 right-2 opacity-0 group-hover/feedback:opacity-100 transition-opacity">
-                <button className="text-xs bg-black/80 px-2 py-1 rounded text-cyber-text border border-cyber-border hover:border-cyber-accent">Edit</button>
+                <button className="text-xs bg-black/80 px-2 py-1 rounded text-cyber-text border border-cyber-border hover:border-cyber-accent">{language === 'en' ? 'Edit' : 'Ubah'}</button>
               </div>
             )}
           </div>
