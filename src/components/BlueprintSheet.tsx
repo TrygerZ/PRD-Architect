@@ -137,10 +137,7 @@ export function BlueprintSheet({
       )}
 
       {!content && isGenerating ? (
-        <div className="text-center text-cyber-text-dim font-mono py-10 no-print flex flex-col items-center gap-4">
-          <RefreshCw className="w-8 h-8 animate-spin text-cyber-accent" />
-          AWAITING_PRD_GENERATION
-        </div>
+        <LoadingSkeleton />
       ) : (
         <div className="space-y-6">
           {sections.map((section, index) => {
@@ -316,5 +313,32 @@ function SheetSection({
         )}
       </div>
     </motion.div>
+  );
+}
+
+function LoadingSkeleton() {
+  return (
+    <div className="space-y-6 no-print">
+      {[1, 2, 3, 4, 5].map((i) => (
+        <div key={i} className="flex flex-col gap-4 p-6 bg-black/20 border border-cyber-border/40 rounded-xl relative justify-between">
+          <div className="h-6 bg-gray-700/30 rounded w-1/3 animate-pulse"></div>
+          <div className="space-y-2">
+            <div className="h-[12px] bg-gray-700/20 rounded w-full"></div>
+            <div className="h-[12px] bg-gray-700/20 rounded w-[80%]"></div>
+            <div className="h-[12px] bg-gray-700/20 rounded w-[60%]"></div>
+          </div>
+          <div className="grid grid-cols-4 gap-4 mt-2">
+            <div className="h-[32px] bg-gray-700/15 rounded"></div>
+            <div className="h-[32px] bg-gray-700/15 rounded"></div>
+            <div className="h-[32px] bg-gray-700/15 rounded"></div>
+            <div className="h-[32px] bg-gray-700/15 rounded"></div>
+          </div>
+        </div>
+      ))}
+      <div className="flex flex-col items-center justify-center py-10 gap-4 text-cyber-accent font-mono">
+        <RefreshCw className="w-8 h-8 animate-spin" />
+        <span className="tracking-widest">GENERATING PRD...</span>
+      </div>
+    </div>
   );
 }
