@@ -2,6 +2,7 @@ export const generatePRD = async (
   prompt: string, 
   customApiKey: string | undefined, 
   language: 'id' | 'en',
+  productType: string,
   onChunk: (chunk: string) => void
 ) => {
   const response = await fetch('/api/generate-prd', {
@@ -9,7 +10,7 @@ export const generatePRD = async (
     headers: {
       'Content-Type': 'application/json',
     },
-    body: JSON.stringify({ prompt, customApiKey, language }),
+    body: JSON.stringify({ prompt, customApiKey, language, productType }),
   });
 
   if (!response.ok) {

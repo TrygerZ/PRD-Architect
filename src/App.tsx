@@ -50,7 +50,7 @@ export default function App() {
     setActiveVersionId(newVersionId);
 
     try {
-      await generatePRD(prompt, customApiKey, language, (chunk) => {
+      await generatePRD(prompt, customApiKey, language, productType, (chunk) => {
         setVersions(prev => prev.map(v => 
           v.id === newVersionId ? { ...v, content: v.content + chunk } : v
         ));
@@ -86,8 +86,8 @@ export default function App() {
       revisionPrompt += `- **${language === 'en' ? 'Section' : 'Bagian'} "${sectionHeading}"**: ${comment}\n`;
     });
     revisionPrompt += language === 'en'
-      ? `\nPlease generate a completely revised standard 11-chapter PRD reflecting these changes. Keep unchanged sections intact.`
-      : `\nTolong buat ulang PRD 11 bab standar secara utuh dengan menerapkan perubahan tersebut. Biarkan bagian yang tidak direvisi tetap seperti semula.`;
+      ? `\nPlease generate a completely revised standard 12-chapter PRD reflecting these changes. Keep unchanged sections intact.`
+      : `\nTolong buat ulang PRD 12 bab standar secara utuh dengan menerapkan perubahan tersebut. Biarkan bagian yang tidak direvisi tetap seperti semula.`;
 
     const newVersionId = Date.now().toString();
     const newVersion: PRDVersion = {
@@ -102,7 +102,7 @@ export default function App() {
     setActiveVersionId(newVersionId);
 
     try {
-      await generatePRD(revisionPrompt, customApiKey, language, (chunk) => {
+      await generatePRD(revisionPrompt, customApiKey, language, productType, (chunk) => {
         setVersions(prev => prev.map(v => 
           v.id === newVersionId ? { ...v, content: v.content + chunk } : v
         ));
