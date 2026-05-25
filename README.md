@@ -27,15 +27,16 @@
 
 **PRD Architect** is a modern, full-stack application designed to dramatically accelerate the product planning phase. By taking a simple product idea as input, it automatically generates a highly structured, enterprise-grade **Product Requirements Document (PRD)**.
 
-The generated document strictly adheres to an 11-chapter industry-standard structure, ensuring that everything from user personas and technical specifications to risk analysis and budget estimates is covered comprehensively.
+The generated document strictly adheres to a 12-chapter industry-standard structure, ensuring that everything from user personas and technical specifications to risk analysis, budget estimates, and AI coding guidelines is covered comprehensively.
 
 ## ✨ Features
 
 - 🧠 **Bring Your Own Model (BYOM)**: Seamlessly switch between AI providers (Gemini, DeepSeek, OpenAI, Groq, or local models via Ollama) by adjusting a single configuration file.
-- 📐 **Enterprise Structure**: Enforces a strict 11-chapter format, generating consistent and high-quality PRDs out of the box.
+- 📐 **Enterprise Structure**: Enforces a strict 12-chapter format (including dedicated AI Agent Implementation Guidelines), generating consistent and high-quality PRDs out of the box.
 - ⚡ **Real-time Streaming Output**: Watch your document take shape in real-time with responsive Markdown rendering.
-- 💬 **Interactive Revisions**: Leave feedback on the generated document to incrementally refine and polish the PRD.
-- 🎨 **Cyberpunk Minimalist UI**: A sleek, dark-themed interface built for focus, speed, and aesthetics.
+- 💬 **Interactive Revisions**: Leave feedback on the generated document to incrementally refine and polish the PRD, complete with a version control system to switch between generation attempts.
+- 🌏 **Bilingual Support**: Full generation and system prompts supported in both English and Indonesian.
+- 🎨 **Cyberpunk Minimalist UI**: A sleek, dark-themed interface built for focus, speed, and aesthetics (now featuring sleek loading skeletons).
 - 📤 **Export Ready**: Instantly copy to clipboard, download as Markdown (`.md`), or print directly to PDF.
 
 ## 🛠️ Tech Stack
@@ -56,6 +57,7 @@ The generated document strictly adheres to an 11-chapter industry-standard struc
 ### Installation
 
 1. **Clone the repository**
+
    ```bash
    git clone https://github.com/TrygerZ/PRD-Architect.git
    cd PRD-Architect
@@ -73,10 +75,11 @@ You can fully customize the AI provider in the `ai-config.ts` file located in th
 ```typescript
 export const AI_CONFIG = {
   // Example for Gemini (Default)
-  ENDPOINT_URL: "https://generativelanguage.googleapis.com/v1beta/openai/chat/completions",
+  ENDPOINT_URL:
+    "https://generativelanguage.googleapis.com/v1beta/openai/chat/completions",
   MODEL_NAME: "gemini-2.5-flash",
-  API_KEY_ENV_NAME: "GEMINI_API_KEY", 
-  
+  API_KEY_ENV_NAME: "GEMINI_API_KEY",
+
   // Example for DeepSeek
   // ENDPOINT_URL: "https://api.deepseek.com/chat/completions",
   // MODEL_NAME: "deepseek-chat",
@@ -86,16 +89,18 @@ export const AI_CONFIG = {
   // ENDPOINT_URL: "https://api.openai.com/v1/chat/completions",
   // MODEL_NAME: "gpt-4o",
   // API_KEY_ENV_NAME: "OPENAI_API_KEY",
-  
+
   // ... other configs
 };
 ```
 
 #### API Key Setup
+
 Provide your API key through one of two methods:
 
-**Method A: Environment Variables (.env)** *(Recommended for local dev)*
+**Method A: Environment Variables (.env)** _(Recommended for local dev)_
 Create a `.env` file in the root of the project:
+
 ```env
 GEMINI_API_KEY=your_api_key_here
 ```
@@ -106,6 +111,7 @@ Click the **Settings (gear icon)** inside the app to paste your API Key. This ov
 ### 🏃‍♂️ Running the App
 
 Start the development server:
+
 ```bash
 npm run dev
 ```
@@ -120,5 +126,5 @@ Create a production build spanning the React SPA and Express backend:
 npm run build
 npm run start
 ```
-The server will bind to `0.0.0.0:3000` and serve the optimized static frontend alongside the API.
 
+The server will bind to `0.0.0.0:3000` and serve the optimized static frontend alongside the API.
