@@ -75,7 +75,7 @@ app.post("/api/generate-prd", async (req, res) => {
     const customKey = customApiKey || process.env[apiKeyEnvName] || Object.entries(process.env).find(([k]) => k.toUpperCase().includes(apiKeyEnvName.split('_')[0]))?.[1];
     
     if (!customKey) {
-      res.write(`data: ${JSON.stringify({ error: "API KEY tidak ditemukan. Pastikan ada custom key atau " + apiKeyEnvName + " di .env/Settings" })}\n\n`);
+      res.write(`data: ${JSON.stringify({ error: "API KEY not found. Please provide a custom key or set " + apiKeyEnvName + " in .env/Settings" })}\n\n`);
       res.end();
       return;
     }

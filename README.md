@@ -48,13 +48,25 @@ AI PRD Generator is a modern, full-stack application designed to automatically d
 
 ### Configuration
 
-You can fully customize the AI provider in the `ai-config.ts` file located in the root directory. By default, it accesses DeepSeek's `deepseek-chat` model.
+You can fully customize the AI provider in the `ai-config.ts` file located in the root directory. By default, it accesses Google's `gemini-2.5-flash` model, but you can configure it for **any OpenAI-compatible API** (DeepSeek, Groq, Ollama, OpenAI).
 
 ```typescript
 export const AI_CONFIG = {
-  ENDPOINT_URL: "https://api.deepseek.com/chat/completions",
-  MODEL_NAME: "deepseek-chat",
-  API_KEY_ENV_NAME: "DEEPSEEK_API_KEY", 
+  // Example for Gemini (Default)
+  ENDPOINT_URL: "https://generativelanguage.googleapis.com/v1beta/openai/chat/completions",
+  MODEL_NAME: "gemini-2.5-flash",
+  API_KEY_ENV_NAME: "GEMINI_API_KEY", 
+  
+  // Example for DeepSeek
+  // ENDPOINT_URL: "https://api.deepseek.com/chat/completions",
+  // MODEL_NAME: "deepseek-chat",
+  // API_KEY_ENV_NAME: "DEEPSEEK_API_KEY",
+
+  // Example for OpenAI
+  // ENDPOINT_URL: "https://api.openai.com/v1/chat/completions",
+  // MODEL_NAME: "gpt-4o",
+  // API_KEY_ENV_NAME: "OPENAI_API_KEY",
+  
   // ... other configs
 };
 ```
@@ -65,7 +77,7 @@ Provide your API key through one of the following methods:
 **Method A: Environment Variables (.env)**
 Create a `.env` file in the root of the project:
 ```env
-DEEPSEEK_API_KEY=your_api_key_here
+GEMINI_API_KEY=your_api_key_here
 ```
 
 **Method B: In-App UI**
