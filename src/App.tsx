@@ -75,7 +75,15 @@ export default function App() {
       : `Saya ingin merevisi PRD saat ini berdasarkan feedback spesifik untuk beberapa bagian.\n\n### PRD Saat Ini:\n${activeVersion.content}\n\n### Permintaan revisi per bagian:\n`;
     
     Object.entries(comments).forEach(([sectionId, comment]) => {
-      revisionPrompt += `- **${language === 'en' ? 'Section' : 'Bagian'} ${sectionId.substring(0, 30)}...**: ${comment}\n`;
+      let sectionHeading = sectionId;
+      const secIdx = parseInt(sectionId.split('_')[1], 10);
+      if (!isNaN(secIdx)) {
+        const chunks = activeVersion.content.split(/(?=^#{1,2}\s)/gm).filter(c => c.trim().length > 0);
+        if (chunks[secIdx]) {
+          sectionHeading = chunks[secIdx].split('\n')[0].replace(/^#+\s/, '').substring(0, 60).trim();
+        }
+      }
+      revisionPrompt += `- **${language === 'en' ? 'Section' : 'Bagian'} "${sectionHeading}"**: ${comment}\n`;
     });
     revisionPrompt += language === 'en'
       ? `\nPlease generate a completely revised standard 11-chapter PRD reflecting these changes. Keep unchanged sections intact.`
@@ -176,7 +184,10 @@ export default function App() {
             }}
             versions={versions}
             activeVersionId={activeVersionId}
-            onSwitchVersion={setActiveVersionId}
+            onSwitchVersion={(vid) => {
+              setActiveVersionId(vid);
+              setComments({});
+            }}
             onRevise={handleRevise}
             isGenerating={isGenerating}
             language={language}
