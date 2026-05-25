@@ -127,7 +127,7 @@ export default function App() {
   };
 
   return (
-    <div className="min-h-screen pt-24 pb-12 px-4 relative flex flex-col items-center">
+    <div className="min-h-screen pt-20 sm:pt-24 pb-12 px-2 sm:px-4 relative flex flex-col items-center">
       <Header 
         onOpenSettings={() => setIsSettingsOpen(true)} 
         onExportMd={handleExportMd}

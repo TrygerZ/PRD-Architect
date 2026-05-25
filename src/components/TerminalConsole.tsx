@@ -37,18 +37,18 @@ export function TerminalConsole({ onGenerate, isGenerating }: TerminalConsolePro
 
   return (
     <div className="w-full max-w-4xl mx-auto glass-panel p-1 rounded-sm no-print mb-8 relative z-10 before:absolute before:-inset-px before:-z-10 before:bg-gradient-to-r before:from-cyber-accent/50 before:to-transparent before:opacity-20 before:rounded-sm">
-      <div className="bg-cyber-bg p-4 flex flex-col gap-4">
-        <div className="flex items-center justify-between text-cyber-text-dim text-xs font-mono border-b border-cyber-border pb-2">
+      <div className="bg-cyber-bg p-3 sm:p-4 flex flex-col gap-3 sm:gap-4">
+        <div className="flex flex-col sm:flex-row sm:items-center justify-between text-cyber-text-dim text-[10px] sm:text-xs font-mono border-b border-cyber-border pb-2 gap-2">
           <div className="flex items-center gap-2">
-            <Terminal size={14} className="text-cyber-accent" />
+            <Terminal size={14} className="text-cyber-accent shrink-0" />
             <span>SYS.PROMPT_INPUT</span>
           </div>
-          <div className="flex items-center gap-4">
-            <div className="flex items-center gap-2 text-cyber-accent/70">
-               <Activity size={12} />
-               <span>DETECTED_MODULE: {detectedType.toUpperCase()}</span>
+          <div className="flex items-center gap-3 sm:gap-4 justify-between sm:justify-end w-full sm:w-auto">
+            <div className="flex items-center gap-1.5 sm:gap-2 text-cyber-accent/70 truncate">
+               <Activity size={12} className="shrink-0" />
+               <span className="truncate">MOD: {detectedType.toUpperCase()}</span>
             </div>
-            <span>CHAR_COUNT: {prompt.length}</span>
+            <span className="shrink-0">CHARS: {prompt.length}</span>
           </div>
         </div>
         
@@ -56,20 +56,20 @@ export function TerminalConsole({ onGenerate, isGenerating }: TerminalConsolePro
           <textarea
             value={prompt}
             onChange={(e) => setPrompt(e.target.value)}
-            placeholder="Jelaskan produk yang ingin kamu bangun... (Cth: Sebuah aplikasi E-Commerce untuk menjual biji kopi Nusantara dengan fitur subscription bulanan)"
-            className="w-full bg-transparent text-cyber-text placeholder:text-cyber-border outline-none resize-none min-h-[120px] font-sans text-sm focus:ring-0 p-2"
+            placeholder="Jelaskan produk yang ingin kamu bangun... (Cth: Sebuah aplikasi E-Commerce untuk menjual biji kopi...)"
+            className="w-full bg-transparent text-cyber-text placeholder:text-cyber-border outline-none resize-none min-h-[120px] font-sans text-sm focus:ring-0 p-1 sm:p-2 mb-12 sm:mb-0"
             disabled={isGenerating}
           />
-          <div className="absolute bottom-2 right-2">
+          <div className="absolute bottom-0 right-0 sm:bottom-2 sm:right-2">
             <button 
               type="submit" 
               disabled={!prompt.trim() || isGenerating}
-              className="cyber-button"
+              className="cyber-button text-xs sm:text-sm py-1.5 px-3 sm:py-2 sm:px-4"
             >
               {isGenerating ? (
-                <>PROCESSING <Loader2 size={16} className="animate-spin" /></>
+                <>PROCESSING <Loader2 size={14} className="animate-spin" /></>
               ) : (
-                <>INITIALIZE <Send size={16} /></>
+                <>INITIALIZE <Send size={14} /></>
               )}
             </button>
           </div>

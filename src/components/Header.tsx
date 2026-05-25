@@ -10,31 +10,31 @@ interface HeaderProps {
 
 export function Header({ onOpenSettings, onExportMd, onCopy, onPrint, hasData }: HeaderProps) {
   return (
-    <header className="fixed top-0 inset-x-0 h-16 glass-panel border-b-cyber-border z-50 flex items-center justify-between px-6 no-print">
-      <div className="flex items-center gap-3">
-        <div className="w-8 h-8 rounded bg-cyber-accent/20 border border-cyber-accent flex items-center justify-center">
-          <div className="w-4 h-4 bg-cyber-accent rounded-sm animate-pulse" />
+    <header className="fixed top-0 inset-x-0 h-16 glass-panel border-b-cyber-border z-50 flex items-center justify-between px-3 sm:px-6 no-print">
+      <div className="flex items-center gap-2 sm:gap-3 shrink-0">
+        <div className="w-6 h-6 sm:w-8 sm:h-8 rounded bg-cyber-accent/20 border border-cyber-accent flex items-center justify-center">
+          <div className="w-3 h-3 sm:w-4 sm:h-4 bg-cyber-accent rounded-sm animate-pulse" />
         </div>
-        <h1 className="text-xl font-mono tracking-widest text-cyber-text uppercase">
-          PRD <span className="text-cyber-accent">Architect</span>
+        <h1 className="text-sm sm:text-xl font-mono tracking-widest text-cyber-text uppercase whitespace-nowrap">
+          PRD <span className="hidden sm:inline text-cyber-accent">Architect</span>
         </h1>
       </div>
 
-      <div className="flex items-center gap-4">
+      <div className="flex items-center gap-2 sm:gap-4 ml-auto">
         {hasData && (
-          <div className="flex items-center gap-2 mr-4 border-r border-cyber-border pr-6">
-            <button onClick={onCopy} className="cyber-button text-xs py-1.5 px-3" title="Copy as Text">
-              <Copy size={14} /> Copy
+          <div className="flex items-center gap-1.5 sm:gap-2 mr-2 sm:mr-4 border-r border-cyber-border pr-2 sm:pr-6">
+            <button onClick={onCopy} className="cyber-button text-xs py-1.5 px-2 sm:px-3 flex items-center gap-1" title="Copy as Text">
+              <Copy size={14} /> <span className="hidden sm:inline">Copy</span>
             </button>
-            <button onClick={onExportMd} className="cyber-button text-xs py-1.5 px-3" title="Download Markdown">
-              <Download size={14} /> .MD
+            <button onClick={onExportMd} className="cyber-button text-xs py-1.5 px-2 sm:px-3 flex items-center gap-1" title="Download Markdown">
+              <Download size={14} /> <span className="hidden sm:inline">.MD</span>
             </button>
-            <button onClick={onPrint} className="cyber-button text-xs py-1.5 px-3" title="Print to PDF">
-              <Printer size={14} /> PDF
+            <button onClick={onPrint} className="cyber-button text-xs py-1.5 px-2 sm:px-3 flex items-center gap-1" title="Print to PDF">
+              <Printer size={14} /> <span className="hidden sm:inline">PDF</span>
             </button>
           </div>
         )}
-        <button onClick={onOpenSettings} className="p-2 text-cyber-text-dim hover:text-cyber-accent transition-colors" title="Settings">
+        <button onClick={onOpenSettings} className="p-1.5 sm:p-2 text-cyber-text-dim hover:text-cyber-accent transition-colors" title="Settings">
           <Settings size={20} />
         </button>
       </div>

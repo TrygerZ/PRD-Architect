@@ -140,13 +140,13 @@ function SheetSection({
       <div className="absolute top-0 right-0 w-32 h-32 bg-cyber-accent/5 blur-3xl -z-10 group-hover:bg-cyber-accent/10 transition-colors" />
       
       {/* Markdown Content Area */}
-      <div className="flex-grow min-w-0 p-6 lg:border-r border-cyber-border/40 prose prose-invert prose-cyber max-w-none 
+      <div className="flex-grow min-w-0 p-4 sm:p-6 lg:border-r border-cyber-border/40 prose prose-invert prose-cyber max-w-none 
           prose-headings:font-sans prose-headings:font-bold prose-headings:text-cyber-text
-          prose-h1:text-2xl prose-h1:border-b prose-h1:border-cyber-border prose-h1:pb-2 prose-h1:mb-4
-          prose-h2:text-xl prose-h2:border-b prose-h2:border-cyber-border prose-h2:pb-2 prose-h2:mb-4 prose-h2:mt-4
-          prose-h3:text-lg prose-h3:text-cyber-accent prose-h3:mt-6
-          prose-p:text-cyber-text-dim prose-p:text-sm prose-p:leading-relaxed
-          prose-li:text-cyber-text-dim prose-li:text-sm
+          prose-h1:text-xl sm:prose-h1:text-2xl prose-h1:border-b prose-h1:border-cyber-border prose-h1:pb-2 prose-h1:mb-4
+          prose-h2:text-lg sm:prose-h2:text-xl prose-h2:border-b prose-h2:border-cyber-border prose-h2:pb-2 prose-h2:mb-4 prose-h2:mt-4
+          prose-h3:text-base sm:prose-h3:text-lg prose-h3:text-cyber-accent prose-h3:mt-6
+          prose-p:text-cyber-text-dim prose-p:text-[13px] sm:prose-p:text-sm prose-p:leading-relaxed
+          prose-li:text-cyber-text-dim prose-li:text-[13px] sm:prose-li:text-sm
           prose-strong:text-cyber-text
           print:prose-p:text-black print:prose-li:text-black print:prose-headings:text-black print:prose-strong:text-black
         ">
