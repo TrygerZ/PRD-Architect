@@ -21,7 +21,7 @@ export default function App() {
 
   useEffect(() => {
     // Load API key from local storage on init
-    const stored = localStorage.getItem('PRD_GEMINI_API_KEY');
+    const stored = localStorage.getItem('PRD_CUSTOM_API_KEY');
     if (stored) {
       setCustomApiKey(stored);
     }
