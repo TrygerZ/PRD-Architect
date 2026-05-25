@@ -135,7 +135,69 @@ export default function App() {
   };
 
   const handlePrint = () => {
-    window.print();
+    const element = document.getElementById('prd-print-only');
+    if (element) {
+      const printWindow = window.open('', '_blank');
+      if (printWindow) {
+        const html = `
+          <html>
+            <head>
+              <title>${productType} - PRD</title>
+              <style>
+                body { 
+                  font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif; 
+                  line-height: 1.6; 
+                  color: #333;
+                  padding: 40px;
+                  max-width: 800px;
+                  margin: 0 auto;
+                }
+                h1, h2, h3, h4 { color: #111; margin-top: 24px; margin-bottom: 16px; }
+                p { margin-bottom: 16px; }
+                ul, ol { margin-bottom: 16px; padding-left: 24px; }
+                li { margin-bottom: 8px; }
+                table { width: 100%; border-collapse: collapse; margin-bottom: 24px; }
+                th, td { border: 1px solid #ddd; padding: 12px; text-align: left; }
+                th { background-color: #f9f9f9; font-weight: 600; }
+                code { 
+                  background-color: #f4f4f5; 
+                  padding: 2px 6px; 
+                  border-radius: 4px; 
+                  font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
+                  font-size: 0.9em;
+                }
+                blockquote {
+                  border-left: 4px solid #ddd;
+                  padding-left: 16px;
+                  color: #666;
+                  margin-left: 0;
+                  margin-right: 0;
+                }
+                @media print {
+                  body { padding: 0; }
+                  @page { margin: 2cm; }
+                }
+              </style>
+            </head>
+            <body>
+              ${element.innerHTML}
+            </body>
+          </html>
+        `;
+        printWindow.document.write(html);
+        printWindow.document.close();
+        printWindow.focus();
+        
+        // Wait for styles to apply before printing
+        setTimeout(() => {
+          printWindow.print();
+          // Optional: close after print, but some browsers block the thread so closing right away might cancel print
+          // printWindow.close(); 
+        }, 500);
+      } else {
+        alert(language === 'en' ? 'Pop-up blocked. Please allow pop-ups to print, or open this app in a new tab.' : 'Pop-up diblokir. Izinkan pop-up untuk mencetak, atau buka aplikasi ini di tab baru.');
+      }
+    }
   };
 
   return (

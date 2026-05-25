@@ -48,8 +48,7 @@ Ensure to include:
     - **${isEn ? 'Problem' : 'Masalah'}:** [${isEn ? 'Problem faced' : 'Masalah yang dihadapi'}]
     - **Pain Point:** [${isEn ? 'Main pain point' : 'Pain point utama'}]
     - **${isEn ? 'Habit' : 'Kebiasaan'}:** [${isEn ? 'Relevant habit' : 'Kebiasaan relevan'}]
-    
-    ${isEn ? `**(Provide a short User Story in the format: "As a [Role], I want to [Goal] so that [Benefit]")**` : `**(Berikan deskripsi singkat User Story dalam format: "Sebagai [Role], saya ingin [Tujuan] agar [Manfaat]")**`}
+    - **User Story:** [${isEn ? 'As a [Role], I want to [Goal] so that [Benefit]' : 'Sebagai [Role], saya ingin [Tujuan] agar [Manfaat]'}]
   - Use clean, well-structured Markdown tables ONLY for the following sections:
     - Chapter 6: Spesifikasi Teknis & Arsitektur - API Design (Columns: Endpoint, Method, Description, Request, Response). Wrap HTTP methods in inline code (e.g. \`GET\`, \`POST\`).
     - Chapter 8: Analisis Risiko & Mitigasi (Columns: ${isEn ? 'Risk, Impact, Likelihood, Mitigation Strategy' : 'Risiko, Dampak, Kemungkinan, Strategi Mitigasi'}). Wrap Impact and Likelihood levels in inline code (${isEn ? 'High, Medium' : 'Tinggi, Sedang'}).

@@ -42,6 +42,13 @@ export function BlueprintSheet({
   return (
     <div className="w-full max-w-5xl mx-auto relative z-10 print:block print:w-full print:max-w-full print:bg-white print:text-black mt-8">
       
+      {/* Hidden container for full PRD print export */}
+      <div id="prd-print-only" style={{ display: 'none' }}>
+        <ReactMarkdown remarkPlugins={[remarkGfm]}>
+          {content}
+        </ReactMarkdown>
+      </div>
+
       {/* Version Control & Revision Panel */}
       {versions.length > 0 && (
         <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center mb-6 gap-4 bg-cyber-surface/60 border border-cyber-border/40 p-4 rounded-xl no-print">
