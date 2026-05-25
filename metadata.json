@@ -1,0 +1,6 @@
+{
+  "name": "PRD Architect",
+  "description": "Prompt-Driven PRD Generator with Sleek Cyber-Utilitarian Dark theme",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}

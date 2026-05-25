@@ -1,0 +1,99 @@
+import { useState, useEffect } from 'react';
+import { Key, X, Check, AlertTriangle } from 'lucide-react';
+import { motion, AnimatePresence } from 'motion/react';
+
+interface ApiKeyModalProps {
+  isOpen: boolean;
+  onClose: () => void;
+  onSave: (key: string) => void;
+}
+
+export function ApiKeyModal({ isOpen, onClose, onSave }: ApiKeyModalProps) {
+  const [apiKey, setApiKey] = useState('');
+  const [saved, setSaved] = useState(false);
+
+  useEffect(() => {
+    if (isOpen) {
+      const stored = localStorage.getItem('PRD_CUSTOM_API_KEY');
+      if (stored) setApiKey(stored);
+      setSaved(false);
+    }
+  }, [isOpen]);
+
+  const handleSave = () => {
+    localStorage.setItem('PRD_CUSTOM_API_KEY', apiKey.trim());
+    onSave(apiKey.trim());
+    setSaved(true);
+    setTimeout(() => {
+      onClose();
+    }, 1000);
+  };
+
+  const handleClear = () => {
+    localStorage.removeItem('PRD_CUSTOM_API_KEY');
+    setApiKey('');
+    onSave('');
+  };
+
+  return (
+    <AnimatePresence>
+      {isOpen && (
+        <div className="fixed inset-0 z-[100] flex items-center justify-center bg-black/60 backdrop-blur-sm p-4 print:hidden">
+          <motion.div 
+            initial={{ opacity: 0, scale: 0.95 }}
+            animate={{ opacity: 1, scale: 1 }}
+            exit={{ opacity: 0, scale: 0.95 }}
+            className="w-full max-w-md glass-panel p-6 border border-cyber-accent/30 shadow-2xl shadow-cyber-accent/20 relative"
+          >
+            <button 
+              onClick={onClose}
+              className="absolute top-4 right-4 text-cyber-text-dim hover:text-cyber-accent"
+            >
+              <X size={20} />
+            </button>
+            
+            <div className="flex items-center gap-3 mb-6 border-b border-cyber-border pb-4">
+              <Key className="text-cyber-accent" size={24} />
+              <h2 className="text-lg font-mono text-cyber-text tracking-wide">SECURE_CREDENTIALS</h2>
+            </div>
+            
+            <div className="mb-6">
+              <label className="block text-xs font-mono text-cyber-text-dim mb-2 uppercase">Custom Provider API Key</label>
+              <input 
+                type="password"
+                value={apiKey}
+                onChange={(e) => setApiKey(e.target.value)}
+                autoComplete="off"
+                placeholder="sk-..."
+                className="w-full bg-cyber-bg border border-cyber-border p-3 text-cyber-text font-mono text-sm focus:border-cyber-accent focus:outline-none transition-colors"
+              />
+              <p className="mt-2 text-[10px] text-cyber-text-dim flex items-start gap-1">
+                <AlertTriangle size={12} className="shrink-0 mt-0.5 text-amber-500" />
+                <span>
+                  Provide the API Key for the model you configured in ai-config.ts. Overrides environment variables.
+                </span>
+              </p>
+            </div>
+            
+            <div className="flex justify-between items-center mt-8">
+              <button 
+                onClick={handleClear}
+                className="text-xs font-mono text-cyber-text-dim hover:text-red-400 transition-colors"
+              >
+                [ CLEAR ]
+              </button>
+              
+              <button 
+                onClick={handleSave}
+                disabled={saved}
+                className="cyber-button"
+              >
+                {saved ? <><Check size={16} /> SAVED</> : 'UPDATE_KEY'}
+              </button>
+            </div>
+          </motion.div>
+        </div>
+      )}
+    </AnimatePresence>
+  );
+}

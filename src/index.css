@@ -1,0 +1,60 @@
+@import "tailwindcss";
+@plugin "@tailwindcss/typography";
+
+@theme {
+  --color-cyber-bg: #0a0e17;
+  --color-cyber-surface: #111827;
+  --color-cyber-border: #1f2937;
+  --color-cyber-accent: #00f0ff;
+  --color-cyber-accent-dim: rgba(0, 240, 255, 0.2);
+  --color-cyber-text: #e2e8f0;
+  --color-cyber-text-dim: #94a3b8;
+  
+  --font-mono: 'JetBrains Mono', 'Fira Code', ui-monospace, monospace;
+  --font-sans: 'Inter', ui-sans-serif, sans-serif;
+}
+
+@layer base {
+  body {
+    @apply bg-[var(--color-cyber-bg)] text-[var(--color-cyber-text)] font-sans antialiased overflow-x-hidden;
+  }
+}
+
+.glass-panel {
+  @apply bg-cyber-surface/80 backdrop-blur-md border border-cyber-border shadow-lg shadow-black/50;
+}
+
+.cyber-button {
+  @apply px-4 py-2 bg-transparent border border-cyber-accent text-cyber-accent flex items-center justify-center gap-2 hover:bg-cyber-accent hover:text-black transition-all duration-300 font-mono text-sm uppercase tracking-wider disabled:opacity-50 disabled:cursor-not-allowed disabled:hover:bg-transparent disabled:hover:text-cyber-accent;
+}
+
+/* Custom Scrollbar */
+::-webkit-scrollbar {
+  width: 8px;
+  height: 8px;
+}
+::-webkit-scrollbar-track {
+  @apply bg-cyber-bg;
+}
+::-webkit-scrollbar-thumb {
+  @apply bg-cyber-border rounded-full;
+}
+::-webkit-scrollbar-thumb:hover {
+  @apply bg-cyber-text-dim;
+}
+
+/* Print Styles for PDF Export */
+@media print {
+  body {
+    @apply bg-white text-black;
+  }
+  .no-print {
+    display: none !important;
+  }
+  .print-page-break {
+    page-break-after: always;
+  }
+  .glass-panel {
+    @apply bg-transparent border-0 shadow-none;
+  }
+}
