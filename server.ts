@@ -106,38 +106,49 @@ async function extractTextFromFile(filePath: string, mimeType: string, originalN
   return text.substring(0, MAX_CHARS);
 }
 
-app.post("/api/upload-files", upload.array('files', 5), async (req, res) => {
-  try {
-    const files = req.files as Express.Multer.File[];
-    if (!files || files.length === 0) {
-      return res.status(400).json({ error: "No files uploaded" });
+app.post("/api/upload-files", (req, res) => {
+  upload.array('files', 5)(req, res, async (err: any) => {
+    if (err instanceof multer.MulterError) {
+      if (err.code === 'LIMIT_FILE_SIZE') {
+        return res.status(400).json({ error: "One or more files exceed the 10MB limit." });
+      }
+      return res.status(400).json({ error: err.message });
+    } else if (err) {
+      return res.status(400).json({ error: err.message });
     }
 
-    const uploadedResults = [];
+    try {
+      const files = req.files as Express.Multer.File[];
+      if (!files || files.length === 0) {
+        return res.status(400).json({ error: "No files uploaded" });
+      }
 
-    for (const file of files) {
-      const content = await extractTextFromFile(file.path, file.mimetype, file.originalname);
-      
-      uploadedResults.push({
-        id: crypto.randomUUID(),
-        name: file.originalname,
-        size: file.size,
-        type: file.mimetype,
-        content: content,
-        charCount: content.length
-      });
+      const uploadedResults = [];
 
-      // Cleanup temp file
-      fs.unlink(file.path, (err) => {
-        if (err) console.error(`Failed to delete temp file ${file.path}:`, err);
-      });
+      for (const file of files) {
+        const content = await extractTextFromFile(file.path, file.mimetype, file.originalname);
+        
+        uploadedResults.push({
+          id: crypto.randomUUID(),
+          name: file.originalname,
+          size: file.size,
+          type: file.mimetype,
+          content: content,
+          charCount: content.length
+        });
+
+        // Cleanup temp file
+        fs.unlink(file.path, (unlinkErr) => {
+          if (unlinkErr) console.error(`Failed to delete temp file ${file.path}:`, unlinkErr);
+        });
+      }
+
+      res.json(uploadedResults);
+    } catch (error: any) {
+      console.error("Upload error:", error);
+      res.status(500).json({ error: error.message || "Failed to process files" });
     }
-
-    res.json(uploadedResults);
-  } catch (error: any) {
-    console.error("Upload error:", error);
-    res.status(500).json({ error: error.message || "Failed to process files" });
-  }
+  });
 });
 
 function getIndustrySpecificPrompt(productType: string): string {
