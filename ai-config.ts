@@ -20,7 +20,7 @@ export const AI_CONFIG = {
   MAX_OUTPUT_TOKENS: 16000,
   
   // Temperature (response creativity)
-  TEMPERATURE: 0.7,
+  TEMPERATURE: 0.5,
   
   // Additional specific instructions for the system prompt
   SYSTEM_PROMPT_ADDITIONS: ""

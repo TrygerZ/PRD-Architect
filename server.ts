@@ -236,7 +236,8 @@ Use EXACTLY this structure for EVERY user story (use list format, NO TABLES):
 - **Edge Cases:**
   - [${isEn ? 'error/boundary scenario 1' : 'skenario error 1'}]
   - [${isEn ? 'error/boundary scenario 2' : 'skenario error 2'}]
-Provide minimum 3 different personas, each with at least 2 user stories.
+CRITICAL: You MUST provide EXACTLY 3 different personas. For EACH persona, you MUST write EXACTLY 2 distinct user stories. This means you will generate a TOTAL of 6 user stories.
+IMPORTANT: You MUST add a horizontal separator (\`---\`) after each User Story block so that it is visually separated from the next one.
 
 **Chapter 5: UX Design & Flow**
 MUST include:
@@ -274,12 +275,7 @@ MVP phase, 12-week sprint plan, and milestones.
 **Chapter 12: AI Agent Implementation Guidelines**
 VERY IMPORTANT. Instructions specifically for the AI Coder:
 A. STRICT TECH STACK:
-- Frontend: React 19, Next.js 14, TypeScript, Tailwind CSS v4, Shadcn/ui, Lucide React, React Hook Form, Zod
-- Backend: Node.js, Express, TypeScript, Prisma ORM
-- Database: PostgreSQL
-- Auth: NextAuth.js or JWT
-- Storage: AWS S3 or Cloudinary
-- Deployment: Vercel (frontend), Railway/Render (backend)
+Analyze the user's request. If the user explicitly provided a tech stack, YOU MUST USE THAT EXACT TECH STACK. If the user did NOT specify a tech stack, YOU MUST dynamically recommend the BEST and most modern tech stack suitable for this specific product (e.g., Next.js/React for web, React Native/Flutter for mobile, Python/FastAPI for AI backends). List your recommended stack clearly categorized into: Frontend, Backend, Database, Auth, Storage, and Deployment.
 B. EXPECTED DIRECTORY STRUCTURE:
 (e.g., /src/app, /src/components, /src/lib, /src/services, /src/types, /src/hooks, /src/store)
 C. CORE DATA TYPES (TypeScript interfaces):
@@ -298,7 +294,15 @@ Explicitly state that the AI should NOT write all code in a single prompt, but e
 - Use Tables ONLY for: API Design, Risk Register, Budget, and Success Metrics.
 - User Stories must use the list format specified.
 - Keep table rows concise. You MUST write the table separator with exactly 3 dashes per column like this: \`|---|---|---|---|\`. NEVER use more than 3 dashes in the table separator.
-- BE CONCISE. Avoid repeating words unnecessarily.${extraPrompt ? '\n\n' + extraPrompt : ''}${getIndustrySpecificPrompt(productType)}
+- BE CONCISE. Avoid repeating words unnecessarily.
+
+**CONSISTENCY RULES (CRITICAL):**
+- DO NOT include any conversational filler, preamble, or introductory text (e.g., "Tentu, saya akan...", "Here is the PRD..."). START IMMEDIATELY with the Markdown heading of the first chapter.
+- Use the EXACT SAME writing style, tone, and format every time you generate a PRD.
+- Your writing style must be: Professional, concise, data-driven, and technical.
+- Always use consistent phrasing for similar concepts across all chapters.
+- Maintain consistent table formatting, heading styles, and list structures across all generations.
+- Never change the narrative voice or formatting approach between different generation sessions.${extraPrompt ? '\n\n' + extraPrompt : ''}${getIndustrySpecificPrompt(productType)}
 `;
 }
 
@@ -356,7 +360,8 @@ app.post("/api/generate-prd", async (req, res) => {
         ],
         stream: true,
         max_tokens: AI_CONFIG.MAX_OUTPUT_TOKENS,
-        temperature: AI_CONFIG.TEMPERATURE
+        temperature: AI_CONFIG.TEMPERATURE,
+        seed: 42
       })
     });
 
