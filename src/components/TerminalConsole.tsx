@@ -1,32 +1,91 @@
-import { useState, FormEvent, useEffect } from 'react';
-import { Terminal, Send, Activity, Loader2 } from 'lucide-react';
-import { ProductType } from '../types';
+import { useState, FormEvent, useEffect } from "react";
+import { Terminal, Send, Activity, Loader2, Paperclip } from "lucide-react";
+import { ProductType, UploadedFile } from "../types";
+import { FileUploader } from "./FileUploader";
 
 interface TerminalConsoleProps {
   onGenerate: (prompt: string, type: ProductType) => void;
   isGenerating: boolean;
-  language: 'id' | 'en';
+  language: "id" | "en";
+  files: UploadedFile[];
+  onFilesChange: (files: UploadedFile[]) => void;
 }
 
-export function TerminalConsole({ onGenerate, isGenerating, language }: TerminalConsoleProps) {
-  const [prompt, setPrompt] = useState('');
-  const [detectedType, setDetectedType] = useState<ProductType>('Unknown');
+export function TerminalConsole({
+  onGenerate,
+  isGenerating,
+  language,
+  files,
+  onFilesChange,
+}: TerminalConsoleProps) {
+  const [prompt, setPrompt] = useState("");
+  const [detectedType, setDetectedType] = useState<ProductType>("Unknown");
+  const [showUploader, setShowUploader] = useState(false);
 
   // Simple heuristic for product type detection
   useEffect(() => {
     const text = prompt.toLowerCase();
-    if (text.includes('m-commerce') || text.includes('e-commerce') || text.includes('toko') || text.includes('shop') || text.includes('beli') || text.includes('jual') || text.includes('marketplace') || text.includes('commerce') || text.includes('store') || text.includes('kasir') || text.includes('pos')) {
-      setDetectedType('e-commerce');
-    } else if (text.includes('saas') || text.includes('subscription') || text.includes('langganan') || text.includes('dashboard') || text.includes('platform') || text.includes('b2b') || text.includes('layanan') || text.includes('service')) {
-      setDetectedType('SaaS');
-    } else if (text.includes('iot') || text.includes('sensor') || text.includes('device') || text.includes('hardware') || text.includes('alat') || text.includes('mesin') || text.includes('perangkat berat') || text.includes('mikrokontroler') || text.includes('arduino') || text.includes('raspberry pt')) {
-      setDetectedType('IoT');
-    } else if (text.includes('mobile') || text.includes('app') || text.includes('android') || text.includes('ios') || text.includes('aplikasi hw') || text.includes('smartphone') || text.includes('hp')) {
-      setDetectedType('Mobile App');
-    } else if (text.includes('internal') || text.includes('admin') || text.includes('cms') || text.includes('manajemen') || text.includes('erp') || text.includes('sistem informasi') || text.includes('portal') || text.includes('karyawan')) {
-      setDetectedType('Internal Tool');
+    if (
+      text.includes("m-commerce") ||
+      text.includes("e-commerce") ||
+      text.includes("toko") ||
+      text.includes("shop") ||
+      text.includes("beli") ||
+      text.includes("jual") ||
+      text.includes("marketplace") ||
+      text.includes("commerce") ||
+      text.includes("store") ||
+      text.includes("kasir") ||
+      text.includes("pos")
+    ) {
+      setDetectedType("e-commerce");
+    } else if (
+      text.includes("saas") ||
+      text.includes("subscription") ||
+      text.includes("langganan") ||
+      text.includes("dashboard") ||
+      text.includes("platform") ||
+      text.includes("b2b") ||
+      text.includes("layanan") ||
+      text.includes("service")
+    ) {
+      setDetectedType("SaaS");
+    } else if (
+      text.includes("iot") ||
+      text.includes("sensor") ||
+      text.includes("device") ||
+      text.includes("hardware") ||
+      text.includes("alat") ||
+      text.includes("mesin") ||
+      text.includes("perangkat berat") ||
+      text.includes("mikrokontroler") ||
+      text.includes("arduino") ||
+      text.includes("raspberry pt")
+    ) {
+      setDetectedType("IoT");
+    } else if (
+      text.includes("mobile") ||
+      text.includes("app") ||
+      text.includes("android") ||
+      text.includes("ios") ||
+      text.includes("aplikasi hw") ||
+      text.includes("smartphone") ||
+      text.includes("hp")
+    ) {
+      setDetectedType("Mobile App");
+    } else if (
+      text.includes("internal") ||
+      text.includes("admin") ||
+      text.includes("cms") ||
+      text.includes("manajemen") ||
+      text.includes("erp") ||
+      text.includes("sistem informasi") ||
+      text.includes("portal") ||
+      text.includes("karyawan")
+    ) {
+      setDetectedType("Internal Tool");
     } else {
-      setDetectedType('Unknown');
+      setDetectedType("Unknown");
     }
   }, [prompt]);
 
@@ -46,31 +105,66 @@ export function TerminalConsole({ onGenerate, isGenerating, language }: Terminal
           </div>
           <div className="flex items-center gap-3 sm:gap-4 justify-between sm:justify-end w-full sm:w-auto">
             <div className="flex items-center gap-1.5 sm:gap-2 text-cyber-accent/70 truncate">
-               <Activity size={12} className="shrink-0" />
-               <span className="truncate">MOD: {detectedType.toUpperCase()}</span>
+              <Activity size={12} className="shrink-0" />
+              <span className="truncate">
+                MOD: {detectedType.toUpperCase()}
+              </span>
             </div>
             <span className="shrink-0">CHARS: {prompt.length}</span>
           </div>
         </div>
-        
+
+        {showUploader && (
+          <div className="border-t border-cyber-border pt-4 mt-2">
+            <FileUploader
+              files={files}
+              onFilesChange={onFilesChange}
+              language={language}
+            />
+          </div>
+        )}
+
         <form onSubmit={handleSubmit} className="relative">
           <textarea
             value={prompt}
             onChange={(e) => setPrompt(e.target.value)}
-            placeholder={language === 'en' ? "Describe the product you want to build... (e.g., An E-Commerce app for local coffee beans...)" : "Jelaskan produk yang ingin kamu bangun... (Cth: Sebuah aplikasi E-Commerce untuk menjual biji kopi...)"}
+            placeholder={
+              language === "en"
+                ? "Describe the product you want to build... (e.g., An E-Commerce app for local coffee beans...)"
+                : "Jelaskan produk yang ingin kamu bangun... (Cth: Sebuah aplikasi E-Commerce untuk menjual biji kopi...)"
+            }
             className="w-full bg-transparent text-cyber-text placeholder:text-cyber-border outline-none resize-none min-h-[120px] font-sans text-sm focus:ring-0 p-1 sm:p-2 mb-12 sm:mb-0"
             disabled={isGenerating}
           />
+          <div className="absolute bottom-0 left-0 sm:bottom-2 sm:left-2">
+            <button
+              type="button"
+              onClick={() => setShowUploader(!showUploader)}
+              className={`flex items-center gap-1.5 text-xs font-mono px-3 py-1.5 rounded-sm transition-colors border ${showUploader || files.length > 0 ? "bg-cyber-accent/10 border-cyber-accent text-cyber-accent" : "bg-black/20 border-cyber-border/60 text-cyber-text-dim hover:text-cyber-text hover:border-cyber-border"}`}
+            >
+              <Paperclip size={14} />
+              <span>{language === "en" ? "Attach" : "Lampirkan"}</span>
+              {files.length > 0 && (
+                <span className="ml-1 bg-cyber-accent text-black px-1.5 py-0.5 rounded-full text-[10px] font-bold">
+                  {files.length}
+                </span>
+              )}
+            </button>
+          </div>
           <div className="absolute bottom-0 right-0 sm:bottom-2 sm:right-2">
-            <button 
-              type="submit" 
+            <button
+              type="submit"
               disabled={!prompt.trim() || isGenerating}
               className="cyber-button text-xs sm:text-sm py-1.5 px-3 sm:py-2 sm:px-4"
             >
               {isGenerating ? (
-                <>PROCESSING <Loader2 size={14} className="animate-spin" /></>
+                <>
+                  PROCESSING <Loader2 size={14} className="animate-spin" />
+                </>
               ) : (
-                <>INITIALIZE <Send size={14} /></>
+                <>
+                  INITIALIZE <Send size={14} />
+                </>
               )}
             </button>
           </div>

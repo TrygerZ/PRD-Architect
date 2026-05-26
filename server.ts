@@ -1,15 +1,144 @@
 import express from "express";
 import path from "path";
+import fs from "fs";
+import os from "os";
 import { createServer as createViteServer } from "vite";
 import dotenv from "dotenv";
 import { AI_CONFIG } from "./ai-config";
+
+import multer from "multer";
+import { createRequire } from "module";
+const require = createRequire(import.meta.url);
+const pdfParse = require("pdf-parse");
+
+import mammoth from "mammoth";
+import * as xlsx from "xlsx";
+import crypto from "crypto";
 
 dotenv.config();
 
 const app = express();
 const PORT = 3000;
 
-app.use(express.json());
+app.use(express.json({ limit: '50mb' }));
+app.use(express.urlencoded({ extended: true, limit: '50mb' }));
+
+const uploadDir = path.join(os.tmpdir(), "uploads");
+if (!fs.existsSync(uploadDir)) {
+  fs.mkdirSync(uploadDir, { recursive: true });
+}
+
+const storage = multer.diskStorage({
+  destination: function (req, file, cb) {
+    cb(null, uploadDir);
+  },
+  filename: function (req, file, cb) {
+    const uniqueSuffix = Date.now() + '-' + Math.round(Math.random() * 1E9);
+    cb(null, uniqueSuffix + path.extname(file.originalname));
+  }
+});
+
+const fileFilter = (req: any, file: Express.Multer.File, cb: multer.FileFilterCallback) => {
+  const allowedMimeTypes = [
+    'application/pdf',
+    'text/markdown',
+    'text/plain',
+    'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
+    'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+    'application/vnd.ms-excel',
+    'text/csv',
+    'image/jpeg',
+    'image/png',
+    'image/gif',
+    'image/webp'
+  ];
+  
+  if (allowedMimeTypes.includes(file.mimetype) || file.originalname.endsWith('.md') || file.originalname.endsWith('.csv')) {
+    cb(null, true);
+  } else {
+    cb(new Error(`Unsupported file type: ${file.mimetype}`));
+  }
+};
+
+const upload = multer({ 
+  storage: storage,
+  limits: { fileSize: 10 * 1024 * 1024 }, // 10MB
+  fileFilter: fileFilter
+});
+
+async function extractTextFromFile(filePath: string, mimeType: string, originalName: string): Promise<string> {
+  const MAX_CHARS = 50000;
+  let text = "";
+
+  try {
+    if (mimeType === 'application/pdf') {
+      const dataBuffer = fs.readFileSync(filePath);
+      const data = await pdfParse(dataBuffer);
+      text = data.text;
+    } else if (mimeType === 'application/vnd.openxmlformats-officedocument.wordprocessingml.document') {
+      const result = await mammoth.extractRawText({ path: filePath });
+      text = result.value;
+    } else if (
+      mimeType === 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' || 
+      mimeType === 'application/vnd.ms-excel' ||
+      mimeType === 'text/csv' ||
+      originalName.endsWith('.csv') ||
+      originalName.endsWith('.xlsx')
+    ) {
+      const workbook = xlsx.readFile(filePath);
+      const sheetNames = workbook.SheetNames;
+      sheetNames.forEach(sheetName => {
+        const worksheet = workbook.Sheets[sheetName];
+        text += `\n--- Sheet: ${sheetName} ---\n`;
+        text += xlsx.utils.sheet_to_csv(worksheet);
+      });
+    } else if (mimeType.startsWith('image/')) {
+      text = `[IMAGE: ${originalName}]`;
+    } else {
+      // Handle text/plain, text/markdown
+      text = fs.readFileSync(filePath, 'utf-8');
+    }
+  } catch (error) {
+    console.error(`Error extracting text from ${originalName}:`, error);
+    text = `[Error extracting text from ${originalName}]`;
+  }
+
+  return text.substring(0, MAX_CHARS);
+}
+
+app.post("/api/upload-files", upload.array('files', 5), async (req, res) => {
+  try {
+    const files = req.files as Express.Multer.File[];
+    if (!files || files.length === 0) {
+      return res.status(400).json({ error: "No files uploaded" });
+    }
+
+    const uploadedResults = [];
+
+    for (const file of files) {
+      const content = await extractTextFromFile(file.path, file.mimetype, file.originalname);
+      
+      uploadedResults.push({
+        id: crypto.randomUUID(),
+        name: file.originalname,
+        size: file.size,
+        type: file.mimetype,
+        content: content,
+        charCount: content.length
+      });
+
+      // Cleanup temp file
+      fs.unlink(file.path, (err) => {
+        if (err) console.error(`Failed to delete temp file ${file.path}:`, err);
+      });
+    }
+
+    res.json(uploadedResults);
+  } catch (error: any) {
+    console.error("Upload error:", error);
+    res.status(500).json({ error: error.message || "Failed to process files" });
+  }
+});
 
 function getIndustrySpecificPrompt(productType: string): string {
   if (!productType) return "";
@@ -168,12 +297,26 @@ app.post("/api/generate-prd", async (req, res) => {
   res.setHeader("Connection", "keep-alive");
 
   try {
-    const { prompt, customApiKey, language = 'id' } = req.body;
+    const { prompt, customApiKey, language = 'id', uploadedFiles } = req.body;
     
     if (!prompt) {
       res.write(`data: ${JSON.stringify({ error: language === 'en' ? "Prompt is required" : "Prompt diperlukan" })}\n\n`);
       return res.end();
     }
+
+    let fileContext = '';
+    if (Array.isArray(uploadedFiles) && uploadedFiles.length > 0) {
+      fileContext += `\n\n### REFERENSI FILE PENDUKUNG ###\n`;
+      fileContext += `Gunakan referensi dari file-file berikut untuk memperkaya konteks dan akurasi dokumen yang akan di-generate:\n\n`;
+      uploadedFiles.forEach(file => {
+        const truncatedContent = file.content.length > 8000 ? file.content.substring(0, 8000) + "... [TRUNCATED]" : file.content;
+        fileContext += `--- FILE START: ${file.name} (Type: ${file.type}) ---\n`;
+        fileContext += `${truncatedContent}\n`;
+        fileContext += `--- FILE END: ${file.name} ---\n\n`;
+      });
+    }
+
+    const finalUserPrompt = prompt + fileContext;
 
     const apiKeyEnvName = AI_CONFIG.API_KEY_ENV_NAME;
     const customKey = customApiKey || process.env[apiKeyEnvName] || Object.entries(process.env).find(([k]) => k.toUpperCase().includes(apiKeyEnvName.split('_')[0]))?.[1];
@@ -198,7 +341,7 @@ app.post("/api/generate-prd", async (req, res) => {
         model: modelName,
         messages: [
           { role: "system", content: finalPrompt },
-          { role: "user", content: prompt }
+          { role: "user", content: finalUserPrompt }
         ],
         stream: true,
         max_tokens: AI_CONFIG.MAX_OUTPUT_TOKENS,

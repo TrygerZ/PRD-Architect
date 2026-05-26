@@ -1,39 +1,48 @@
+import { UploadedFile } from "../types";
+
 export const generatePRD = async (
-  prompt: string, 
-  customApiKey: string | undefined, 
-  language: 'id' | 'en',
+  prompt: string,
+  customApiKey: string | undefined,
+  language: "id" | "en",
   productType: string,
-  onChunk: (chunk: string) => void
+  uploadedFiles: UploadedFile[],
+  onChunk: (chunk: string) => void,
 ) => {
-  const response = await fetch('/api/generate-prd', {
-    method: 'POST',
+  const response = await fetch("/api/generate-prd", {
+    method: "POST",
     headers: {
-      'Content-Type': 'application/json',
+      "Content-Type": "application/json",
     },
-    body: JSON.stringify({ prompt, customApiKey, language, productType }),
+    body: JSON.stringify({
+      prompt,
+      customApiKey,
+      language,
+      productType,
+      uploadedFiles,
+    }),
   });
 
   if (!response.ok) {
-    throw new Error('Failed to generate PRD');
+    throw new Error("Failed to generate PRD");
   }
 
   const reader = response.body?.getReader();
-  const decoder = new TextDecoder('utf-8');
+  const decoder = new TextDecoder("utf-8");
   let done = false;
-  
+
   if (!reader) {
-     throw new Error('ReadableStream not supported.');
+    throw new Error("ReadableStream not supported.");
   }
 
-  let buffer = '';
-  let batchedChunk = '';
+  let buffer = "";
+  let batchedChunk = "";
   let lastFlush = Date.now();
   let flushTimeout: any = null;
 
   const flush = () => {
     if (batchedChunk) {
       onChunk(batchedChunk);
-      batchedChunk = '';
+      batchedChunk = "";
     }
     if (flushTimeout) clearTimeout(flushTimeout);
   };
@@ -46,30 +55,30 @@ export const generatePRD = async (
       buffer += decoder.decode(value, { stream: true });
       let newlineIdx;
 
-      while ((newlineIdx = buffer.indexOf('\n')) !== -1) {
+      while ((newlineIdx = buffer.indexOf("\n")) !== -1) {
         const line = buffer.slice(0, newlineIdx);
         buffer = buffer.slice(newlineIdx + 1);
 
-        if (line.startsWith('data: ')) {
+        if (line.startsWith("data: ")) {
           const dataStr = line.substring(6);
-          if (dataStr === '[DONE]') {
+          if (dataStr === "[DONE]") {
             done = true;
             flush();
             break;
           }
-          
+
           let data;
           try {
             data = JSON.parse(dataStr);
           } catch (e: any) {
-            console.error('Error parsing JSON from SSE', e, dataStr);
+            console.error("Error parsing JSON from SSE", e, dataStr);
             continue;
           }
 
           if (data.error) {
             throw new Error(data.error);
           }
-          
+
           if (data.text) {
             batchedChunk += data.text;
             // Throttle flush to avoid blocking UI thread with continuous heavy markdown parsing
@@ -88,6 +97,6 @@ export const generatePRD = async (
       }
     }
   }
-  
+
   flush();
 };
