@@ -31,10 +31,11 @@ The generated document strictly adheres to a 12-chapter industry-standard struct
 
 ## ✨ Features
 
-- 🧠 **Bring Your Own Model (BYOM)**: Seamlessly switch between AI providers (Gemini, DeepSeek, OpenAI, Groq, or local models via Ollama) by adjusting a single configuration file.
+- 🧠 **Bring Your Own Model (BYOM)**: Seamlessly switch between AI providers (DeepSeek, Claude, Gemini, OpenAI) and select specific models via the in-app Settings UI.
 - 📐 **Enterprise Structure**: Enforces a strict 12-chapter format (including dedicated AI Agent Implementation Guidelines), generating consistent and high-quality PRDs out of the box.
 - ⚡ **Real-time Streaming Output**: Watch your document take shape in real-time with responsive Markdown rendering.
 - 💬 **Interactive Revisions**: Leave feedback on the generated document to incrementally refine and polish the PRD, complete with a version control system to switch between generation attempts.
+- 📄 **File Context Support**: Upload reference files (PDF, DOCX, text) to provide additional context and enrich the generated document.
 - 🌏 **Bilingual Support**: Full generation and system prompts supported in both English and Indonesian.
 - 🎨 **Cyberpunk Minimalist UI**: A sleek, dark-themed interface built for focus, speed, and aesthetics (now featuring sleek loading skeletons).
 - 📤 **Export Ready**: Instantly copy to clipboard, download as Markdown (`.md`), or print directly to PDF.
@@ -70,43 +71,24 @@ The generated document strictly adheres to a 12-chapter industry-standard struct
 
 ### ⚙️ Configuration
 
-You can fully customize the AI provider in the `ai-config.ts` file located in the root directory. By default, it accesses Google's `gemini-2.5-flash` model, but you can configure it for **any OpenAI-compatible API** (DeepSeek, Groq, Ollama, OpenAI).
-
-```typescript
-export const AI_CONFIG = {
-  // Example for Gemini (Default)
-  ENDPOINT_URL:
-    "https://generativelanguage.googleapis.com/v1beta/openai/chat/completions",
-  MODEL_NAME: "gemini-2.5-flash",
-  API_KEY_ENV_NAME: "GEMINI_API_KEY",
-
-  // Example for DeepSeek
-  // ENDPOINT_URL: "https://api.deepseek.com/chat/completions",
-  // MODEL_NAME: "deepseek-chat",
-  // API_KEY_ENV_NAME: "DEEPSEEK_API_KEY",
-
-  // Example for OpenAI
-  // ENDPOINT_URL: "https://api.openai.com/v1/chat/completions",
-  // MODEL_NAME: "gpt-4o",
-  // API_KEY_ENV_NAME: "OPENAI_API_KEY",
-
-  // ... other configs
-};
-```
+You can fully customize the AI provider and model directly from the application's **Settings (gear icon)** within the UI. You can choose from **DeepSeek, Claude, Gemini, and GPT** and specify exact models (e.g., `deepseek-chat`, `claude-3-7-sonnet-20250219`, `gpt-4o`, `gemini-2.5-flash`).
 
 #### API Key Setup
 
-Provide your API key through one of two methods:
+Provide your API keys through one of two methods:
 
 **Method A: Environment Variables (.env)** _(Recommended for local dev)_
-Create a `.env` file in the root of the project:
+Create a `.env` file in the root of the project to set default values for the backend proxy:
 
 ```env
-GEMINI_API_KEY=your_api_key_here
+DEEPSEEK_API_KEY=your_deepseek_key
+ANTHROPIC_API_KEY=your_claude_key
+GEMINI_API_KEY=your_gemini_key
+OPENAI_API_KEY=your_openai_key
 ```
 
 **Method B: In-App UI**
-Click the **Settings (gear icon)** inside the app to paste your API Key. This overrides environment variables and stores the key securely in your browser's local storage.
+Click the **Settings (gear icon)** inside the app to paste your Custom API Key. This overrides environment variables and stores the key securely in your browser's local storage to be passed with your requests.
 
 ### 🏃‍♂️ Running the App
 
