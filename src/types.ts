@@ -1,3 +1,5 @@
+export type AIProvider = "claude" | "gemini" | "deepseek" | "gpt";
+
 export interface PRDSection {
   title: string;
   content: string;

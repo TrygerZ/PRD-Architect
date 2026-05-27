@@ -2,11 +2,15 @@ import { useState, useEffect } from "react";
 import { Key, X, Check, AlertTriangle } from "lucide-react";
 import { motion, AnimatePresence } from "motion/react";
 
+import { AIProvider } from "../types";
+
 interface ApiKeyModalProps {
   isOpen: boolean;
   onClose: () => void;
-  onSave: (key: string) => void;
+  onSave: (key: string, provider: AIProvider, model: string) => void;
   language: "id" | "en";
+  initialProvider?: AIProvider;
+  initialModel?: string;
 }
 
 export function ApiKeyModal({
@@ -14,21 +18,46 @@ export function ApiKeyModal({
   onClose,
   onSave,
   language,
+  initialProvider = "deepseek",
+  initialModel = "deepseek-chat",
 }: ApiKeyModalProps) {
   const [apiKey, setApiKey] = useState("");
+  const [provider, setProvider] = useState<AIProvider>(initialProvider);
+  const [model, setModel] = useState<string>(initialModel);
   const [saved, setSaved] = useState(false);
+
+  const MODELS: Record<AIProvider, string[]> = {
+    deepseek: ["deepseek-chat", "deepseek-reasoner", "deepseek-v4-pro", "deepseek-v4-flash"],
+    claude: ["claude-3-7-sonnet-20250219", "claude-3-5-sonnet-20241022", "claude-3-5-haiku-20241022", "claude-3-opus-20240229"],
+    gemini: ["gemini-2.5-flash", "gemini-2.5-pro", "gemini-2.0-flash", "gemini-2.0-flash-lite", "gemini-1.5-pro", "gemini-1.5-flash"],
+    gpt: ["gpt-4o", "gpt-4o-mini", "chatgpt-4o-latest", "o1", "o1-mini", "o3-mini"]
+  };
 
   useEffect(() => {
     if (isOpen) {
-      const stored = localStorage.getItem("PRD_CUSTOM_API_KEY");
-      if (stored) setApiKey(stored);
+      const storedKey = localStorage.getItem("PRD_CUSTOM_API_KEY");
+      const storedProv = localStorage.getItem("PRD_AI_PROVIDER") as AIProvider;
+      const storedModel = localStorage.getItem("PRD_AI_MODEL");
+      if (storedKey) setApiKey(storedKey);
+      if (storedProv) setProvider(storedProv);
+      else setProvider(initialProvider);
+      if (storedModel) setModel(storedModel);
+      else setModel(initialModel);
       setSaved(false);
     }
-  }, [isOpen]);
+  }, [isOpen, initialProvider, initialModel]);
+
+  const handleProviderChange = (newProvider: AIProvider) => {
+    setProvider(newProvider);
+    // Reset to the default model for the new provider
+    setModel(MODELS[newProvider][0]);
+  };
 
   const handleSave = () => {
     localStorage.setItem("PRD_CUSTOM_API_KEY", apiKey.trim());
-    onSave(apiKey.trim());
+    localStorage.setItem("PRD_AI_PROVIDER", provider);
+    localStorage.setItem("PRD_AI_MODEL", model);
+    onSave(apiKey.trim(), provider, model);
     setSaved(true);
     setTimeout(() => {
       onClose();
@@ -37,8 +66,9 @@ export function ApiKeyModal({
 
   const handleClear = () => {
     localStorage.removeItem("PRD_CUSTOM_API_KEY");
+    // We don't remove provider or model, just reset key
     setApiKey("");
-    onSave("");
+    onSave("", provider, model);
   };
 
   return (
@@ -61,13 +91,46 @@ export function ApiKeyModal({
             <div className="flex items-center gap-3 mb-6 border-b border-cyber-border pb-4">
               <Key className="text-cyber-accent" size={24} />
               <h2 className="text-lg font-mono text-cyber-text tracking-wide">
-                SECURE_CREDENTIALS
+                AI SETTINGS
               </h2>
+            </div>
+            
+            <div className="mb-4">
+              <label className="block text-xs font-mono text-cyber-text-dim mb-2 uppercase">
+                {language === "en" ? "AI Provider" : "Penyedia AI"}
+              </label>
+              <select
+                value={provider}
+                onChange={(e) => handleProviderChange(e.target.value as AIProvider)}
+                className="w-full bg-cyber-bg border border-cyber-border p-3 text-cyber-text font-mono text-sm focus:border-cyber-accent focus:outline-none transition-colors appearance-none"
+              >
+                <option value="claude">Claude</option>
+                <option value="gemini">Gemini</option>
+                <option value="deepseek">DeepSeek</option>
+                <option value="gpt">GPT</option>
+              </select>
+            </div>
+
+            <div className="mb-4">
+              <label className="block text-xs font-mono text-cyber-text-dim mb-2 uppercase">
+                {language === "en" ? "AI Model" : "Model AI"}
+              </label>
+              <select
+                value={model}
+                onChange={(e) => setModel(e.target.value)}
+                className="w-full bg-cyber-bg border border-cyber-border p-3 text-cyber-text font-mono text-sm focus:border-cyber-accent focus:outline-none transition-colors appearance-none"
+              >
+                {MODELS[provider].map((m) => (
+                  <option key={m} value={m}>
+                    {m}
+                  </option>
+                ))}
+              </select>
             </div>
 
             <div className="mb-6">
               <label className="block text-xs font-mono text-cyber-text-dim mb-2 uppercase">
-                Custom Provider API Key
+                {language === "en" ? "Custom API Key (Optional)" : "Custom API Key (Opsional)"}
               </label>
               <input
                 type="password"
@@ -84,8 +147,8 @@ export function ApiKeyModal({
                 />
                 <span>
                   {language === "en"
-                    ? "Provide the API Key for the model you configured in ai-config.ts. Overrides environment variables."
-                    : "Masukkan API Key untuk provider yang dikonfigurasi di ai-config.ts. Ini akan menimpa environment variable."}
+                    ? "Overrides environment variables. Your key is stored locally in your browser."
+                    : "Berlaku untuk provider di atas dan menggantikan environment variable. Disimpan secara lokal di browser Anda."}
                 </span>
               </p>
             </div>

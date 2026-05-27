@@ -4,7 +4,6 @@ import fs from "fs";
 import os from "os";
 import { createServer as createViteServer } from "vite";
 import dotenv from "dotenv";
-import { AI_CONFIG } from "./ai-config";
 
 import multer from "multer";
 import { createRequire } from "module";
@@ -312,7 +311,7 @@ app.post("/api/generate-prd", async (req, res) => {
   res.setHeader("Connection", "keep-alive");
 
   try {
-    const { prompt, customApiKey, language = 'id', uploadedFiles } = req.body;
+    const { prompt, customApiKey, provider = 'deepseek', model = 'deepseek-chat', language = 'id', productType, uploadedFiles } = req.body;
     
     if (!prompt) {
       res.write(`data: ${JSON.stringify({ error: language === 'en' ? "Prompt is required" : "Prompt diperlukan" })}\n\n`);
@@ -333,36 +332,78 @@ app.post("/api/generate-prd", async (req, res) => {
 
     const finalUserPrompt = prompt + fileContext;
 
-    const apiKeyEnvName = AI_CONFIG.API_KEY_ENV_NAME;
-    const customKey = customApiKey || process.env[apiKeyEnvName] || Object.entries(process.env).find(([k]) => k.toUpperCase().includes(apiKeyEnvName.split('_')[0]))?.[1];
+    let apiKeyEnvName = "";
+    let endpoint = "";
+    let modelName = model;
+
+    if (provider === "gpt") {
+      apiKeyEnvName = "OPENAI_API_KEY";
+      endpoint = "https://api.openai.com/v1/chat/completions";
+      if (!modelName) modelName = "gpt-4o";
+    } else if (provider === "gemini") {
+      apiKeyEnvName = "GEMINI_API_KEY";
+      endpoint = "https://generativelanguage.googleapis.com/v1beta/openai/chat/completions";
+      if (!modelName) modelName = "gemini-2.5-flash";
+    } else if (provider === "claude") {
+      apiKeyEnvName = "ANTHROPIC_API_KEY";
+      endpoint = "https://api.anthropic.com/v1/messages";
+      if (!modelName) modelName = "claude-3-7-sonnet-20250219";
+    } else {
+      apiKeyEnvName = "DEEPSEEK_API_KEY";
+      endpoint = "https://api.deepseek.com/chat/completions";
+      if (!modelName) modelName = "deepseek-chat";
+    }
+
+    const customKey = customApiKey;
     
     if (!customKey) {
-      res.write(`data: ${JSON.stringify({ error: (language === 'en' ? "API KEY not found. Please provide a custom key or set " : "API KEY tidak ditemukan. Pastikan ada custom key atau ") + apiKeyEnvName + " in .env/Settings" })}\n\n`);
+      res.write(`data: ${JSON.stringify({ error: language === 'en' ? "API KEY not found. Please provide a custom key in Settings." : "API KEY tidak ditemukan. Silakan masukkan API Key di Pengaturan." })}\n\n`);
       res.end();
       return;
     }
 
-    const endpoint = AI_CONFIG.ENDPOINT_URL;
-    const modelName = AI_CONFIG.MODEL_NAME;
-    const finalPrompt = getSystemPrompt(language, AI_CONFIG.SYSTEM_PROMPT_ADDITIONS);
+    const finalPrompt = getSystemPrompt(language, "", productType);
 
-    const response = await fetch(endpoint, {
-      method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-        "Authorization": "Bearer " + customKey
-      },
-      body: JSON.stringify({
+    let fetchHeaders: any = {
+      "Content-Type": "application/json",
+    };
+    let fetchBody: any = {};
+
+    if (provider === "claude") {
+      fetchHeaders["x-api-key"] = customKey;
+      fetchHeaders["anthropic-version"] = "2023-06-01";
+      fetchBody = {
+        model: modelName,
+        system: finalPrompt,
+        messages: [
+          { role: "user", content: finalUserPrompt }
+        ],
+        max_tokens: 8192,
+        temperature: 0.5,
+        stream: true,
+      };
+    } else {
+      fetchHeaders["Authorization"] = "Bearer " + customKey;
+      fetchBody = {
         model: modelName,
         messages: [
           { role: "system", content: finalPrompt },
           { role: "user", content: finalUserPrompt }
         ],
         stream: true,
-        max_tokens: AI_CONFIG.MAX_OUTPUT_TOKENS,
-        temperature: AI_CONFIG.TEMPERATURE,
-        seed: 42
-      })
+        max_tokens: 8192,
+        temperature: 0.5,
+      };
+
+      if (provider === "gpt" || provider === "deepseek") {
+        fetchBody.seed = 42;
+      }
+    }
+
+    const response = await fetch(endpoint, {
+      method: "POST",
+      headers: fetchHeaders,
+      body: JSON.stringify(fetchBody)
     });
 
     if (!response.ok) {
@@ -393,13 +434,19 @@ app.post("/api/generate-prd", async (req, res) => {
           }
           try {
             const data = JSON.parse(dataStr);
-            const chunkText = data.choices?.[0]?.delta?.content;
-            if (chunkText) {
-              res.write(`data: ${JSON.stringify({ text: chunkText })}\n\n`);
-            }
-            const finishReason = data.choices?.[0]?.finish_reason;
-            if (finishReason && finishReason !== "stop" && finishReason !== null) {
-                res.write(`data: ${JSON.stringify({ text: "\n\n> **Note:** Generation stopped. Reason: `" + finishReason + "`\n\n" })}\n\n`);
+            if (provider === 'claude') {
+              if (data.type === 'content_block_delta' && data.delta?.type === 'text_delta') {
+                res.write(`data: ${JSON.stringify({ text: data.delta.text })}\n\n`);
+              }
+            } else {
+              const chunkText = data.choices?.[0]?.delta?.content;
+              if (chunkText) {
+                res.write(`data: ${JSON.stringify({ text: chunkText })}\n\n`);
+              }
+              const finishReason = data.choices?.[0]?.finish_reason;
+              if (finishReason && finishReason !== "stop" && finishReason !== null) {
+                  res.write(`data: ${JSON.stringify({ text: "\n\n> **Note:** Generation stopped. Reason: `" + finishReason + "`\n\n" })}\n\n`);
+              }
             }
           } catch (e) {
             console.error("Custom provider parse error", e, dataStr);

@@ -5,11 +5,13 @@ import { SystemSchematic } from "./components/SystemSchematic";
 import { BlueprintSheet, getSections } from "./components/BlueprintSheet";
 import { ApiKeyModal } from "./components/ApiKeyModal";
 import { generatePRD } from "./services/geminiService";
-import { ProductType, PRDVersion, PRDComment, UploadedFile } from "./types";
+import { ProductType, PRDVersion, PRDComment, UploadedFile, AIProvider } from "./types";
 
 export default function App() {
   const [isSettingsOpen, setIsSettingsOpen] = useState(false);
   const [customApiKey, setCustomApiKey] = useState("");
+  const [provider, setProvider] = useState<AIProvider>("deepseek");
+  const [model, setModel] = useState<string>("deepseek-chat");
   const [isGenerating, setIsGenerating] = useState(false);
   const [productType, setProductType] = useState<ProductType>("Unknown");
   const [language, setLanguage] = useState<"id" | "en">("id");
@@ -27,6 +29,14 @@ export default function App() {
     const stored = localStorage.getItem("PRD_CUSTOM_API_KEY");
     if (stored) {
       setCustomApiKey(stored);
+    }
+    const storedProv = localStorage.getItem("PRD_AI_PROVIDER") as AIProvider;
+    if (storedProv) {
+      setProvider(storedProv);
+    }
+    const storedModel = localStorage.getItem("PRD_AI_MODEL");
+    if (storedModel) {
+      setModel(storedModel);
     }
   }, []);
 
@@ -56,6 +66,8 @@ export default function App() {
       await generatePRD(
         prompt,
         customApiKey,
+        provider,
+        model,
         language,
         productType,
         uploadedFiles,
@@ -127,6 +139,8 @@ export default function App() {
       await generatePRD(
         revisionPrompt,
         customApiKey,
+        provider,
+        model,
         language,
         productType,
         uploadedFiles,
@@ -311,8 +325,14 @@ export default function App() {
       <ApiKeyModal
         isOpen={isSettingsOpen}
         onClose={() => setIsSettingsOpen(false)}
-        onSave={(key) => setCustomApiKey(key)}
+        onSave={(key, p, m) => {
+          setCustomApiKey(key);
+          setProvider(p);
+          setModel(m);
+        }}
         language={language}
+        initialProvider={provider}
+        initialModel={model}
       />
 
       {/* Background Decor */}

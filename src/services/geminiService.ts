@@ -1,8 +1,10 @@
-import { UploadedFile } from "../types";
+import { UploadedFile, AIProvider } from "../types";
 
 export const generatePRD = async (
   prompt: string,
   customApiKey: string | undefined,
+  provider: AIProvider,
+  model: string,
   language: "id" | "en",
   productType: string,
   uploadedFiles: UploadedFile[],
@@ -16,6 +18,8 @@ export const generatePRD = async (
     body: JSON.stringify({
       prompt,
       customApiKey,
+      provider,
+      model,
       language,
       productType,
       uploadedFiles,
