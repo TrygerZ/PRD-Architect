@@ -1,13 +1,11 @@
 import { useState, useEffect } from "react";
-import { motion, useAnimation } from "motion/react";
+import { motion } from "motion/react";
 import ReactMarkdown from "react-markdown";
 import remarkGfm from "remark-gfm";
 import {
   MessageSquare,
-  GitCommit,
   GitBranch,
   RefreshCw,
-  Send,
   Check,
 } from "lucide-react";
 import { PRDVersion } from "../types";

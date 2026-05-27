@@ -5,7 +5,7 @@ import { SystemSchematic } from "./components/SystemSchematic";
 import { BlueprintSheet, getSections } from "./components/BlueprintSheet";
 import { ApiKeyModal } from "./components/ApiKeyModal";
 import { generatePRD } from "./services/geminiService";
-import { ProductType, PRDVersion, PRDComment, UploadedFile, AIProvider } from "./types";
+import { ProductType, PRDVersion, UploadedFile, AIProvider } from "./types";
 
 export default function App() {
   const [isSettingsOpen, setIsSettingsOpen] = useState(false);

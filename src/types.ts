@@ -1,10 +1,5 @@
 export type AIProvider = "claude" | "gemini" | "deepseek" | "gpt";
 
-export interface PRDSection {
-  title: string;
-  content: string;
-}
-
 export type ProductType =
   | "e-commerce"
   | "SaaS"
@@ -12,16 +7,6 @@ export type ProductType =
   | "Mobile App"
   | "Internal Tool"
   | "Unknown";
-
-export interface GeneratePRDResponse {
-  prd: string;
-  error?: string;
-}
-
-export interface PRDComment {
-  sectionIndex: number;
-  text: string;
-}
 
 export interface UploadedFile {
   id: string;
