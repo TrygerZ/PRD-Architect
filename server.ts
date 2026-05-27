@@ -354,7 +354,7 @@ app.post("/api/generate-prd", async (req, res) => {
       if (!modelName) modelName = "deepseek-chat";
     }
 
-    const customKey = customApiKey;
+    const customKey = customApiKey || process.env[apiKeyEnvName];
     
     if (!customKey) {
       res.write(`data: ${JSON.stringify({ error: language === 'en' ? "API KEY not found. Please provide a custom key in Settings." : "API KEY tidak ditemukan. Silakan masukkan API Key di Pengaturan." })}\n\n`);

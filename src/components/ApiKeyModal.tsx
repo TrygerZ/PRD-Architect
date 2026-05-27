@@ -170,7 +170,7 @@ export function ApiKeyModal({
                 {saved ? (
                   <>
                     <Check size={16} />{" "}
-                    {language === "en" ? "SAVED" : "TERSIPAN"}
+                    {language === "en" ? "SAVED" : "TERSIMPAN"}
                   </>
                 ) : language === "en" ? (
                   "UPDATE_KEY"
