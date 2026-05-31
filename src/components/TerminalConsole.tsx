@@ -1,5 +1,6 @@
 import { useState, FormEvent, useEffect } from "react";
-import { Terminal, Send, Activity, Loader2, Paperclip } from "lucide-react";
+import { Send, Loader2, Paperclip } from "lucide-react";
+import { motion } from "motion/react";
 import { ProductType, UploadedFile } from "../types";
 import { FileUploader } from "./FileUploader";
 
@@ -96,80 +97,88 @@ export function TerminalConsole({
   };
 
   return (
-    <div className="w-full max-w-4xl mx-auto glass-panel p-1 rounded-sm no-print mb-8 relative z-10 before:absolute before:-inset-px before:-z-10 before:bg-gradient-to-r before:from-cyber-accent/50 before:to-transparent before:opacity-20 before:rounded-sm">
-      <div className="bg-cyber-bg p-3 sm:p-4 flex flex-col gap-3 sm:gap-4">
-        <div className="flex flex-col sm:flex-row sm:items-center justify-between text-cyber-text-dim text-[10px] sm:text-xs font-mono border-b border-cyber-border pb-2 gap-2">
-          <div className="flex items-center gap-2">
-            <Terminal size={14} className="text-cyber-accent shrink-0" />
-            <span>SYS.PROMPT_INPUT</span>
-          </div>
-          <div className="flex items-center gap-3 sm:gap-4 justify-between sm:justify-end w-full sm:w-auto">
-            <div className="flex items-center gap-1.5 sm:gap-2 text-cyber-accent/70 truncate">
-              <Activity size={12} className="shrink-0" />
-              <span className="truncate">
-                MOD: {detectedType.toUpperCase()}
+    <motion.div 
+      initial={{ opacity: 0, y: 10 }}
+      animate={{ opacity: 1, y: 0 }}
+      transition={{ duration: 0.3 }}
+      className="w-full bg-[#1a1a1a] border border-[#2a2a2a] rounded-[8px] p-6 mb-8 relative z-10 no-print"
+    >
+      <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center border-b border-[#2a2a2a] pb-4 mb-4 gap-2">
+        <h2 className="text-[#f5f5f5] text-[15px] font-semibold font-body">
+          {language === "en" ? "Product Description" : "Deskripsi Produk"}
+        </h2>
+        <div className="flex items-center gap-4 text-[12px] text-[#555555] font-mono">
+          <span>Mode: <span className="text-[#999999]">{detectedType}</span></span>
+          <span>Chars: <span className="text-[#999999]">{prompt.length}</span></span>
+        </div>
+      </div>
+
+      {showUploader && (
+        <motion.div 
+          initial={{ opacity: 0, height: 0 }}
+          animate={{ opacity: 1, height: "auto" }}
+          className="mb-4"
+        >
+          <FileUploader
+            files={files}
+            onFilesChange={onFilesChange}
+            language={language}
+          />
+        </motion.div>
+      )}
+
+      <form onSubmit={handleSubmit} className="relative">
+        <textarea
+          value={prompt}
+          onChange={(e) => setPrompt(e.target.value)}
+          placeholder={
+            language === "en"
+              ? "Describe the product you want to build..."
+              : "Jelaskan produk yang ingin kamu bangun..."
+          }
+          className="w-full bg-transparent text-[#f5f5f5] placeholder:text-[#555555] outline-none resize-y min-h-[120px] font-mono text-[13px] border border-[#2a2a2a] focus:border-[#6666ff] rounded-[8px] p-4 transition-all duration-200 ease"
+          disabled={isGenerating}
+          style={{ paddingBottom: '60px' }}
+        />
+        
+        <div className="absolute bottom-3 left-3 flex items-center gap-2">
+          <button
+            type="button"
+            onClick={() => setShowUploader(!showUploader)}
+            className={`flex items-center gap-1.5 text-[13px] font-medium px-3 py-1.5 rounded-[6px] transition-all duration-200 ease border ${
+              showUploader || files.length > 0
+                ? "bg-[#222222] border-[#2a2a2a] text-[#f5f5f5]"
+                : "bg-transparent border-transparent text-[#999999] hover:bg-[#222222] hover:text-[#f5f5f5] hover:border-[#2a2a2a]"
+            }`}
+          >
+            <Paperclip size={16} strokeWidth={1.5} />
+            <span className="font-body">{language === "en" ? "Attach File" : "Lampirkan File"}</span>
+            {files.length > 0 && (
+              <span className="ml-1 bg-[#f5f5f5] text-[#111111] px-1.5 rounded-full text-[11px] font-bold font-mono">
+                {files.length}
               </span>
-            </div>
-            <span className="shrink-0">CHARS: {prompt.length}</span>
-          </div>
+            )}
+          </button>
         </div>
 
-        {showUploader && (
-          <div className="border-t border-cyber-border pt-4 mt-2">
-            <FileUploader
-              files={files}
-              onFilesChange={onFilesChange}
-              language={language}
-            />
-          </div>
-        )}
-
-        <form onSubmit={handleSubmit} className="relative">
-          <textarea
-            value={prompt}
-            onChange={(e) => setPrompt(e.target.value)}
-            placeholder={
-              language === "en"
-                ? "Describe the product you want to build... (e.g., An E-Commerce app for local coffee beans...)"
-                : "Jelaskan produk yang ingin kamu bangun... (Cth: Sebuah aplikasi E-Commerce untuk menjual biji kopi...)"
-            }
-            className="w-full bg-transparent text-cyber-text placeholder:text-cyber-border outline-none resize-none min-h-[120px] font-sans text-sm focus:ring-0 p-1 sm:p-2 mb-12 sm:mb-0"
-            disabled={isGenerating}
-          />
-          <div className="absolute bottom-0 left-0 sm:bottom-2 sm:left-2">
-            <button
-              type="button"
-              onClick={() => setShowUploader(!showUploader)}
-              className={`flex items-center gap-1.5 text-xs font-mono px-3 py-1.5 rounded-sm transition-colors border ${showUploader || files.length > 0 ? "bg-cyber-accent/10 border-cyber-accent text-cyber-accent" : "bg-black/20 border-cyber-border/60 text-cyber-text-dim hover:text-cyber-text hover:border-cyber-border"}`}
-            >
-              <Paperclip size={14} />
-              <span>{language === "en" ? "Attach" : "Lampirkan"}</span>
-              {files.length > 0 && (
-                <span className="ml-1 bg-cyber-accent text-black px-1.5 py-0.5 rounded-full text-[10px] font-bold">
-                  {files.length}
-                </span>
-              )}
-            </button>
-          </div>
-          <div className="absolute bottom-0 right-0 sm:bottom-2 sm:right-2">
-            <button
-              type="submit"
-              disabled={!prompt.trim() || isGenerating}
-              className="cyber-button text-xs sm:text-sm py-1.5 px-3 sm:py-2 sm:px-4"
-            >
-              {isGenerating ? (
-                <>
-                  PROCESSING <Loader2 size={14} className="animate-spin" />
-                </>
-              ) : (
-                <>
-                  INITIALIZE <Send size={14} />
-                </>
-              )}
-            </button>
-          </div>
-        </form>
-      </div>
-    </div>
+        <div className="absolute bottom-3 right-3">
+          <button
+            type="submit"
+            disabled={!prompt.trim() || isGenerating}
+            className="flex items-center gap-2 text-[13px] font-medium px-4 py-2 rounded-[6px] transition-all duration-200 ease bg-[#f5f5f5] text-[#111111] hover:bg-[#e5e5e5] disabled:opacity-40 disabled:cursor-not-allowed font-body"
+          >
+            {isGenerating ? (
+              <>
+                {language === "en" ? "Generating" : "Memproses"} <Loader2 size={16} strokeWidth={1.5} className="animate-spin" />
+              </>
+            ) : (
+              <>
+                {language === "en" ? "Generate" : "Buat PRD"} < Send size={16} strokeWidth={1.5} />
+              </>
+            )}
+          </button>
+        </div>
+      </form>
+    </motion.div>
   );
 }

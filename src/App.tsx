@@ -1,11 +1,11 @@
 import { useState, useEffect } from "react";
 import { Header } from "./components/Header";
 import { TerminalConsole } from "./components/TerminalConsole";
-import { SystemSchematic } from "./components/SystemSchematic";
 import { BlueprintSheet, getSections } from "./components/BlueprintSheet";
 import { ApiKeyModal } from "./components/ApiKeyModal";
 import { generatePRD } from "./services/geminiService";
 import { ProductType, PRDVersion, UploadedFile, AIProvider } from "./types";
+import { ArrowUp } from "lucide-react";
 
 export default function App() {
   const [isSettingsOpen, setIsSettingsOpen] = useState(false);
@@ -15,6 +15,9 @@ export default function App() {
   const [isGenerating, setIsGenerating] = useState(false);
   const [productType, setProductType] = useState<ProductType>("Unknown");
   const [language, setLanguage] = useState<"id" | "en">("id");
+  const [showScrollTop, setShowScrollTop] = useState(false);
+  const [isToCOpen, setIsToCOpen] = useState(false);
+  const [toastMessage, setToastMessage] = useState<string | null>(null);
 
   const [uploadedFiles, setUploadedFiles] = useState<UploadedFile[]>([]);
 
@@ -23,6 +26,11 @@ export default function App() {
   const [comments, setComments] = useState<Record<string, string>>({});
 
   const [error, setError] = useState<string | null>(null);
+
+  const showToast = (msg: string) => {
+    setToastMessage(msg);
+    setTimeout(() => setToastMessage(null), 3000);
+  };
 
   useEffect(() => {
     // Load API key from local storage on init
@@ -38,6 +46,17 @@ export default function App() {
     if (storedModel) {
       setModel(storedModel);
     }
+    
+    // Scroll listener
+    const handleScroll = () => {
+      if (window.scrollY > 500) {
+        setShowScrollTop(true);
+      } else {
+        setShowScrollTop(false);
+      }
+    };
+    window.addEventListener("scroll", handleScroll);
+    return () => window.removeEventListener("scroll", handleScroll);
   }, []);
 
   const activeVersion = versions.find((v) => v.id === activeVersionId);
@@ -181,11 +200,11 @@ export default function App() {
   const handleCopy = () => {
     if (!prdContent) return;
     navigator.clipboard.writeText(prdContent);
-    alert(
+    showToast(
       language === "en"
         ? "PRD copied to clipboard!"
-        : "PRD disalin ke clipboard!",
-    ); // Could replace with custom toast
+        : "PRD disalin ke clipboard!"
+    );
   };
 
   const handlePrint = () => {
@@ -199,14 +218,21 @@ export default function App() {
               <title>${productType} - PRD</title>
               <style>
                 body { 
-                  font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif; 
+                  font-family: 'Inter Display', 'Inter', -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif; 
                   line-height: 1.6; 
                   color: #333;
                   padding: 40px;
                   max-width: 800px;
                   margin: 0 auto;
                 }
-                h1, h2, h3, h4 { color: #111; margin-top: 24px; margin-bottom: 16px; }
+                h1 { 
+                  font-family: 'Instrument Serif', 'Georgia', serif; 
+                  font-weight: 400; 
+                  color: #111; 
+                  margin-top: 24px; 
+                  margin-bottom: 16px; 
+                }
+                h2, h3, h4 { color: #111; margin-top: 32px; margin-bottom: 16px; font-weight: 600; }
                 p { margin-bottom: 16px; }
                 ul, ol { margin-bottom: 16px; padding-left: 24px; }
                 li { margin-bottom: 8px; }
@@ -249,22 +275,23 @@ export default function App() {
           // printWindow.close();
         }, 500);
       } else {
-        alert(
+        showToast(
           language === "en"
-            ? "Pop-up blocked. Please allow pop-ups to print, or open this app in a new tab."
-            : "Pop-up diblokir. Izinkan pop-up untuk mencetak, atau buka aplikasi ini di tab baru.",
+            ? "Pop-up blocked. Please allow pop-ups to print."
+            : "Pop-up diblokir. Izinkan pop-up untuk mencetak."
         );
       }
     }
   };
 
   return (
-    <div className="min-h-screen pt-20 sm:pt-24 pb-12 px-2 sm:px-4 relative flex flex-col items-center">
+    <div className="min-h-screen pt-20 pb-12 px-6 flex flex-col items-center">
       <Header
         onOpenSettings={() => setIsSettingsOpen(true)}
         onExportMd={handleExportMd}
         onCopy={handleCopy}
         onPrint={handlePrint}
+        onToggleToC={() => setIsToCOpen(!isToCOpen)}
         hasData={prdContent.length > 0}
         language={language}
         onToggleLanguage={() =>
@@ -272,7 +299,7 @@ export default function App() {
         }
       />
 
-      <div className="w-full relative z-10 flex flex-col items-center flex-grow">
+      <div className="w-full max-w-[800px] relative z-10 flex flex-col items-center flex-grow">
         {(!activeVersionId || versions.length === 0) && (
           <TerminalConsole
             onGenerate={handleGenerate}
@@ -284,17 +311,9 @@ export default function App() {
         )}
 
         {error && (
-          <div className="w-full max-w-4xl glass-panel p-4 mb-4 border-red-500/50 text-red-400 text-sm font-mono no-print">
-            [SYS_ERR]: {error}
+          <div className="w-full bg-[#1a1a1a] p-4 mb-4 border border-[#8a3a3a] rounded-[8px] text-[#8a3a3a] text-[15px] font-medium no-print">
+            {error}
           </div>
-        )}
-
-        {/* Dynamic Schematic */}
-        {(isGenerating || prdContent || error) && (
-          <SystemSchematic
-            productType={productType}
-            isGenerating={isGenerating}
-          />
         )}
 
         {/* Output */}
@@ -302,6 +321,8 @@ export default function App() {
           <BlueprintSheet
             content={prdContent}
             comments={comments}
+            isToCOpen={isToCOpen}
+            setIsToCOpen={setIsToCOpen}
             onCommentChange={(secId, comment) => {
               setComments((prev) => {
                 const newCom = { ...prev, [secId]: comment };
@@ -335,9 +356,27 @@ export default function App() {
         initialModel={model}
       />
 
-      {/* Background Decor */}
-      <div className="fixed inset-0 pointer-events-none -z-10 no-print flex flex-col items-center justify-center blur-3xl opacity-20">
-        <div className="w-full max-w-2xl h-[500px] bg-cyber-accent rounded-full mb-10" />
+      {/* Scroll to Top Button */}
+      <button
+        onClick={() => window.scrollTo({ top: 0, behavior: 'smooth' })}
+        className={`fixed bottom-[80px] right-[80px] z-35 w-[36px] h-[36px] rounded-full bg-[#222222] border border-[#333333] text-[#999999] hover:bg-[#333333] hover:text-[#f5f5f5] flex items-center justify-center transition-all duration-200 no-print ${
+          showScrollTop
+            ? "opacity-100 translate-y-0 pointer-events-auto"
+            : "opacity-0 translate-y-2 pointer-events-none"
+        }`}
+        title={language === "en" ? "Scroll to top" : "Kembali ke atas"}
+      >
+        <ArrowUp size={16} strokeWidth={1.5} />
+      </button>
+      {/* Toast Notification */}
+      <div 
+        className={`fixed bottom-6 left-1/2 -translate-x-1/2 z-[100] transition-all duration-300 pointer-events-none no-print
+          ${toastMessage ? "translate-y-0 opacity-100" : "translate-y-8 opacity-0"}`
+        }
+      >
+        <div className="bg-[#222222] border border-[#333333] text-[#f5f5f5] text-[13px] px-4 py-2.5 rounded shadow-xl flex items-center gap-2">
+          {toastMessage}
+        </div>
       </div>
     </div>
   );

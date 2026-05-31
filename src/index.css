@@ -1,60 +1,130 @@
+@import url('https://fonts.googleapis.com/css2?family=Instrument+Serif:ital@0;1&display=swap');
+@import url('https://fonts.googleapis.com/css2?family=Inter:opsz,wght@14..32,400;14..32,500;14..32,600&display=swap');
+@import url('https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;500&display=swap');
 @import "tailwindcss";
 @plugin "@tailwindcss/typography";
 
 @theme {
-  --color-cyber-bg: #0a0e17;
-  --color-cyber-surface: #111827;
-  --color-cyber-border: #1f2937;
-  --color-cyber-accent: #00f0ff;
-  --color-cyber-accent-dim: rgba(0, 240, 255, 0.2);
-  --color-cyber-text: #e2e8f0;
-  --color-cyber-text-dim: #94a3b8;
-  
-  --font-mono: 'JetBrains Mono', 'Fira Code', ui-monospace, monospace;
-  --font-sans: 'Inter', ui-sans-serif, sans-serif;
+  --color-bg: #111111;
+  --color-surface: #1a1a1a;
+  --color-surface-elevated: #222222;
+  --color-border: #2a2a2a;
+  --color-text-primary: #f5f5f5;
+  --color-text-secondary: #999999;
+  --color-text-muted: #555555;
+  --color-interactive: #6666ff;
+  --color-interactive-hover: #8888ff;
+  --color-interactive-subtle: rgba(102, 102, 255, 0.1);
+
+  --font-display: 'Instrument Serif', 'Georgia', serif;
+  --font-body: 'Inter Display', 'Inter', sans-serif;
+  --font-mono: 'JetBrains Mono', 'Fira Code', monospace;
 }
 
 @layer base {
   body {
-    @apply bg-[var(--color-cyber-bg)] text-[var(--color-cyber-text)] font-sans antialiased overflow-x-hidden;
+    background-color: var(--color-bg);
+    color: var(--color-text-primary);
+    font-family: var(--font-body);
+    -webkit-font-smoothing: antialiased;
+    -moz-osx-font-smoothing: grayscale;
+    overflow-x: hidden;
+  }
+  
+  h1 {
+    font-family: var(--font-display);
+    font-weight: 400;
+  }
+  h2, h3, h4, h5, h6 {
+    font-family: var(--font-body);
+    font-weight: 600;
   }
 }
 
+.panel,
+.card,
 .glass-panel {
-  @apply bg-cyber-surface/80 backdrop-blur-md border border-cyber-border shadow-lg shadow-black/50;
-}
-
-.cyber-button {
-  @apply px-4 py-2 bg-transparent border border-cyber-accent text-cyber-accent flex items-center justify-center gap-2 hover:bg-cyber-accent hover:text-black transition-all duration-300 font-mono text-sm uppercase tracking-wider disabled:opacity-50 disabled:cursor-not-allowed disabled:hover:bg-transparent disabled:hover:text-cyber-accent;
+  background: var(--color-surface);
+  border: 1px solid var(--color-border);
+  border-radius: 8px;
 }
 
 /* Custom Scrollbar */
+html {
+  scroll-behavior: smooth;
+}
 ::-webkit-scrollbar {
   width: 8px;
   height: 8px;
 }
 ::-webkit-scrollbar-track {
-  @apply bg-cyber-bg;
+  background: var(--color-bg);
 }
 ::-webkit-scrollbar-thumb {
-  @apply bg-cyber-border rounded-full;
+  background: #2a2a2a;
+  border-radius: 9999px;
+  transition: background 200ms ease;
 }
 ::-webkit-scrollbar-thumb:hover {
-  @apply bg-cyber-text-dim;
+  background: var(--color-text-muted);
+}
+
+/* Cursor blink */
+@keyframes blink {
+  0%, 100% { border-color: transparent; }
+  50% { border-color: var(--color-text-muted); }
+}
+.animate-blink {
+  animation: blink 1s step-end infinite;
+}
+
+/* Typography Details */
+.drop-cap::first-letter {
+  font-family: var(--font-display);
+  font-size: 3em;
+  font-weight: 400;
+  float: left;
+  line-height: 1;
+  margin-right: 8px;
+  margin-top: 4px;
+  color: var(--color-text-primary);
+}
+
+.anchor-link {
+  position: absolute;
+  left: -24px;
+  color: var(--color-text-muted);
+  font-family: var(--font-mono);
+  font-size: 14px;
+  opacity: 0;
+  transition: opacity 200ms ease, color 200ms ease;
+  text-decoration: none;
+}
+.group\/section:hover .anchor-link {
+  opacity: 1;
+}
+.group\/section:hover .anchor-link:hover {
+  color: var(--color-interactive);
 }
 
 /* Print Styles for PDF Export */
 @media print {
   body {
-    @apply bg-white text-black;
+    background: white !important;
+    color: #111111 !important;
+  }
+  .card, .panel, .glass-panel {
+    background: transparent !important;
+    border: 1px solid #ccc !important;
+    box-shadow: none !important;
+  }
+  header {
+    display: none !important;
   }
   .no-print {
     display: none !important;
   }
   .print-page-break {
     page-break-after: always;
-  }
-  .glass-panel {
-    @apply bg-transparent border-0 shadow-none;
   }
 }

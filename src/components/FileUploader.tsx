@@ -126,21 +126,21 @@ export function FileUploader({
 
   const getFileIcon = (type: string) => {
     if (type.includes("image"))
-      return <ImageIcon className="w-5 h-5 text-purple-400" />;
+      return <ImageIcon strokeWidth={1.5} className="w-4 h-4 text-[#999999]" />;
     if (
       type.includes("spreadsheet") ||
       type.includes("excel") ||
       type.includes("csv")
     )
-      return <FileSpreadsheet className="w-5 h-5 text-green-400" />;
-    return <FileText className="w-5 h-5 text-cyan-400" />;
+      return <FileSpreadsheet strokeWidth={1.5} className="w-4 h-4 text-[#999999]" />;
+    return <FileText strokeWidth={1.5} className="w-4 h-4 text-[#999999]" />;
   };
 
   return (
-    <div className="w-full flex flex-col gap-4 mb-4">
+    <div className="w-full flex flex-col gap-4">
       <div
-        className={`w-full border-2 border-dashed rounded-xl p-6 flex flex-col items-center justify-center transition-colors cursor-pointer
-          ${isDragging ? "border-cyber-accent bg-cyber-accent/10" : "border-cyber-border/60 hover:border-cyber-accent/50 bg-black/20"}
+        className={`w-full border border-dashed rounded-[8px] py-8 px-6 flex flex-col items-center justify-center transition-colors cursor-pointer
+          ${isDragging ? "border-[#f5f5f5] bg-[#222222]" : "border-[#333333] hover:border-[#666666] bg-transparent"}
           ${isUploading ? "opacity-50 pointer-events-none" : ""}`}
         onDragOver={onDragOver}
         onDragLeave={onDragLeave}
@@ -159,17 +159,18 @@ export function FileUploader({
           }}
         />
         {isUploading ? (
-          <div className="flex flex-col items-center gap-2 text-cyber-accent">
-            <Loader2 className="w-8 h-8 animate-spin" />
+          <div className="flex flex-col items-center gap-2 text-[#999999]">
+            <Loader2 className="w-6 h-6 animate-spin" strokeWidth={1.5} />
             <span className="font-mono text-sm">{t.uploading}</span>
           </div>
         ) : (
-          <div className="flex flex-col items-center gap-2 text-cyber-text-dim text-center">
+          <div className="flex flex-col items-center gap-2 text-center text-[#999999]">
             <Upload
-              className={`w-8 h-8 mb-2 ${isDragging ? "text-cyber-accent" : "text-cyber-text-dim"}`}
+              strokeWidth={1.5}
+              className={`w-6 h-6 mb-2 ${isDragging ? "text-[#f5f5f5]" : "text-[#555555]"}`}
             />
-            <span className="font-medium text-cyber-text">{t.dropHere}</span>
-            <span className="text-xs font-mono opacity-60">
+            <span className="font-medium text-[15px] text-[#999999]">{t.dropHere}</span>
+            <span className="text-xs font-mono text-[#555555]">
               {t.supportedFormats}
             </span>
           </div>
@@ -179,12 +180,12 @@ export function FileUploader({
       <AnimatePresence>
         {error && (
           <motion.div
-            initial={{ opacity: 0, y: -10 }}
+            initial={{ opacity: 0, y: -4 }}
             animate={{ opacity: 1, y: 0 }}
-            exit={{ opacity: 0, y: -10 }}
-            className="w-full p-3 bg-red-900/30 border border-red-500/50 rounded-lg flex items-center gap-3 text-red-400 text-sm"
+            exit={{ opacity: 0, y: -4 }}
+            className="w-full p-3 bg-red-900/10 border border-red-500/30 rounded-[6px] flex items-center gap-3 text-red-500 text-sm"
           >
-            <AlertCircle className="w-5 h-5 shrink-0" />
+            <AlertCircle className="w-4 h-4 shrink-0" strokeWidth={1.5} />
             <span>{error}</span>
           </motion.div>
         )}
@@ -196,31 +197,35 @@ export function FileUploader({
             {files.map((file) => (
               <motion.div
                 key={file.id}
-                initial={{ opacity: 0, scale: 0.95 }}
-                animate={{ opacity: 1, scale: 1 }}
-                exit={{ opacity: 0, scale: 0.95 }}
-                className="flex items-center justify-between p-3 rounded-lg bg-cyber-surface/60 border border-cyber-border/40 group hover:border-cyber-accent/40 transition-colors"
+                initial={{ opacity: 0 }}
+                animate={{ opacity: 1 }}
+                exit={{ opacity: 0 }}
+                transition={{ duration: 0.2 }}
+                className="flex items-center justify-between p-3 rounded-[6px] bg-[#1a1a1a] border border-[#2a2a2a] group hover:border-[#333333] transition-colors"
               >
                 <div className="flex items-center gap-3 overflow-hidden">
                   {getFileIcon(file.type)}
                   <div className="flex flex-col min-w-0">
                     <span
-                      className="text-sm font-medium text-cyber-text truncate"
+                      className="text-sm font-medium text-[#f5f5f5] truncate"
                       title={file.name}
                     >
                       {file.name}
                     </span>
-                    <span className="text-xs font-mono text-cyber-text-dim">
+                    <span className="text-[12px] font-mono text-[#555555]">
                       {(file.size / 1024).toFixed(1)} KB •{" "}
                       {file.charCount.toLocaleString()} {t.chars}
                     </span>
                   </div>
                 </div>
                 <button
-                  onClick={() => removeFile(file.id)}
-                  className="p-1.5 rounded-md hover:bg-red-500/20 text-cyber-text-dim hover:text-red-400 transition-colors"
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    removeFile(file.id);
+                  }}
+                  className="p-1.5 rounded-md hover:bg-[#222222] text-[#555555] hover:text-[#ef4444] transition-colors"
                 >
-                  <X className="w-4 h-4" />
+                  <X className="w-4 h-4" strokeWidth={1.5} />
                 </button>
               </motion.div>
             ))}
