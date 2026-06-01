@@ -1,5 +1,5 @@
 import { useState, useRef, useEffect } from "react";
-import { Send, Paperclip, Loader2, X } from "lucide-react";
+import { Send, Paperclip, Loader2, Pause } from "lucide-react";
 import { getQuickPrompts } from "../utils/quickPrompts";
 
 interface ChatInputProps {
@@ -86,24 +86,28 @@ export function ChatInput({
             rows={1}
           />
 
-          <div className="absolute right-2 bottom-[10px] flex items-center gap-2">
+          <div className="absolute bottom-3 right-3 flex items-center gap-2">
             {isGenerating && onCancel && (
               <button
                 type="button"
                 onClick={onCancel}
-                className="flex items-center gap-2 text-[13px] font-medium px-4 py-2 rounded-[8px] transition-all duration-200 ease border border-[#8a3a3a] text-[#8a3a3a] hover:bg-[#8a3a3a] hover:text-white font-body"
+                className="flex items-center justify-center w-[36px] h-[36px] rounded-[8px] border border-[#8a3a3a] text-[#8a3a3a] hover:bg-[#8a3a3a] hover:text-white transition-all duration-200"
+                title={language === "en" ? "Cancel" : "Batal"}
               >
-                <X size={16} strokeWidth={1.5} />
-                {language === "en" ? "Cancel" : "Batal"}
+                <Pause size={16} strokeWidth={1.5} />
               </button>
             )}
-
             <button
               type="submit"
               disabled={!prompt.trim() || isGenerating}
-              className="w-[32px] h-[32px] flex items-center justify-center rounded-[8px] transition-all duration-200 bg-[#f5f5f5] text-[#111111] hover:bg-[#e5e5e5] disabled:opacity-30 disabled:cursor-not-allowed"
+              className="flex items-center justify-center w-[36px] h-[36px] rounded-[8px] bg-[#f5f5f5] text-[#111111] hover:bg-[#e5e5e5] disabled:opacity-30 disabled:cursor-not-allowed transition-all duration-200"
+              title={language === "en" ? "Generate" : "Buat PRD"}
             >
-              <Send size={16} strokeWidth={1.5} className="relative -ml-[1px]" />
+              {isGenerating ? (
+                <Loader2 size={16} strokeWidth={1.5} className="animate-spin" />
+              ) : (
+                <Send size={16} strokeWidth={1.5} className="relative -ml-[1px]" />
+              )}
             </button>
           </div>
         </form>
