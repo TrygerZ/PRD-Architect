@@ -27,10 +27,10 @@ export function ApiKeyModal({
   const [saved, setSaved] = useState(false);
 
   const MODELS: Record<AIProvider, string[]> = {
-    deepseek: ["deepseek-chat", "deepseek-reasoner", "deepseek-v4-pro", "deepseek-v4-flash"],
-    claude: ["claude-3-7-sonnet-20250219", "claude-3-5-sonnet-20241022", "claude-3-5-haiku-20241022", "claude-3-opus-20240229"],
-    gemini: ["gemini-2.5-flash", "gemini-2.5-pro", "gemini-2.0-flash", "gemini-2.0-flash-lite", "gemini-1.5-pro", "gemini-1.5-flash"],
-    gpt: ["gpt-4o", "gpt-4o-mini", "chatgpt-4o-latest", "o1", "o1-mini", "o3-mini"]
+    deepseek: ["deepseek-v4-flash", "deepseek-v4-pro"],
+    claude: ["claude-4.5-sonnet", "claude-4.5-haiku", "claude-4.0-sonnet", "claude-4.0-haiku", "claude-3.7-sonnet", "claude-3.5-haiku"],
+    gemini: ["gemini-3.5-flash", "gemini-3.5-pro", "gemini-3.0-flash", "gemini-3.0-pro", "gemini-2.5-flash", "gemini-2.5-pro"],
+    gpt: ["gpt-5.5", "gpt-5.4", "gpt-5.2", "gpt-5-mini", "gpt-4o", "gpt-4o-mini"]
   };
 
   useEffect(() => {

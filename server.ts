@@ -331,15 +331,15 @@ app.post("/api/generate-prd", async (req, res) => {
     if (provider === "gpt") {
       apiKeyEnvName = "OPENAI_API_KEY";
       endpoint = "https://api.openai.com/v1/chat/completions";
-      if (!modelName) modelName = "gpt-4o";
+      if (!modelName) modelName = "gpt-5.5";
     } else if (provider === "gemini") {
       apiKeyEnvName = "GEMINI_API_KEY";
       endpoint = "https://generativelanguage.googleapis.com/v1beta/openai/chat/completions";
-      if (!modelName) modelName = "gemini-2.5-flash";
+      if (!modelName) modelName = "gemini-3.5-flash";
     } else if (provider === "claude") {
       apiKeyEnvName = "ANTHROPIC_API_KEY";
       endpoint = "https://api.anthropic.com/v1/messages";
-      if (!modelName) modelName = "claude-3-7-sonnet-20250219";
+      if (!modelName) modelName = "claude-4.5-sonnet";
     } else {
       apiKeyEnvName = "DEEPSEEK_API_KEY";
       endpoint = "https://api.deepseek.com/chat/completions";

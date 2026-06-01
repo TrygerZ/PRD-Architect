@@ -31,12 +31,12 @@ The generated document strictly adheres to a 12-chapter industry-standard struct
 
 ## ✨ Features
 
-- 🧠 **Bring Your Own Model (BYOM)**: Seamlessly switch between AI providers (DeepSeek, Claude, Gemini, OpenAI) and select specific models via the in-app Settings UI.
+- 🧠 **Bring Your Own Model (BYOM)**: Seamlessly switch between AI providers (DeepSeek, Claude, Gemini, OpenAI) and select specific models via the in-app Settings UI. Tuned for output up to `16,384` max tokens for DeepSeek V4 and Claude 3.7.
 - 📐 **Enterprise Structure**: Enforces a strict 12-chapter format (including dedicated AI Agent Implementation Guidelines), generating consistent and high-quality PRDs out of the box.
 - ⚡ **Real-time Streaming Output**: Watch your document take shape in real-time with responsive Markdown rendering.
 - 💬 **Interactive Revisions**: Leave feedback on the generated document to incrementally refine and polish the PRD, complete with a version control system to switch between generation attempts.
-- 📄 **File Context Support**: Upload reference files (PDF, DOCX, text) to provide additional context and enrich the generated document.
-- 🌏 **Bilingual Support**: Full generation and system prompts supported in both English and Indonesian.
+- 📄 **Advanced File Context Support**: Upload reference files (PDF, DOCX, XLSX, Excel, CSV, text, and Images) to provide robust additional context and enrich the generated document.
+- 🌏 **Bilingual Support & Quick Prompts**: Full generation, system prompts, and pre-built quick prompt starters supported seamlessly in both English and Indonesian.
 - 🎨 **Cyberpunk Minimalist UI**: A sleek, dark-themed interface built for focus, speed, and aesthetics (now featuring sleek loading skeletons).
 - 📤 **Export Ready**: Instantly copy to clipboard, download as Markdown (`.md`), or print directly to PDF.
 
