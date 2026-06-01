@@ -15,8 +15,6 @@ import { PRDVersion } from "../types";
 interface BlueprintSheetProps {
   content: string; // active version content
   comments?: Record<string, string>;
-  isToCOpen?: boolean;
-  setIsToCOpen?: (open: boolean) => void;
   onCommentChange?: (sectionId: string, comment: string) => void;
   versions?: PRDVersion[];
   activeVersionId?: string | null;
@@ -78,8 +76,6 @@ export const getSections = (content: string): Section[] => {
 export function BlueprintSheet({
   content,
   comments = {},
-  isToCOpen,
-  setIsToCOpen,
   onCommentChange,
   versions = [],
   activeVersionId,
@@ -100,13 +96,12 @@ export function BlueprintSheet({
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
       if (e.key === "Escape") {
-        if (isToCOpen && setIsToCOpen) setIsToCOpen(false);
         if (isFeedbackDrawerOpen) setIsFeedbackDrawerOpen(false);
       }
     };
     window.addEventListener("keydown", handleKeyDown);
     return () => window.removeEventListener("keydown", handleKeyDown);
-  }, [isToCOpen, isFeedbackDrawerOpen, setIsToCOpen]);
+  }, [isFeedbackDrawerOpen]);
 
   // Track progress
   const [activeSectionIdx, setActiveSectionIdx] = useState(0);
@@ -157,43 +152,6 @@ export function BlueprintSheet({
         <ReactMarkdown remarkPlugins={[remarkGfm]}>{content}</ReactMarkdown>
       </div>
 
-      {/* Floating TOC Pane */}
-      <div
-        className={`fixed top-14 left-0 bottom-0 w-[240px] bg-[#1a1a1a] border-r border-[#2a2a2a] z-20 overflow-y-auto transform transition-transform duration-200 ease no-print ${
-          isToCOpen ? "translate-x-0" : "-translate-x-full"
-        }`}
-      >
-        <div className="p-4 pt-6">
-          <h3 className="text-[13px] font-semibold text-[#f5f5f5] mb-4 font-body opacity-60 uppercase tracking-widest">
-            {language === "en" ? "Contents" : "Daftar Isi"}
-          </h3>
-          <nav className="flex flex-col gap-1.5">
-            {sections.map((sec, idx) => (
-              <a
-                key={idx}
-                href={`#sec_${idx}`}
-                onClick={() => {
-                  if (setIsToCOpen && window.innerWidth < 1024) setIsToCOpen(false);
-                }}
-                className={`py-1.5 px-3 rounded-[6px] text-[13px] transition-all duration-200 ease font-body whitespace-nowrap overflow-hidden text-ellipsis ${
-                  activeSectionIdx === idx
-                    ? "text-[#f5f5f5] bg-[#2a2a2a] font-medium"
-                    : "text-[#999999] hover:text-[#f5f5f5] hover:bg-[#222222]"
-                }`}
-              >
-                {sec.heading}
-              </a>
-            ))}
-          </nav>
-        </div>
-      </div>
-
-      {/* Invisible Hover zone for ToC toggle */}
-      <div 
-        className="fixed left-0 top-14 w-4 h-full z-[19] cursor-pointer hidden lg:block" 
-        onMouseEnter={() => setIsToCOpen && setIsToCOpen(true)} 
-      />
-
       {/* FAB button */}
       <button
         onClick={() => setIsFeedbackDrawerOpen(!isFeedbackDrawerOpen)}
@@ -219,7 +177,7 @@ export function BlueprintSheet({
       >
         <div className="p-6">
           <div className="flex items-center justify-between mb-8 pb-4 border-b border-[#2a2a2a]">
-            <h2 className="text-[18px] font-semibold text-[#f5f5f5] font-body flex items-center gap-2">
+            <h2 className="text-[18px] font-semibold text-[#f5f5f5] flex items-center gap-2">
               <MessageSquareText size={16} strokeWidth={1.5} className="text-[#999999]" />
               {language === "en" ? "Feedback" : "Umpan Balik"}
             </h2>
@@ -233,7 +191,7 @@ export function BlueprintSheet({
               }`}
             >
               <RefreshCw className={`w-4 h-4 ${isGenerating ? "animate-spin" : ""}`} strokeWidth={1.5} />
-              <span className="hidden sm:inline font-body">
+              <span className="hidden sm:inline">
                 {language === "en" ? "Regenerate" : "Buat Ulang"}
               </span>
             </button>
@@ -370,8 +328,8 @@ function SheetSection({
           <div
             id={sectionId}
             className="w-full prose prose-invert max-w-none 
-              prose-headings:font-body prose-headings:font-normal prose-headings:text-[#f5f5f5]
-              prose-h1:font-display prose-h1:text-[36px] sm:prose-h1:text-[48px] prose-h1:mt-8 prose-h1:mb-4 prose-h1:leading-[1.15]
+              prose-headings:font-normal prose-headings:text-[#f5f5f5]
+              prose-h1:text-[36px] sm:prose-h1:text-[48px] prose-h1:mt-8 prose-h1:mb-4 prose-h1:leading-[1.15]
               prose-h2:hidden
               prose-h3:text-[18px] prose-h3:mt-8 prose-h3:font-semibold
               prose-p:text-[#999999] prose-p:text-[15px] prose-p:leading-[1.6] prose-p:mb-4
@@ -402,7 +360,7 @@ function SheetSection({
                   <thead className="bg-[#222222] text-[#f5f5f5] border-b border-[#2a2a2a] print:bg-gray-100 print:text-black print:border-gray-300" {...props} />
                 ),
                 th: ({ node, ...props }) => (
-                  <th className="px-4 py-3 font-semibold whitespace-nowrap text-[13px] font-body" {...props} />
+                  <th className="px-4 py-3 font-semibold whitespace-nowrap text-[13px]" {...props} />
                 ),
                 tbody: ({ node, ...props }) => (
                   <tbody className="divide-y divide-[#2a2a2a] print:divide-gray-200" {...props} />
@@ -487,7 +445,7 @@ function FeedbackCard({
 
   return (
     <div className="bg-[#1a1a1a] border border-[#2a2a2a] rounded-[8px] p-4 text-left">
-      <div className="font-medium text-[13px] text-[#f5f5f5] mb-2 truncate font-body" title={section.heading}>
+      <div className="font-medium text-[13px] text-[#f5f5f5] mb-2 truncate" title={section.heading}>
         {section.heading}
       </div>
 
@@ -497,7 +455,7 @@ function FeedbackCard({
             autoFocus
             value={tempComment}
             onChange={(e) => setTempComment(e.target.value)}
-            className="flex-grow w-full bg-[#111111] border border-[#2a2a2a] text-[#f5f5f5] text-[13px] p-3 rounded-[6px] focus:outline-none focus:border-[#6666ff] transition-all duration-200 ease min-h-[100px] resize-y font-body"
+            className="flex-grow w-full bg-[#111111] border border-[#2a2a2a] text-[#f5f5f5] text-[13px] p-3 rounded-[6px] focus:outline-none focus:border-[#6666ff] transition-all duration-200 ease min-h-[100px] resize-y"
             placeholder={
               language === "en"
                 ? "Add your feedback here..."
@@ -528,7 +486,7 @@ function FeedbackCard({
       ) : (
         <div
           onClick={() => setIsEditing(true)}
-          className={`text-[13px] rounded-[6px] transition-all duration-200 ease cursor-pointer border mt-2 font-body ${
+          className={`text-[13px] rounded-[6px] transition-all duration-200 ease cursor-pointer border mt-2 ${
             comment 
               ? "text-[#cccccc] p-3 bg-[#111111] border-[#2a2a2a] hover:border-[#555555]" 
               : "text-[#555555] p-3 border-dashed border-[#2a2a2a] bg-transparent hover:border-[#555555] hover:text-[#999999]"

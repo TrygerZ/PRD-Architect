@@ -93,14 +93,14 @@ export function ApiKeyModal({
               <div className="w-[32px] h-[32px] rounded-[6px] bg-[#222222] border border-[#2a2a2a] flex items-center justify-center">
                 <Key className="text-[#999999]" size={16} strokeWidth={1.5} />
               </div>
-              <h2 className="text-[18px] font-semibold text-[#f5f5f5] font-body">
+              <h2 className="text-[18px] font-semibold text-[#f5f5f5]">
                 {language === "en" ? "Settings" : "Pengaturan"}
               </h2>
             </div>
             
             <div className="space-y-6">
               <div>
-                <label htmlFor="ai-provider" className="block text-[13px] font-medium text-[#999999] mb-2 font-body">
+                <label htmlFor="ai-provider" className="block text-[13px] font-medium text-[#999999] mb-2">
                   {language === "en" ? "AI Provider" : "Penyedia AI"}
                 </label>
                 <div className="relative">
@@ -108,7 +108,7 @@ export function ApiKeyModal({
                     id="ai-provider"
                     value={provider}
                     onChange={(e) => handleProviderChange(e.target.value as AIProvider)}
-                    className="w-full bg-[#111111] border border-[#2a2a2a] p-3 rounded-[6px] text-[#f5f5f5] text-[13px] font-body focus:border-[#6666ff] focus:outline-none transition-all duration-200 ease appearance-none pr-10"
+                    className="w-full bg-[#111111] border border-[#2a2a2a] p-3 rounded-[6px] text-[#f5f5f5] text-[13px] focus:border-[#6666ff] focus:outline-none transition-all duration-200 ease appearance-none pr-10"
                   >
                     <option value="claude" className="bg-[#111111]">Claude</option>
                     <option value="gemini" className="bg-[#111111]">Gemini</option>
@@ -122,7 +122,7 @@ export function ApiKeyModal({
               </div>
 
               <div>
-                <label htmlFor="ai-model" className="block text-[13px] font-medium text-[#999999] mb-2 font-body">
+                <label htmlFor="ai-model" className="block text-[13px] font-medium text-[#999999] mb-2">
                   {language === "en" ? "AI Model" : "Model AI"}
                 </label>
                 <div className="relative">
@@ -130,7 +130,7 @@ export function ApiKeyModal({
                     id="ai-model"
                     value={model}
                     onChange={(e) => setModel(e.target.value)}
-                    className="w-full bg-[#111111] border border-[#2a2a2a] p-3 rounded-[6px] text-[#f5f5f5] text-[13px] font-body focus:border-[#6666ff] focus:outline-none transition-all duration-200 ease appearance-none pr-10"
+                    className="w-full bg-[#111111] border border-[#2a2a2a] p-3 rounded-[6px] text-[#f5f5f5] text-[13px] focus:border-[#6666ff] focus:outline-none transition-all duration-200 ease appearance-none pr-10"
                   >
                     {MODELS[provider].map((m) => (
                       <option key={m} value={m} className="bg-[#111111]">
@@ -145,7 +145,7 @@ export function ApiKeyModal({
               </div>
 
               <div className="mb-8">
-                <label htmlFor="custom-api-key" className="block text-[13px] font-medium text-[#999999] mb-2 font-body">
+                <label htmlFor="custom-api-key" className="block text-[13px] font-medium text-[#999999] mb-2">
                   {language === "en" ? "Custom API Key" : "Custom API Key"}
                 </label>
                 <input
@@ -163,7 +163,7 @@ export function ApiKeyModal({
                     strokeWidth={1.5}
                     className="shrink-0 mt-0.5 text-[#8a7a2a]"
                   />
-                  <p className="text-[12px] text-[#999999] leading-relaxed font-body">
+                  <p className="text-[12px] text-[#999999] leading-relaxed">
                     {language === "en"
                       ? "Overrides the system default key. Your key is stored securely in your browser's local storage."
                       : "Berlaku untuk provider di atas dan menggantikan key sistem. Tersimpan secara lokal di browser kamu."}
@@ -184,7 +184,7 @@ export function ApiKeyModal({
               <button
                 onClick={handleSave}
                 disabled={saved}
-                className="flex items-center gap-2 text-[13px] font-medium px-4 py-2 rounded-[6px] transition-all duration-200 ease bg-[#f5f5f5] text-[#111111] hover:bg-[#e5e5e5] disabled:opacity-50 disabled:cursor-not-allowed font-body"
+                className="flex items-center gap-2 text-[13px] font-medium px-4 py-2 rounded-[6px] transition-all duration-200 ease bg-[#f5f5f5] text-[#111111] hover:bg-[#e5e5e5] disabled:opacity-50 disabled:cursor-not-allowed"
               >
                 {saved ? (
                   <>

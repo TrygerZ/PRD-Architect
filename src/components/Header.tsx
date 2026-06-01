@@ -1,4 +1,4 @@
-import { Settings, Download, Copy, Printer, List, PanelLeft } from "lucide-react";
+import { Settings, Download, Copy, Printer, PanelLeft } from "lucide-react";
 import { motion } from "motion/react";
 
 interface HeaderProps {
@@ -6,7 +6,6 @@ interface HeaderProps {
   onExportMd: () => void;
   onCopy: () => void;
   onPrint: () => void;
-  onToggleToC?: () => void;
   hasData: boolean;
   language: "id" | "en";
   onToggleLanguage: () => void;
@@ -19,7 +18,6 @@ export function Header({
   onExportMd,
   onCopy,
   onPrint,
-  onToggleToC,
   hasData,
   language,
   onToggleLanguage,
@@ -43,17 +41,7 @@ export function Header({
             <PanelLeft size={18} strokeWidth={1.5} />
           </button>
         )}
-        {!minimal && hasData && onToggleToC && (
-          <button 
-            onClick={onToggleToC}
-            aria-label={language === "en" ? "Toggle Table of Contents" : "Tampilkan Daftar Isi"}
-            className="text-[#999999] hover:text-[#f5f5f5] transition-all duration-200 ease p-1 rounded-[6px] hover:bg-[#222222]"
-            title={language === "en" ? "Toggle Table of Contents" : "Tampilkan Daftar Isi"}
-          >
-            <List size={16} strokeWidth={1.5} />
-          </button>
-        )}
-        <h1 className="text-[18px] sm:text-[18px] font-[600] tracking-[-0.02em] text-[#f5f5f5] font-body">
+        <h1 className="text-[18px] sm:text-[18px] font-[600] tracking-[-0.02em] text-[#f5f5f5]">
           PRD <span className="hidden sm:inline">Architect</span>
         </h1>
       </div>
@@ -68,7 +56,7 @@ export function Header({
                title={language === "en" ? "Copy as Text" : "Salin Text"}
             >
               <Copy size={16} strokeWidth={1.5} />
-              <span className="hidden sm:inline font-body">
+              <span className="hidden sm:inline">
                 {language === "en" ? "Copy" : "Salin"}
               </span>
             </button>

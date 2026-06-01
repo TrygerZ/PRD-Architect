@@ -20,7 +20,6 @@ export default function App() {
   const [productType, setProductType] = useState<ProductType>("Unknown");
   const [language, setLanguage] = useState<"id" | "en">("id");
   const [showScrollTop, setShowScrollTop] = useState(false);
-  const [isToCOpen, setIsToCOpen] = useState(false);
   const [toastMessage, setToastMessage] = useState<string | null>(null);
 
   const [uploadedFiles, setUploadedFiles] = useState<UploadedFile[]>([]);
@@ -311,7 +310,6 @@ export default function App() {
         onExportMd={handleExportMd}
         onCopy={handleCopy}
         onPrint={handlePrint}
-        onToggleToC={() => setIsToCOpen(!isToCOpen)}
         hasData={prdContent.length > 0}
         language={language}
         onToggleLanguage={() =>
@@ -367,8 +365,6 @@ export default function App() {
                 <BlueprintSheet
                   content={prdContent}
                   comments={comments}
-                  isToCOpen={isToCOpen}
-                  setIsToCOpen={setIsToCOpen}
                   onCommentChange={(secId, comment) => {
                     setComments((prev) => {
                       const newCom = { ...prev, [secId]: comment };
@@ -423,7 +419,7 @@ export default function App() {
             const container = document.getElementById('chat-messages-container');
             if (container) container.scrollTo({ top: 0, behavior: 'smooth' });
           }}
-          className={`fixed bottom-[100px] right-[40px] z-[45] w-[36px] h-[36px] rounded-full bg-[#222222] border border-[#333333] text-[#999999] hover:bg-[#333333] hover:text-[#f5f5f5] flex items-center justify-center transition-all duration-200 no-print`}
+          className={`fixed bottom-[160px] right-[40px] z-[45] w-[36px] h-[36px] rounded-full bg-[#222222] border border-[#333333] text-[#999999] hover:bg-[#333333] hover:text-[#f5f5f5] flex items-center justify-center transition-all duration-200 no-print`}
           title={language === "en" ? "Scroll to top" : "Kembali ke atas"}
         >
           <ArrowUp size={16} strokeWidth={1.5} />
