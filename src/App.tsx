@@ -135,15 +135,8 @@ export default function App() {
       );
     } catch (err: any) {
       if (err.name === 'AbortError') {
-        setVersions((prev) => prev.filter((v) => v.id !== newVersionId));
-        if (activeVersionId === newVersionId) {
-          const remaining = versions.filter(v => v.id !== newVersionId);
-          if (remaining.length > 0) {
-            setActiveVersionId(remaining[remaining.length - 1].id);
-          } else {
-            setActiveVersionId(null);
-          }
-        }
+        // Keep the partially generated output — don't delete it
+        setIsGenerating(false);
         return;
       }
       setError(
@@ -196,15 +189,8 @@ export default function App() {
         });
     } catch (err: any) {
       if (err.name === 'AbortError') {
-        setVersions((prev) => prev.filter((v) => v.id !== newVersionId));
-        if (activeVersionId === newVersionId) {
-          const remaining = versions.filter(v => v.id !== newVersionId);
-          if (remaining.length > 0) {
-            setActiveVersionId(remaining[remaining.length - 1].id);
-          } else {
-            setActiveVersionId(null);
-          }
-        }
+        // Keep the partially generated output — don't delete it
+        setIsGenerating(false);
         return;
       }
       setError(
@@ -289,15 +275,8 @@ export default function App() {
       setComments({});
     } catch (err: any) {
       if (err.name === 'AbortError') {
-        setVersions((prev) => prev.filter((v) => v.id !== newVersionId));
-        if (activeVersionId === newVersionId) {
-          const remaining = versions.filter(v => v.id !== newVersionId);
-          if (remaining.length > 0) {
-            setActiveVersionId(remaining[remaining.length - 1].id);
-          } else {
-            setActiveVersionId(null);
-          }
-        }
+        // Keep the partially generated output — don't delete it
+        setIsGenerating(false);
         return;
       }
       setError(
