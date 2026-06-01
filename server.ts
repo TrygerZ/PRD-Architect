@@ -411,7 +411,10 @@ app.post("/api/generate-prd", async (req, res) => {
 
     if (!response.ok) {
       const body = await response.text();
-      throw new Error(`Provider Error (${response.status}): ${body}`);
+      console.error(`Provider Error (${response.status}): ${body}`);
+      throw new Error(language === 'en'
+        ? 'AI provider returned an error. Please check your API key and model settings.'
+        : 'Penyedia AI mengembalikan error. Periksa API key dan pengaturan model Anda.');
     }
 
     const reader = response.body?.getReader();
