@@ -1,11 +1,12 @@
 import { useState, useRef, useEffect } from "react";
-import { Send, Paperclip, Loader2 } from "lucide-react";
+import { Send, Paperclip, Loader2, X } from "lucide-react";
 import { getQuickPrompts } from "../utils/quickPrompts";
 
 interface ChatInputProps {
   onSend: (text: string) => void;
   isGenerating: boolean;
   language: "en" | "id";
+  onCancel?: () => void;
   onAttachClick?: () => void;
   hasFiles?: boolean;
   initialPrompt?: string;
@@ -16,6 +17,7 @@ export function ChatInput({
   onSend,
   isGenerating,
   language,
+  onCancel,
   onAttachClick,
   hasFiles = false,
   initialPrompt = "",
@@ -84,17 +86,26 @@ export function ChatInput({
             rows={1}
           />
 
-          <button
-            type="submit"
-            disabled={!prompt.trim() || isGenerating}
-            className="absolute right-2 bottom-[10px] w-[32px] h-[32px] flex items-center justify-center rounded-[8px] transition-all duration-200 bg-[#f5f5f5] text-[#111111] hover:bg-[#e5e5e5] disabled:opacity-30 disabled:cursor-not-allowed"
-          >
-            {isGenerating ? (
-              <Loader2 size={16} strokeWidth={1.5} className="animate-spin" />
-            ) : (
-              <Send size={16} strokeWidth={1.5} className="relative -ml-[1px]" />
+          <div className="absolute right-2 bottom-[10px] flex items-center gap-2">
+            {isGenerating && onCancel && (
+              <button
+                type="button"
+                onClick={onCancel}
+                className="flex items-center gap-2 text-[13px] font-medium px-4 py-2 rounded-[8px] transition-all duration-200 ease border border-[#8a3a3a] text-[#8a3a3a] hover:bg-[#8a3a3a] hover:text-white font-body"
+              >
+                <X size={16} strokeWidth={1.5} />
+                {language === "en" ? "Cancel" : "Batal"}
+              </button>
             )}
-          </button>
+
+            <button
+              type="submit"
+              disabled={!prompt.trim() || isGenerating}
+              className="w-[32px] h-[32px] flex items-center justify-center rounded-[8px] transition-all duration-200 bg-[#f5f5f5] text-[#111111] hover:bg-[#e5e5e5] disabled:opacity-30 disabled:cursor-not-allowed"
+            >
+              <Send size={16} strokeWidth={1.5} className="relative -ml-[1px]" />
+            </button>
+          </div>
         </form>
 
         {showQuickPrompts && (

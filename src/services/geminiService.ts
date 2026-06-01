@@ -9,6 +9,7 @@ export const generatePRD = async (
   productType: string,
   uploadedFiles: UploadedFile[],
   mode: string = "initial",
+  signal: AbortSignal | undefined,
   onChunk: (chunk: string) => void,
 ) => {
   const response = await fetch("/api/generate-prd", {
@@ -26,6 +27,7 @@ export const generatePRD = async (
       uploadedFiles,
       mode,
     }),
+    signal,
   });
 
   if (!response.ok) {

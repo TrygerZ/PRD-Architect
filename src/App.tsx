@@ -33,12 +33,20 @@ export default function App() {
 
   const [sidebarOpen, setSidebarOpen] = useState(true);
   const [currentPrompt, setCurrentPrompt] = useState("");
+  const [abortController, setAbortController] = useState<AbortController | null>(null);
+
+  const handleCancel = () => {
+    abortController?.abort();
+    setAbortController(null);
+    setIsGenerating(false);
+  };
 
   const handleNewPRD = () => {
     setActiveVersionId(null);
     setComments({});
     setCurrentPrompt("");
     setUploadedFiles([]);
+    setVersions([]);
   };
 
   const showToast = (msg: string) => {
@@ -88,6 +96,10 @@ export default function App() {
     setError(null);
     setComments({}); // reset comments on new base generation
 
+    abortController?.abort();
+    const controller = new AbortController();
+    setAbortController(controller);
+
     const newVersionId = Date.now().toString();
     const newVersion: PRDVersion = {
       id: newVersionId,
@@ -112,6 +124,7 @@ export default function App() {
         type,
         uploadedFiles,
         "initial",
+        controller.signal,
         (chunk) => {
           setVersions((prev) =>
             prev.map((v) =>
@@ -121,6 +134,18 @@ export default function App() {
         },
       );
     } catch (err: any) {
+      if (err.name === 'AbortError') {
+        setVersions((prev) => prev.filter((v) => v.id !== newVersionId));
+        if (activeVersionId === newVersionId) {
+          const remaining = versions.filter(v => v.id !== newVersionId);
+          if (remaining.length > 0) {
+            setActiveVersionId(remaining[remaining.length - 1].id);
+          } else {
+            setActiveVersionId(null);
+          }
+        }
+        return;
+      }
       setError(
         err.message ||
           (language === "en"
@@ -142,6 +167,10 @@ export default function App() {
     setIsGenerating(true);
     setError(null);
 
+    abortController?.abort();
+    const controller = new AbortController();
+    setAbortController(controller);
+
     const appendPrompt = language === "en"
       ? `I have an existing PRD. Please ADD the following to it:\n\n### EXISTING PRD:\n${activeVersion.content}\n\n### ADDITIONAL REQUEST:\n${newPrompt}`
       : `Saya punya PRD yang sudah ada. Tolong TAMBAHKAN berikut:\n\n### PRD SAAT INI:\n${activeVersion.content}\n\n### PERMINTAAN TAMBAHAN:\n${newPrompt}`;
@@ -160,12 +189,24 @@ export default function App() {
 
     try {
       await generatePRD(appendPrompt, customApiKey, provider, model, language,
-        activeVersion.productType, uploadedFiles, "append", (chunk) => {
+        activeVersion.productType, uploadedFiles, "append", controller.signal, (chunk) => {
           setVersions((prev) => prev.map((v) =>
             v.id === newVersionId ? { ...v, content: v.content + chunk } : v
           ));
         });
     } catch (err: any) {
+      if (err.name === 'AbortError') {
+        setVersions((prev) => prev.filter((v) => v.id !== newVersionId));
+        if (activeVersionId === newVersionId) {
+          const remaining = versions.filter(v => v.id !== newVersionId);
+          if (remaining.length > 0) {
+            setActiveVersionId(remaining[remaining.length - 1].id);
+          } else {
+            setActiveVersionId(null);
+          }
+        }
+        return;
+      }
       setError(
         err.message ||
           (language === "en"
@@ -182,6 +223,10 @@ export default function App() {
 
     setIsGenerating(true);
     setError(null);
+
+    abortController?.abort();
+    const controller = new AbortController();
+    setAbortController(controller);
 
     // Build revision prompt
     let revisionPrompt =
@@ -231,6 +276,7 @@ export default function App() {
         activeVersion.productType,
         uploadedFiles,
         "revision",
+        controller.signal,
         (chunk) => {
           setVersions((prev) =>
             prev.map((v) =>
@@ -242,6 +288,18 @@ export default function App() {
       // Clear comments after successful revision
       setComments({});
     } catch (err: any) {
+      if (err.name === 'AbortError') {
+        setVersions((prev) => prev.filter((v) => v.id !== newVersionId));
+        if (activeVersionId === newVersionId) {
+          const remaining = versions.filter(v => v.id !== newVersionId);
+          if (remaining.length > 0) {
+            setActiveVersionId(remaining[remaining.length - 1].id);
+          } else {
+            setActiveVersionId(null);
+          }
+        }
+        return;
+      }
       setError(
         err.message ||
           (language === "en"
@@ -447,6 +505,7 @@ export default function App() {
               }
             }}
             isGenerating={isGenerating}
+            onCancel={handleCancel}
             language={language}
             onAttachClick={() => setShowUploader(!showUploader)}
             hasFiles={uploadedFiles.length > 0}
