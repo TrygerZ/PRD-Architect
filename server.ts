@@ -267,13 +267,41 @@ ${extraPrompt ? '\n\n' + extraPrompt : ''}${getIndustrySpecificPrompt(productTyp
 `;
 }
 
+function getRevisionPrompt(language: string) {
+  const isEn = language === 'en';
+  return `You are an editor revising an existing Product Requirements Document.
+
+CRITICAL INSTRUCTIONS:
+1. Focus ONLY on the sections mentioned in the feedback below
+2. Keep ALL unchanged sections EXACTLY as they are — do not rewrite them
+3. Only modify content related to the specific feedback provided
+4. Maintain the same writing style and format as the existing document
+5. Output pure Markdown — no preamble, no notes, no explanations
+6. Do NOT add new sections unless explicitly requested
+7. Do NOT remove existing content unless feedback specifically says to`;
+}
+
+function getAppendPrompt(language: string) {
+  const isEn = language === 'en';
+  return `You are enhancing an existing Product Requirements Document.
+
+CRITICAL INSTRUCTIONS:
+1. ADD the requested information to the EXISTING document
+2. Do NOT change or regenerate existing content
+3. Insert new content in the most relevant existing section
+4. If the new content requires a new subsection, add it under the relevant chapter
+5. Maintain the same writing style, tone, and format
+6. Output pure Markdown — no preamble, no notes, no explanations
+7. Preserve ALL existing content exactly as-is`;
+}
+
 app.post("/api/generate-prd", async (req, res) => {
   res.setHeader("Content-Type", "text/event-stream");
   res.setHeader("Cache-Control", "no-cache");
   res.setHeader("Connection", "keep-alive");
 
   try {
-    const { prompt, customApiKey, provider = 'deepseek', model = 'deepseek-chat', language = 'id', productType, uploadedFiles } = req.body;
+    const { prompt, customApiKey, provider = 'deepseek', model = 'deepseek-chat', language = 'id', productType, uploadedFiles, mode = 'initial' } = req.body;
     
     if (!prompt) {
       res.write(`data: ${JSON.stringify({ error: language === 'en' ? "Prompt is required" : "Prompt diperlukan" })}\n\n`);
@@ -324,7 +352,14 @@ app.post("/api/generate-prd", async (req, res) => {
       return;
     }
 
-    const finalPrompt = getSystemPrompt(language, "", productType);
+    let finalPrompt;
+    if (mode === 'revision') {
+      finalPrompt = getRevisionPrompt(language);
+    } else if (mode === 'append') {
+      finalPrompt = getAppendPrompt(language);
+    } else {
+      finalPrompt = getSystemPrompt(language, "", productType);
+    }
 
     let fetchHeaders: any = {
       "Content-Type": "application/json",

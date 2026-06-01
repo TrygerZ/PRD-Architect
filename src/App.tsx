@@ -109,6 +109,7 @@ export default function App() {
         language,
         type,
         uploadedFiles,
+        "initial",
         (chunk) => {
           setVersions((prev) =>
             prev.map((v) =>
@@ -125,6 +126,43 @@ export default function App() {
             : "Terjadi kesalahan tidak terduga saat membuat PRD."),
       );
       console.error(err);
+    } finally {
+      setIsGenerating(false);
+    }
+  };
+
+  const handleAppend = async (newPrompt: string) => {
+    if (!activeVersion) {
+      handleGenerate(newPrompt, "Unknown");
+      return;
+    }
+
+    setIsGenerating(true);
+    setError(null);
+
+    const appendPrompt = language === "en"
+      ? `I have an existing PRD. Please ADD the following to it:\n\n### EXISTING PRD:\n${activeVersion.content}\n\n### ADDITIONAL REQUEST:\n${newPrompt}`
+      : `Saya punya PRD yang sudah ada. Tolong TAMBAHKAN berikut:\n\n### PRD SAAT INI:\n${activeVersion.content}\n\n### PERMINTAAN TAMBAHAN:\n${newPrompt}`;
+
+    const newVersionId = Date.now().toString();
+    const newVersion: PRDVersion = {
+      id: newVersionId, timestamp: Date.now(), content: "",
+      prompt: appendPrompt, productType: activeVersion.productType,
+      referencedFilesCount: uploadedFiles.length,
+    };
+
+    setVersions((prev) => [...prev, newVersion]);
+    setActiveVersionId(newVersionId);
+
+    try {
+      await generatePRD(appendPrompt, customApiKey, provider, model, language,
+        activeVersion.productType, uploadedFiles, "append", (chunk) => {
+          setVersions((prev) => prev.map((v) =>
+            v.id === newVersionId ? { ...v, content: v.content + chunk } : v
+          ));
+        });
+    } catch (err: any) {
+      setError(err.message || "Error");
     } finally {
       setIsGenerating(false);
     }
@@ -182,6 +220,7 @@ export default function App() {
         language,
         productType,
         uploadedFiles,
+        "revision",
         (chunk) => {
           setVersions((prev) =>
             prev.map((v) =>
@@ -388,7 +427,13 @@ export default function App() {
 
           {/* Input — fixed bottom */}
           <ChatInput
-            onSend={(text) => handleGenerate(text, "Unknown")}
+            onSend={(text) => {
+              if (activeVersion) {
+                handleAppend(text);
+              } else {
+                handleGenerate(text, "Unknown");
+              }
+            }}
             isGenerating={isGenerating}
             language={language}
             onAttachClick={() => setShowUploader(!showUploader)}
