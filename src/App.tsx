@@ -93,6 +93,7 @@ export default function App() {
       timestamp: Date.now(),
       content: "",
       prompt: prompt,
+      userDisplayPrompt: prompt,
       productType: type,
       referencedFilesCount: uploadedFiles.length,
     };
@@ -147,7 +148,9 @@ export default function App() {
     const newVersionId = Date.now().toString();
     const newVersion: PRDVersion = {
       id: newVersionId, timestamp: Date.now(), content: "",
-      prompt: appendPrompt, productType: activeVersion.productType,
+      prompt: appendPrompt,
+      userDisplayPrompt: newPrompt,
+      productType: activeVersion.productType,
       referencedFilesCount: uploadedFiles.length,
     };
 
@@ -195,8 +198,8 @@ export default function App() {
     });
     revisionPrompt +=
       language === "en"
-        ? `\nPlease generate a completely revised standard 12-chapter PRD reflecting these changes. Keep unchanged sections intact.`
-        : `\nTolong buat ulang PRD 12 bab standar secara utuh dengan menerapkan perubahan tersebut. Biarkan bagian yang tidak direvisi tetap seperti semula.`;
+        ? `\nApply ONLY the revisions listed above. Keep ALL other sections exactly as they are — do not rewrite them.`
+        : `\nTerapkan HANYA revisi yang disebutkan di atas. Biarkan SEMUA bagian lainnya persis seperti aslinya — jangan menulis ulang.`;
 
     const newVersionId = Date.now().toString();
     const newVersion: PRDVersion = {
@@ -204,6 +207,7 @@ export default function App() {
       timestamp: Date.now(),
       content: "",
       prompt: revisionPrompt, // In chat layout we might not want to show this giant prompt
+      userDisplayPrompt: language === "en" ? "Revising PRD based on comments..." : "Merevisi PRD berdasarkan komentar...",
       productType: activeVersion.productType,
       referencedFilesCount: uploadedFiles.length,
     };
@@ -218,7 +222,7 @@ export default function App() {
         provider,
         model,
         language,
-        productType,
+        activeVersion.productType,
         uploadedFiles,
         "revision",
         (chunk) => {
@@ -397,7 +401,9 @@ export default function App() {
                 
                 {/* User Message */}
                 <div className="bg-[#222222] rounded-[8px] p-4 max-w-[85%] ml-auto shadow-sm border border-[#2a2a2a]">
-                  <p className="text-[14px] text-[#f5f5f5] whitespace-pre-wrap">{userPrompt.length > 300 && userPrompt.includes("### Revisions requested per section") ? (language === "en" ? "Revising PRD based on comments..." : "Merevisi PRD berdasarkan komentar...") : userPrompt}</p>
+                  <p className="text-[14px] text-[#f5f5f5] whitespace-pre-wrap">
+                    {activeVersion?.userDisplayPrompt || userPrompt}
+                  </p>
                 </div>
 
                 {/* AI Response — BlueprintSheet */}

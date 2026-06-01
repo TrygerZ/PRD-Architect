@@ -272,13 +272,15 @@ function getRevisionPrompt(language: string) {
   return `You are an editor revising an existing Product Requirements Document.
 
 CRITICAL INSTRUCTIONS:
-1. Focus ONLY on the sections mentioned in the feedback below
-2. Keep ALL unchanged sections EXACTLY as they are — do not rewrite them
-3. Only modify content related to the specific feedback provided
-4. Maintain the same writing style and format as the existing document
-5. Output pure Markdown — no preamble, no notes, no explanations
-6. Do NOT add new sections unless explicitly requested
-7. Do NOT remove existing content unless feedback specifically says to`;
+1. OUTPUT THE COMPLETE, FULL MARKDOWN DOCUMENT with ONLY the requested revisions
+2. Focus ONLY on the sections mentioned in the feedback below
+3. Keep ALL unchanged sections EXACTLY word-for-word — do not rewrite them
+4. Only modify content specifically related to the provided feedback
+5. Maintain the SAME writing style, tone, and format
+6. Output pure Markdown — no preamble, no notes, no explanations
+7. Do NOT add new sections unless explicitly requested
+8. Do NOT remove existing content unless feedback specifically says to
+9. Your output will REPLACE the entire existing document, so you MUST include EVERYTHING`;
 }
 
 function getAppendPrompt(language: string) {
@@ -286,13 +288,13 @@ function getAppendPrompt(language: string) {
   return `You are enhancing an existing Product Requirements Document.
 
 CRITICAL INSTRUCTIONS:
-1. ADD the requested information to the EXISTING document
-2. Do NOT change or regenerate existing content
+1. OUTPUT THE COMPLETE, FULL MARKDOWN DOCUMENT with the requested information ADDED
+2. Do NOT change or regenerate existing content — keep it EXACTLY word-for-word
 3. Insert new content in the most relevant existing section
-4. If the new content requires a new subsection, add it under the relevant chapter
-5. Maintain the same writing style, tone, and format
-6. Output pure Markdown — no preamble, no notes, no explanations
-7. Preserve ALL existing content exactly as-is`;
+4. Maintain the SAME writing style, tone, and format — do not reformat anything
+5. Output pure Markdown — no preamble, no notes, no explanations
+6. PRESERVE ALL existing content exactly as-is — reproduce it faithfully
+7. Your output will REPLACE the entire existing document, so you MUST include EVERYTHING`;
 }
 
 app.post("/api/generate-prd", async (req, res) => {
@@ -352,13 +354,19 @@ app.post("/api/generate-prd", async (req, res) => {
       return;
     }
 
-    let finalPrompt;
+    let modeInstructions = '';
     if (mode === 'revision') {
-      finalPrompt = getRevisionPrompt(language);
+      modeInstructions = getRevisionPrompt(language);
     } else if (mode === 'append') {
-      finalPrompt = getAppendPrompt(language);
-    } else {
+      modeInstructions = getAppendPrompt(language);
+    }
+
+    let finalPrompt;
+    if (mode === 'initial') {
       finalPrompt = getSystemPrompt(language, "", productType);
+    } else {
+      // Gabungkan: full system prompt + mode instructions di akhir
+      finalPrompt = getSystemPrompt(language, "", productType) + '\n\n' + modeInstructions;
     }
 
     let fetchHeaders: any = {

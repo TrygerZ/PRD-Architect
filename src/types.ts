@@ -24,4 +24,5 @@ export interface PRDVersion {
   prompt: string;
   productType: ProductType;
   referencedFilesCount?: number;
+  userDisplayPrompt?: string;
 }
