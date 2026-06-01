@@ -248,6 +248,7 @@ MVP phase, 12-week sprint plan, milestones.
 
 **Chapter 12: AI Agent Implementation Guidelines**
 Tech stack recommendation, directory structure, core data types, AI agent roadmap (phases).
+${getIndustrySpecificPrompt(productType)}
 
 **FORMATTING RULES:**
 - Heading level 2 (##) untuk judul chapter
@@ -263,8 +264,7 @@ Setiap chapter dimulai dengan \`## [nomor]. [Judul Chapter]\` (heading level 2).
 User Stories menggunakan list format (bukan tabel) dengan field: Role, Problem, Pain Point, Habit, User Story, Acceptance Criteria, Edge Cases.
 Tabel hanya untuk: API Design, Risk Register, Success Metrics.
 Jangan gunakan placeholder — semua konten harus konkret dan spesifik.
-${extraPrompt ? '\n\n' + extraPrompt : ''}${getIndustrySpecificPrompt(productType)}
-`;
+${extraPrompt ? '\n\n' + extraPrompt : ''}`;
 }
 
 function getRevisionPrompt(language: string) {
@@ -383,7 +383,7 @@ app.post("/api/generate-prd", async (req, res) => {
         messages: [
           { role: "user", content: finalUserPrompt }
         ],
-        max_tokens: 8192,
+        max_tokens: 16384,
         temperature: 0.2,
         stream: true,
       };
@@ -396,8 +396,9 @@ app.post("/api/generate-prd", async (req, res) => {
           { role: "user", content: finalUserPrompt }
         ],
         stream: true,
-        max_tokens: 8192,
-        temperature: 0.2,
+        max_tokens: 16384,
+        temperature: 0.1,
+        top_p: 0.1,
         seed: 42,
       };
     }
@@ -444,11 +445,6 @@ app.post("/api/generate-prd", async (req, res) => {
               const chunkText = data.choices?.[0]?.delta?.content;
               if (chunkText) {
                 res.write(`data: ${JSON.stringify({ text: chunkText })}\n\n`);
-              }
-              const finishReason = data.choices?.[0]?.finish_reason;
-              if (finishReason && finishReason !== "stop" && finishReason !== null) {
-                  const stoppedNote = "\n\n> **Note:** Generation stopped. Reason: \\`" + finishReason + "\\`\n\n";
-                  res.write(`data: ${JSON.stringify({ text: stoppedNote })}\n\n`);
               }
             }
           } catch (e) {
