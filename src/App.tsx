@@ -88,7 +88,7 @@ export default function App() {
         provider,
         model,
         language,
-        productType,
+        type,
         uploadedFiles,
         (chunk) => {
           setVersions((prev) =>

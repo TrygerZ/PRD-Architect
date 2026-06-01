@@ -445,7 +445,8 @@ app.post("/api/generate-prd", async (req, res) => {
               }
               const finishReason = data.choices?.[0]?.finish_reason;
               if (finishReason && finishReason !== "stop" && finishReason !== null) {
-                  res.write(`data: ${JSON.stringify({ text: "\n\n> **Note:** Generation stopped. Reason: `" + finishReason + "`\n\n" })}\n\n`);
+                  const stoppedNote = "\n\n> **Note:** Generation stopped. Reason: \\`" + finishReason + "\\`\n\n";
+                  res.write(`data: ${JSON.stringify({ text: stoppedNote })}\n\n`);
               }
             }
           } catch (e) {

@@ -33,6 +33,7 @@ export function Header({
         {hasData && onToggleToC && (
           <button 
             onClick={onToggleToC}
+            aria-label={language === "en" ? "Toggle Table of Contents" : "Tampilkan Daftar Isi"}
             className="text-[#999999] hover:text-[#f5f5f5] transition-all duration-200 ease p-1 rounded-[6px] hover:bg-[#222222]"
             title={language === "en" ? "Toggle Table of Contents" : "Tampilkan Daftar Isi"}
           >

@@ -129,6 +129,7 @@ export function TerminalConsole({
 
       <form onSubmit={handleSubmit} className="relative">
         <textarea
+          aria-label={language === "en" ? "Product description input" : "Input deskripsi produk"}
           value={prompt}
           onChange={(e) => setPrompt(e.target.value)}
           placeholder={

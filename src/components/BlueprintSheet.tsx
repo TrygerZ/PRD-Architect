@@ -1,5 +1,5 @@
-import { useState, useEffect, useRef } from "react";
-import { motion, AnimatePresence } from "motion/react";
+import { useState, useEffect } from "react";
+import { motion } from "motion/react";
 import ReactMarkdown from "react-markdown";
 import remarkGfm from "remark-gfm";
 import {
@@ -71,7 +71,7 @@ export const getSections = (content: string): Section[] => {
     });
   }
 
-  return sections.filter((s) => s.content.trim().length > 0);
+  return sections.filter((s) => s.heading.trim().length > 0);
 };
 
 export function BlueprintSheet({
@@ -111,7 +111,7 @@ export function BlueprintSheet({
 
   useEffect(() => {
     const handleScroll = () => {
-      const headings = Array.from(document.querySelectorAll("h2"));
+      const headings = Array.from(document.querySelectorAll("[data-prd-content] h2"));
       let currentIdx = 0;
       for (let i = 0; i < headings.length; i++) {
         const rect = headings[i].getBoundingClientRect();
@@ -141,7 +141,7 @@ export function BlueprintSheet({
         }`}
       >
         <div className="p-4 pt-6">
-          <h3 className="text-[13px] font-semibold text-[#f5f5f5] mb-4 font-body opacity-60 uppercase tracking-widest hidden">
+          <h3 className="text-[13px] font-semibold text-[#f5f5f5] mb-4 font-body opacity-60 uppercase tracking-widest">
             {language === "en" ? "Contents" : "Daftar Isi"}
           </h3>
           <nav className="flex flex-col gap-1.5">
@@ -167,7 +167,7 @@ export function BlueprintSheet({
 
       {/* Invisible Hover zone for ToC toggle */}
       <div 
-        className="fixed left-0 top-14 w-4 h-full z-19 cursor-pointer hidden lg:block" 
+        className="fixed left-0 top-14 w-4 h-full z-[19] cursor-pointer hidden lg:block" 
         onMouseEnter={() => setIsToCOpen && setIsToCOpen(true)} 
       />
 
@@ -190,7 +190,7 @@ export function BlueprintSheet({
 
       {/* Section Progress */}
       {sections.length > 0 && !isGenerating && (
-        <div className="fixed bottom-20 right-[24px] z-35 flex flex-col items-end gap-1.5 no-print font-mono text-[13px] text-[#555555]">
+        <div className="fixed bottom-20 right-[24px] z-[35] flex flex-col items-end gap-1.5 no-print font-mono text-[13px] text-[#555555]">
           <span>{String(activeSectionIdx + 1).padStart(2, "0")} / {String(sections.length).padStart(2, "0")}</span>
           <div className="w-[48px] h-[2px] bg-[#2a2a2a] rounded overflow-hidden">
             <div 
@@ -282,7 +282,7 @@ export function BlueprintSheet({
       {!content && isGenerating ? (
         <LoadingSkeleton />
       ) : (
-        <div className="space-y-4">
+        <div className="space-y-2" data-prd-content="true">
           {sections.map((section, index) => {
             const sectionId = `sec_${index}`;
             return (
@@ -326,7 +326,7 @@ function SheetSection({
       initial={{ opacity: 0, y: 10 }}
       animate={{ opacity: 1, y: 0 }}
       transition={{ duration: 0.3 }}
-      className="relative group/section pb-4 print:break-inside-avoid print:bg-transparent print:border-none print:shadow-none print:p-0"
+      className="relative group/section pb-3 print:break-inside-avoid print:bg-transparent print:border-none print:shadow-none print:p-0"
     >
       <div
         id={sectionId}

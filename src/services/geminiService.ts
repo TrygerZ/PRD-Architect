@@ -27,7 +27,8 @@ export const generatePRD = async (
   });
 
   if (!response.ok) {
-    throw new Error("Failed to generate PRD");
+    const errorData = await response.json().catch(() => ({}));
+    throw new Error(errorData.error || `Server responded with ${response.status}`);
   }
 
   const reader = response.body?.getReader();
