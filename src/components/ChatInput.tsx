@@ -8,7 +8,6 @@ interface ChatInputProps {
   onAttachClick?: () => void;
   hasFiles?: boolean;
   initialPrompt?: string;
-  setInitialPrompt?: (val: string) => void;
   showQuickPrompts?: boolean;
 }
 
@@ -26,18 +25,16 @@ export function ChatInput({
   onAttachClick,
   hasFiles = false,
   initialPrompt = "",
-  setInitialPrompt,
   showQuickPrompts = false,
 }: ChatInputProps) {
   const [prompt, setPrompt] = useState(initialPrompt);
   const textareaRef = useRef<HTMLTextAreaElement>(null);
 
   useEffect(() => {
-    if (initialPrompt !== undefined && initialPrompt !== prompt && setInitialPrompt) {
+    if (initialPrompt && initialPrompt !== prompt) {
       setPrompt(initialPrompt);
-      setInitialPrompt(""); // clear it so we don't keep resetting it
     }
-  }, [initialPrompt, prompt, setInitialPrompt]);
+  }, [initialPrompt]);
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();

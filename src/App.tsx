@@ -7,6 +7,7 @@ import { ApiKeyModal } from "./components/ApiKeyModal";
 import { generatePRD } from "./services/geminiService";
 import { ProductType, PRDVersion, UploadedFile, AIProvider } from "./types";
 import { ArrowUp } from "lucide-react";
+import { FileUploader } from "./components/FileUploader";
 
 import { Sidebar } from "./components/Sidebar";
 
@@ -338,6 +339,15 @@ export default function App() {
         {/* Chat Area */}
         <div className="flex-1 flex flex-col relative overflow-hidden">
           <div className="flex-1 overflow-y-auto px-6 pb-[180px]" id="chat-messages-container">
+            {showUploader && (
+              <div className="max-w-[640px] mx-auto w-full mb-4 mt-4">
+                <FileUploader
+                  files={uploadedFiles}
+                  onFilesChange={setUploadedFiles}
+                  language={language}
+                />
+              </div>
+            )}
             {!hasMessage ? (
               <WelcomeScreen language={language} onQuickPrompt={(text) => setCurrentPrompt(text)} />
             ) : (
@@ -388,8 +398,7 @@ export default function App() {
             onAttachClick={() => setShowUploader(!showUploader)}
             hasFiles={uploadedFiles.length > 0}
             initialPrompt={currentPrompt}
-            setInitialPrompt={setCurrentPrompt}
-            showQuickPrompts={!hasMessage}
+            showQuickPrompts={false}
           />
         </div>
       </div>
