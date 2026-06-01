@@ -282,7 +282,7 @@ export function BlueprintSheet({
       {!content && isGenerating ? (
         <LoadingSkeleton />
       ) : (
-        <div className="space-y-2" data-prd-content="true">
+        <div className="space-y-0" data-prd-content="true">
           {sections.map((section, index) => {
             const sectionId = `sec_${index}`;
             return (
@@ -326,7 +326,7 @@ function SheetSection({
       initial={{ opacity: 0, y: 10 }}
       animate={{ opacity: 1, y: 0 }}
       transition={{ duration: 0.3 }}
-      className="relative group/section pb-3 print:break-inside-avoid print:bg-transparent print:border-none print:shadow-none print:p-0"
+      className="relative group/section pb-2 print:break-inside-avoid print:bg-transparent print:border-none print:shadow-none print:p-0"
     >
       <div
         id={sectionId}
@@ -455,7 +455,7 @@ function SheetSection({
       </div>
 
       {index < total - 1 && (
-        <div className="relative mt-[24px] mb-[16px] h-[1px] bg-[#2a2a2a] no-print">
+        <div className="relative mt-[16px] mb-[8px] h-[1px] bg-[#2a2a2a] no-print">
         </div>
       )}
     </motion.div>

@@ -100,11 +100,12 @@ export function ApiKeyModal({
             
             <div className="space-y-6">
               <div>
-                <label className="block text-[13px] font-medium text-[#999999] mb-2 font-body">
+                <label htmlFor="ai-provider" className="block text-[13px] font-medium text-[#999999] mb-2 font-body">
                   {language === "en" ? "AI Provider" : "Penyedia AI"}
                 </label>
                 <div className="relative">
                   <select
+                    id="ai-provider"
                     value={provider}
                     onChange={(e) => handleProviderChange(e.target.value as AIProvider)}
                     className="w-full bg-[#111111] border border-[#2a2a2a] p-3 rounded-[6px] text-[#f5f5f5] text-[13px] font-body focus:border-[#6666ff] focus:outline-none transition-all duration-200 ease appearance-none pr-10"
@@ -121,11 +122,12 @@ export function ApiKeyModal({
               </div>
 
               <div>
-                <label className="block text-[13px] font-medium text-[#999999] mb-2 font-body">
+                <label htmlFor="ai-model" className="block text-[13px] font-medium text-[#999999] mb-2 font-body">
                   {language === "en" ? "AI Model" : "Model AI"}
                 </label>
                 <div className="relative">
                   <select
+                    id="ai-model"
                     value={model}
                     onChange={(e) => setModel(e.target.value)}
                     className="w-full bg-[#111111] border border-[#2a2a2a] p-3 rounded-[6px] text-[#f5f5f5] text-[13px] font-body focus:border-[#6666ff] focus:outline-none transition-all duration-200 ease appearance-none pr-10"
@@ -143,10 +145,11 @@ export function ApiKeyModal({
               </div>
 
               <div className="mb-8">
-                <label className="block text-[13px] font-medium text-[#999999] mb-2 font-body">
+                <label htmlFor="custom-api-key" className="block text-[13px] font-medium text-[#999999] mb-2 font-body">
                   {language === "en" ? "Custom API Key" : "Custom API Key"}
                 </label>
                 <input
+                  id="custom-api-key"
                   type="password"
                   value={apiKey}
                   onChange={(e) => setApiKey(e.target.value)}
