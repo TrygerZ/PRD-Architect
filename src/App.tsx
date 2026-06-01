@@ -15,7 +15,7 @@ export default function App() {
   const [isSettingsOpen, setIsSettingsOpen] = useState(false);
   const [customApiKey, setCustomApiKey] = useState("");
   const [provider, setProvider] = useState<AIProvider>("deepseek");
-  const [model, setModel] = useState<string>("deepseek-chat");
+  const [model, setModel] = useState<string>("deepseek-v4-flash");
   const [isGenerating, setIsGenerating] = useState(false);
   const [productType, setProductType] = useState<ProductType>("Unknown");
   const [language, setLanguage] = useState<"id" | "en">("id");
@@ -38,6 +38,7 @@ export default function App() {
     setActiveVersionId(null);
     setComments({});
     setCurrentPrompt("");
+    setUploadedFiles([]);
   };
 
   const showToast = (msg: string) => {
@@ -165,7 +166,12 @@ export default function App() {
           ));
         });
     } catch (err: any) {
-      setError(err.message || "Error");
+      setError(
+        err.message ||
+          (language === "en"
+            ? "An unexpected error occurred while appending."
+            : "Terjadi kesalahan saat menambahkan konten."),
+      );
     } finally {
       setIsGenerating(false);
     }

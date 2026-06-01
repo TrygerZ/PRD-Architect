@@ -1,5 +1,4 @@
 import { useState, useEffect } from "react";
-import { motion } from "motion/react";
 import ReactMarkdown from "react-markdown";
 import remarkGfm from "remark-gfm";
 import {
@@ -107,19 +106,21 @@ export function BlueprintSheet({
   const [activeSectionIdx, setActiveSectionIdx] = useState(0);
 
   useEffect(() => {
+    const container = document.getElementById('chat-messages-container');
+    if (!container) return;
+    
     const handleScroll = () => {
-      const headings = Array.from(document.querySelectorAll("[data-prd-content] h2"));
+      const headings = Array.from(container.querySelectorAll("[data-prd-content] h2"));
       let currentIdx = 0;
       for (let i = 0; i < headings.length; i++) {
         const rect = headings[i].getBoundingClientRect();
-        if (rect.top <= 100) {
-          currentIdx = i;
-        }
+        if (rect.top <= 100) currentIdx = i;
       }
       setActiveSectionIdx(currentIdx);
     };
-    window.addEventListener("scroll", handleScroll);
-    return () => window.removeEventListener("scroll", handleScroll);
+    
+    container.addEventListener("scroll", handleScroll);
+    return () => container.removeEventListener("scroll", handleScroll);
   }, [sections]);
 
   const activeVersion = versions.find(v => v.id === activeVersionId) || versions[versions.length - 1];
