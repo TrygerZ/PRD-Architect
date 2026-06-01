@@ -301,7 +301,44 @@ Explicitly state that the AI should NOT write all code in a single prompt, but e
 - Your writing style must be: Professional, concise, data-driven, and technical.
 - Always use consistent phrasing for similar concepts across all chapters.
 - Maintain consistent table formatting, heading styles, and list structures across all generations.
-- Never change the narrative voice or formatting approach between different generation sessions.${extraPrompt ? '\n\n' + extraPrompt : ''}${getIndustrySpecificPrompt(productType)}
+- Never change the narrative voice or formatting approach between different generation sessions.
+
+**CONCRETE EXAMPLE of Chapter 1 output:**
+
+# 1. Executive Summary
+
+**Nama Produk:** [Nama Produk]
+**Tujuan Produk:** [1-2 kalimat menjelaskan tujuan utama produk]
+**Masalah yang Dipecahkan:** [1-2 kalimat]
+**Target Pengguna:** [deskripsi singkat pengguna utama]
+**Value Proposition:** [1 kalimat nilai unik produk]
+
+**CONCRETE EXAMPLE of User Story format:**
+
+- **Role:** Pemilik toko kelontong
+- **Problem:** Kesulitan mencatat stok barang secara manual
+- **Pain Point:** Sering kehabisan stok tanpa sepengetahuan
+- **Habit:** Mencatat di buku setiap malam
+- **User Story:** Sebagai pemilik toko, saya ingin stok otomatis terupdate saat transaksi sehingga saya tidak perlu catat manual
+- **Acceptance Criteria:**
+  - [ ] Stok berkurang otomatis saat transaksi selesai
+  - [ ] Notifikasi stok minimal muncul di dashboard
+  - [ ] Riwayat perubahan stok tercatat
+- **Edge Cases:**
+  - [Transaksi dibatalkan setelah stok berkurang]
+  - [Dua kasir transaksi di barang yang sama bersamaan]
+---
+
+**CONCRETE EXAMPLE of table format:**
+
+| Endpoint | Method | Description |
+|---|---|---|
+| /api/products | GET | Mengambil daftar produk |
+|---|---|---|
+
+Gunakan separator tabel dengan tepat 3 strip: |---|---|
+
+**CRITICAL REMINDER:** Output hanya Markdown murni. JANGAN ADA kata pengantar seperti "Tentu, saya akan generate PRD" — langsung mulai dari heading chapter 1.${extraPrompt ? '\n\n' + extraPrompt : ''}${getIndustrySpecificPrompt(productType)}
 `;
 }
 
@@ -379,7 +416,7 @@ app.post("/api/generate-prd", async (req, res) => {
           { role: "user", content: finalUserPrompt }
         ],
         max_tokens: 8192,
-        temperature: 0.5,
+        temperature: 0.2,
         stream: true,
       };
     } else {
@@ -392,12 +429,9 @@ app.post("/api/generate-prd", async (req, res) => {
         ],
         stream: true,
         max_tokens: 8192,
-        temperature: 0.5,
+        temperature: 0.2,
+        seed: 42,
       };
-
-      if (provider === "gpt" || provider === "deepseek") {
-        fetchBody.seed = 42;
-      }
     }
 
     const response = await fetch(endpoint, {
