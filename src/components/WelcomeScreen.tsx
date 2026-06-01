@@ -8,7 +8,7 @@ interface WelcomeScreenProps {
 
 export function WelcomeScreen({ language, onQuickPrompt }: WelcomeScreenProps) {
   return (
-    <div className="w-full flex flex-col items-center justify-center flex-1 h-full pt-[10vh]">
+    <div className="w-full flex flex-col items-center justify-center flex-1 h-full pt-[5vh] sm:pt-[10vh]">
       <motion.div 
         initial={{ opacity: 0, y: 10 }}
         animate={{ opacity: 1, y: 0 }}

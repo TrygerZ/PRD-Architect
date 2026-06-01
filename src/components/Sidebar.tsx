@@ -31,7 +31,7 @@ export function Sidebar({
 
   return (
     <div 
-      className={`w-[320px] h-full bg-[#1a1a1a] border-r border-[#2a2a2a] overflow-y-auto shrink-0 transition-transform duration-200 ease-in-out flex flex-col ${isOpen ? "absolute z-40 lg:relative translate-x-0" : "-translate-x-full fixed lg:relative lg:translate-x-0 lg:block hidden"}`}
+      className={`${isOpen ? "w-[280px] sm:w-[320px]" : "w-[280px] sm:w-[320px]"} h-full bg-[#1a1a1a] border-r border-[#2a2a2a] overflow-y-auto shrink-0 transition-transform duration-200 ease-in-out flex flex-col ${isOpen ? "absolute z-40 lg:relative translate-x-0" : "-translate-x-full fixed lg:relative lg:translate-x-0 lg:block hidden"}`}
     >
       <button 
         onClick={onNewPRD}

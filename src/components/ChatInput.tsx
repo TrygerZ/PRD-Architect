@@ -40,6 +40,12 @@ export function ChatInput({
   };
 
   const handleKeyDown = (e: React.KeyboardEvent<HTMLTextAreaElement>) => {
+    const isMobile = 'ontouchstart' in window;
+    if (isMobile) {
+      // Mobile: Enter = newline (no Shift key available)
+      return;
+    }
+    // Desktop: Enter = submit, Shift+Enter = newline
     if (e.key === 'Enter' && !e.shiftKey) {
       e.preventDefault();
       handleSubmit(e);
@@ -62,7 +68,7 @@ export function ChatInput({
             <button
               type="button"
               onClick={onAttachClick}
-              className={`absolute left-3 bottom-[14px] flex items-center justify-center w-[32px] h-[32px] rounded-[8px] transition-all duration-200 bg-transparent ${
+              className={`absolute left-[10px] top-1/2 -translate-y-1/2 flex items-center justify-center w-[32px] h-[32px] rounded-[8px] transition-all duration-200 bg-transparent ${
                 hasFiles ? "text-[#f5f5f5] bg-[#222222]" : "text-[#666666] hover:text-[#999999] hover:bg-[#222222]"
               }`}
             >
@@ -81,12 +87,12 @@ export function ChatInput({
                 ? "Describe the product you want to build..."
                 : "Jelaskan produk yang ingin kamu bangun..."
             }
-            className="w-full bg-[#1a1a1a] text-[#f5f5f5] placeholder:text-[#555555] outline-none resize-none min-h-[48px] max-h-[200px] font-mono text-[14px] border border-[#333333] focus:border-[#6666ff] rounded-[12px] p-3 pl-12 pr-14 transition-all duration-200"
+            className="w-full bg-[#1a1a1a] text-[#f5f5f5] placeholder:text-[#555555] outline-none resize-none min-h-[48px] max-h-[200px] font-mono text-[14px] border border-[#333333] focus:border-[#6666ff] rounded-[12px] p-3 pl-12 pr-[88px] transition-all duration-200"
             disabled={isGenerating}
             rows={1}
           />
 
-          <div className="absolute bottom-3 right-3 flex items-center gap-2">
+          <div className="absolute right-[10px] top-1/2 -translate-y-1/2 flex items-center gap-1.5">
             {isGenerating && onCancel && (
               <button
                 type="button"

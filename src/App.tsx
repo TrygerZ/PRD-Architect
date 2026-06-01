@@ -31,7 +31,7 @@ export default function App() {
 
   const [error, setError] = useState<string | null>(null);
 
-  const [sidebarOpen, setSidebarOpen] = useState(true);
+  const [sidebarOpen, setSidebarOpen] = useState(false);
   const [currentPrompt, setCurrentPrompt] = useState("");
   const [abortController, setAbortController] = useState<AbortController | null>(null);
 
@@ -422,7 +422,7 @@ export default function App() {
 
         {/* Chat Area */}
         <div className="flex-1 flex flex-col relative overflow-hidden">
-          <div className="flex-1 overflow-y-auto px-6 pb-[180px]" id="chat-messages-container">
+          <div className="flex-1 overflow-y-auto px-4 sm:px-6 pb-[240px]" id="chat-messages-container">
             {showUploader && (
               <div className="max-w-[640px] mx-auto w-full mb-4 mt-4">
                 <FileUploader
@@ -443,7 +443,7 @@ export default function App() {
                 )}
                 
                 {/* User Message */}
-                <div className="bg-[#222222] rounded-[8px] p-4 max-w-[85%] ml-auto shadow-sm border border-[#2a2a2a]">
+                <div className="bg-[#222222] rounded-[8px] p-3 sm:p-4 max-w-[95%] sm:max-w-[85%] ml-auto shadow-sm border border-[#2a2a2a]">
                   <p className="text-[14px] text-[#f5f5f5] whitespace-pre-wrap">
                     {activeVersion?.userDisplayPrompt || userPrompt}
                   </p>

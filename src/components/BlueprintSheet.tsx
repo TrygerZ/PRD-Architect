@@ -156,7 +156,7 @@ export function BlueprintSheet({
       {/* FAB button */}
       <button
         onClick={() => setIsFeedbackDrawerOpen(!isFeedbackDrawerOpen)}
-        className={`fixed bottom-[100px] right-[40px] z-[40] w-[48px] h-[48px] rounded-full flex items-center justify-center transition-all duration-200 ease shadow-lg no-print ${
+        className={`fixed bottom-[130px] sm:bottom-[110px] right-[40px] z-[40] w-[48px] h-[48px] rounded-full flex items-center justify-center transition-all duration-200 ease shadow-lg no-print ${
           isFeedbackDrawerOpen 
             ? "bg-[#2a2a2a] text-[#f5f5f5]" 
             : "bg-[#f5f5f5] hover:bg-[#e5e5e5] text-[#111111]"
@@ -172,7 +172,7 @@ export function BlueprintSheet({
 
       {/* Slide-in Feedback Drawer */}
       <div
-        className={`fixed top-14 right-0 bottom-0 w-[400px] max-w-[100vw] bg-[#1a1a1a] border-l border-[#2a2a2a] z-30 transition-transform duration-200 ease overflow-y-auto no-print ${
+        className={`fixed top-0 right-0 bottom-0 w-[400px] max-w-[100vw] bg-[#1a1a1a] border-l border-[#2a2a2a] z-30 transition-transform duration-200 ease overflow-y-auto no-print ${
           isFeedbackDrawerOpen ? "translate-x-0" : "translate-x-full"
         }`}
       >
