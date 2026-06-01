@@ -44,18 +44,17 @@ export const getSections = (content: string): Section[] => {
 
   for (let i = 0; i < lines.length; i++) {
     const line = lines[i];
-    const match = line.match(/^(#{1,2})\s+(.*)/);
+    const match = line.match(/^(#{2})\s+(.*)/);
 
     if (match) {
       if (currentContent.length > 0) {
         sections.push({
           index: sections.length,
-          level: currentLevel,
+          level: 2,
           heading: currentHeading,
           content: currentContent.join("\n"),
         });
       }
-      currentLevel = match[1].length;
       currentHeading = match[2];
       currentContent = [line];
     } else {
@@ -66,7 +65,7 @@ export const getSections = (content: string): Section[] => {
   if (currentContent.length > 0) {
     sections.push({
       index: sections.length,
-      level: currentLevel,
+      level: 2,
       heading: currentHeading,
       content: currentContent.join("\n"),
     });
@@ -327,14 +326,14 @@ function SheetSection({
       initial={{ opacity: 0, y: 10 }}
       animate={{ opacity: 1, y: 0 }}
       transition={{ duration: 0.3 }}
-      className="relative group/section pb-6 print:break-inside-avoid print:bg-transparent print:border-none print:shadow-none print:p-0"
+      className="relative group/section pb-4 print:break-inside-avoid print:bg-transparent print:border-none print:shadow-none print:p-0"
     >
       <div
         id={sectionId}
         className="w-full prose prose-invert max-w-none 
           prose-headings:font-body prose-headings:font-normal prose-headings:text-[#f5f5f5]
           prose-h1:font-display prose-h1:text-[36px] sm:prose-h1:text-[48px] prose-h1:mt-8 prose-h1:mb-4 prose-h1:leading-[1.15]
-          prose-h2:text-[24px] prose-h2:mt-4 prose-h2:mb-6 prose-h2:leading-[1.4]
+          prose-h2:text-[24px] prose-h2:mt-0 prose-h2:mb-4 prose-h2:leading-[1.4]
           prose-h3:text-[18px] prose-h3:mt-8 prose-h3:font-semibold
           prose-p:text-[#999999] prose-p:text-[15px] prose-p:leading-[1.6] prose-p:mb-4
           prose-a:text-[#6666ff] hover:prose-a:text-[#8888ff] prose-a:no-underline transition-colors
@@ -456,7 +455,7 @@ function SheetSection({
       </div>
 
       {index < total - 1 && (
-        <div className="relative mt-[32px] mb-[32px] h-[1px] bg-[#2a2a2a] no-print">
+        <div className="relative mt-[24px] mb-[16px] h-[1px] bg-[#2a2a2a] no-print">
         </div>
       )}
     </motion.div>
