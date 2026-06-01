@@ -328,18 +328,10 @@ app.post("/api/generate-prd", async (req, res) => {
     let endpoint = "";
     let modelName = model;
 
-    if (provider === "gpt") {
-      apiKeyEnvName = "OPENAI_API_KEY";
-      endpoint = "https://api.openai.com/v1/chat/completions";
-      if (!modelName) modelName = "gpt-4o";
-    } else if (provider === "gemini") {
+    if (provider === "gemini") {
       apiKeyEnvName = "GEMINI_API_KEY";
       endpoint = "https://generativelanguage.googleapis.com/v1beta/openai/chat/completions";
       if (!modelName) modelName = "gemini-2.5-flash";
-    } else if (provider === "claude") {
-      apiKeyEnvName = "ANTHROPIC_API_KEY";
-      endpoint = "https://api.anthropic.com/v1/messages";
-      if (!modelName) modelName = "claude-3-7-sonnet-20250219";
     } else {
       apiKeyEnvName = "DEEPSEEK_API_KEY";
       endpoint = "https://api.deepseek.com/chat/completions";
@@ -374,18 +366,17 @@ app.post("/api/generate-prd", async (req, res) => {
     };
     let fetchBody: any = {};
 
-    if (provider === "claude") {
-      fetchHeaders["x-api-key"] = customKey;
-      fetchHeaders["anthropic-version"] = "2023-06-01";
+    if (provider === "gemini") {
+      fetchHeaders["Authorization"] = "Bearer " + customKey;
       fetchBody = {
         model: modelName,
-        system: finalPrompt,
         messages: [
+          { role: "system", content: finalPrompt },
           { role: "user", content: finalUserPrompt }
         ],
-        max_tokens: 16384,
-        temperature: 0.2,
         stream: true,
+        max_tokens: 8192,
+        temperature: 0.1,
       };
     } else {
       fetchHeaders["Authorization"] = "Bearer " + customKey;
@@ -440,15 +431,9 @@ app.post("/api/generate-prd", async (req, res) => {
           }
           try {
             const data = JSON.parse(dataStr);
-            if (provider === 'claude') {
-              if (data.type === 'content_block_delta' && data.delta?.type === 'text_delta') {
-                res.write(`data: ${JSON.stringify({ text: data.delta.text })}\n\n`);
-              }
-            } else {
-              const chunkText = data.choices?.[0]?.delta?.content;
-              if (chunkText) {
-                res.write(`data: ${JSON.stringify({ text: chunkText })}\n\n`);
-              }
+            const chunkText = data.choices?.[0]?.delta?.content;
+            if (chunkText) {
+              res.write(`data: ${JSON.stringify({ text: chunkText })}\n\n`);
             }
           } catch (e) {
             console.error("Custom provider parse error", e, dataStr);

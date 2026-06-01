@@ -28,9 +28,7 @@ export function ApiKeyModal({
 
   const MODELS: Record<AIProvider, string[]> = {
     deepseek: ["deepseek-v4-flash", "deepseek-v4-pro"],
-    claude: ["claude-3-7-sonnet-20250219", "claude-3-5-sonnet-20241022", "claude-3-5-haiku-20241022", "claude-3-opus-20240229"],
-    gemini: ["gemini-2.5-flash", "gemini-2.5-pro"],
-    gpt: ["gpt-4o", "gpt-4o-mini", "gpt-4-turbo", "gpt-3.5-turbo"]
+    gemini: ["gemini-2.5-flash", "gemini-2.5-pro"]
   };
 
   useEffect(() => {
@@ -110,10 +108,8 @@ export function ApiKeyModal({
                     onChange={(e) => handleProviderChange(e.target.value as AIProvider)}
                     className="w-full bg-[#111111] border border-[#2a2a2a] p-3 rounded-[6px] text-[#f5f5f5] text-[13px] focus:border-[#6666ff] focus:outline-none transition-all duration-200 ease appearance-none pr-10"
                   >
-                    <option value="claude" className="bg-[#111111]">Claude</option>
                     <option value="gemini" className="bg-[#111111]">Gemini</option>
                     <option value="deepseek" className="bg-[#111111]">DeepSeek</option>
-                    <option value="gpt" className="bg-[#111111]">GPT</option>
                   </select>
                   <div className="absolute right-3 top-1/2 -translate-y-1/2 pointer-events-none text-[#555555]">
                     <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"><path d="m6 9 6 6 6-6"/></svg>

@@ -1,4 +1,4 @@
-export type AIProvider = "claude" | "gemini" | "deepseek" | "gpt";
+export type AIProvider = "deepseek" | "gemini";
 
 export type ProductType =
   | "e-commerce"

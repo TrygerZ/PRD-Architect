@@ -31,7 +31,7 @@ The generated document strictly adheres to a 12-chapter industry-standard struct
 
 ## ✨ Features
 
-- 🧠 **Bring Your Own Model (BYOM)**: Seamlessly switch between AI providers (DeepSeek, Claude, Gemini, OpenAI) and select specific models via the in-app Settings UI. Tuned for output up to `16,384` max tokens for DeepSeek V4 and Claude 3.7.
+- 🧠 **Bring Your Own Model (BYOM)**: Seamlessly switch between AI providers (DeepSeek, Gemini) and select specific models via the in-app Settings UI.
 - 📐 **Enterprise Structure**: Enforces a strict 12-chapter format (including dedicated AI Agent Implementation Guidelines), generating consistent and high-quality PRDs out of the box.
 - ⚡ **Real-time Streaming Output**: Watch your document take shape in real-time with responsive Markdown rendering.
 - 💬 **Interactive Revisions**: Leave feedback on the generated document to incrementally refine and polish the PRD, complete with a version control system to switch between generation attempts.
@@ -45,7 +45,7 @@ The generated document strictly adheres to a 12-chapter industry-standard struct
 - **Frontend**: React 19, Vite, Tailwind CSS v4, Lucide React (Icons), React Markdown
 - **Backend**: Node.js, Express.js
 - **Tooling**: TypeScript, esbuild
-- **Integration**: `@google/genai` (For Gemini streaming) or generic OpenAI-compatible streaming clients.
+- **Integration**: Native fetch API for OpenAI-compatible streaming (DeepSeek) and Gemini API.
 
 ## 🚀 Getting Started
 
@@ -53,7 +53,7 @@ The generated document strictly adheres to a 12-chapter industry-standard struct
 
 - Node.js (v18 or higher)
 - npm or pnpm
-- API Key from your preferred AI provider (e.g., Gemini, DeepSeek, OpenAI)
+- API Key from your preferred AI provider (e.g., Gemini, DeepSeek)
 
 ### Installation
 
@@ -71,7 +71,7 @@ The generated document strictly adheres to a 12-chapter industry-standard struct
 
 ### ⚙️ Configuration
 
-You can fully customize the AI provider and model directly from the application's **Settings (gear icon)** within the UI. You can choose from **DeepSeek, Claude, Gemini, and GPT** and specify exact models (e.g., `deepseek-v4-flash`, `claude-4.5-sonnet`, `gpt-5.5`, `gemini-3.5-flash`).
+You can fully customize the AI provider and model directly from the application's **Settings (gear icon)** within the UI. You can choose from **DeepSeek and Gemini** and specify exact models (e.g., `deepseek-v4-flash`, `gemini-2.5-pro`).
 
 #### API Key Setup
 
@@ -82,9 +82,7 @@ Create a `.env` file in the root of the project to set default values for the ba
 
 ```env
 DEEPSEEK_API_KEY=your_deepseek_key
-ANTHROPIC_API_KEY=your_claude_key
 GEMINI_API_KEY=your_gemini_key
-OPENAI_API_KEY=your_openai_key
 ```
 
 **Method B: In-App UI**
