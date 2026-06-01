@@ -71,7 +71,7 @@ The generated document strictly adheres to a 12-chapter industry-standard struct
 
 ### ⚙️ Configuration
 
-You can fully customize the AI provider and model directly from the application's **Settings (gear icon)** within the UI. You can choose from **DeepSeek, Claude, Gemini, and GPT** and specify exact models (e.g., `deepseek-chat`, `claude-3-7-sonnet-20250219`, `gpt-4o`, `gemini-2.5-flash`).
+You can fully customize the AI provider and model directly from the application's **Settings (gear icon)** within the UI. You can choose from **DeepSeek, Claude, Gemini, and GPT** and specify exact models (e.g., `deepseek-v4-flash`, `claude-4.5-sonnet`, `gpt-5.5`, `gemini-3.5-flash`).
 
 #### API Key Setup
 
