@@ -1,4 +1,4 @@
-import { Settings, Download, Copy, Printer, List } from "lucide-react";
+import { Settings, Download, Copy, Printer, List, PanelLeft } from "lucide-react";
 import { motion } from "motion/react";
 
 interface HeaderProps {
@@ -10,6 +10,8 @@ interface HeaderProps {
   hasData: boolean;
   language: "id" | "en";
   onToggleLanguage: () => void;
+  minimal?: boolean;
+  onToggleSidebar?: () => void;
 }
 
 export function Header({
@@ -21,16 +23,27 @@ export function Header({
   hasData,
   language,
   onToggleLanguage,
+  minimal = false,
+  onToggleSidebar,
 }: HeaderProps) {
   return (
     <motion.header 
       initial={{ opacity: 0, y: -20 }}
       animate={{ opacity: 1, y: 0 }}
       transition={{ duration: 0.3 }}
-      className="fixed top-0 inset-x-0 h-14 bg-[#111111] border-b border-[#2a2a2a] z-50 flex items-center justify-between px-6 no-print"
+      className="fixed top-0 inset-x-0 h-12 bg-[#111111] border-b border-[#2a2a2a] z-50 flex items-center justify-between px-4 no-print"
     >
       <div className="flex items-center shrink-0 gap-3">
-        {hasData && onToggleToC && (
+        {onToggleSidebar && (
+          <button 
+            onClick={onToggleSidebar}
+            aria-label="Toggle Sidebar"
+            className="text-[#999999] hover:text-[#f5f5f5] transition-all duration-200 ease p-1.5 rounded-[6px] hover:bg-[#222222] mr-2"
+          >
+            <PanelLeft size={18} strokeWidth={1.5} />
+          </button>
+        )}
+        {!minimal && hasData && onToggleToC && (
           <button 
             onClick={onToggleToC}
             aria-label={language === "en" ? "Toggle Table of Contents" : "Tampilkan Daftar Isi"}
@@ -40,14 +53,15 @@ export function Header({
             <List size={16} strokeWidth={1.5} />
           </button>
         )}
-        <h1 className="text-[18px] sm:text-[18px] font-semibold tracking-[-0.02em] text-[#f5f5f5] font-body">
+        <h1 className="text-[18px] sm:text-[18px] font-[600] tracking-[-0.02em] text-[#f5f5f5] font-body">
           PRD <span className="hidden sm:inline">Architect</span>
         </h1>
       </div>
 
       <div className="flex items-center gap-2 sm:gap-4 ml-auto">
-        {hasData && (
+        {!minimal && hasData && (
           <div className="flex items-center gap-1.5 sm:gap-2 mr-2 sm:mr-4 pr-2 sm:pr-6 border-r border-[#2a2a2a]">
+            {/* Export buttons */}
             <button
                onClick={onCopy}
                className="text-[#999999] hover:text-[#f5f5f5] transition-all duration-200 ease py-1.5 px-2 flex items-center gap-1.5 text-[13px] font-medium rounded-[6px] hover:bg-[#222222]"

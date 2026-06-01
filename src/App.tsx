@@ -1,11 +1,14 @@
 import { useState, useEffect } from "react";
 import { Header } from "./components/Header";
-import { TerminalConsole } from "./components/TerminalConsole";
+import { WelcomeScreen } from "./components/WelcomeScreen";
+import { ChatInput } from "./components/ChatInput";
 import { BlueprintSheet, getSections } from "./components/BlueprintSheet";
 import { ApiKeyModal } from "./components/ApiKeyModal";
 import { generatePRD } from "./services/geminiService";
 import { ProductType, PRDVersion, UploadedFile, AIProvider } from "./types";
 import { ArrowUp } from "lucide-react";
+
+import { Sidebar } from "./components/Sidebar";
 
 export default function App() {
   const [isSettingsOpen, setIsSettingsOpen] = useState(false);
@@ -20,12 +23,22 @@ export default function App() {
   const [toastMessage, setToastMessage] = useState<string | null>(null);
 
   const [uploadedFiles, setUploadedFiles] = useState<UploadedFile[]>([]);
+  const [showUploader, setShowUploader] = useState(false);
 
   const [versions, setVersions] = useState<PRDVersion[]>([]);
   const [activeVersionId, setActiveVersionId] = useState<string | null>(null);
   const [comments, setComments] = useState<Record<string, string>>({});
 
   const [error, setError] = useState<string | null>(null);
+
+  const [sidebarOpen, setSidebarOpen] = useState(true);
+  const [currentPrompt, setCurrentPrompt] = useState("");
+
+  const handleNewPRD = () => {
+    setActiveVersionId(null);
+    setComments({});
+    setCurrentPrompt("");
+  };
 
   const showToast = (msg: string) => {
     setToastMessage(msg);
@@ -49,20 +62,26 @@ export default function App() {
     
     // Scroll listener
     const handleScroll = () => {
-      if (window.scrollY > 500) {
+      const chatContainer = document.getElementById('chat-messages-container');
+      if (chatContainer && chatContainer.scrollTop > 500) {
         setShowScrollTop(true);
       } else {
         setShowScrollTop(false);
       }
     };
-    window.addEventListener("scroll", handleScroll);
-    return () => window.removeEventListener("scroll", handleScroll);
-  }, []);
+    const chatContainer = document.getElementById('chat-messages-container');
+    if (chatContainer) {
+      chatContainer.addEventListener("scroll", handleScroll);
+      return () => chatContainer.removeEventListener("scroll", handleScroll);
+    }
+  }, [activeVersionId]);
 
   const activeVersion = versions.find((v) => v.id === activeVersionId);
   const prdContent = activeVersion?.content || "";
+  const hasMessage = !!activeVersionId || versions.length > 0;
+  const userPrompt = activeVersion?.prompt || "";
 
-  const handleGenerate = async (prompt: string, type: ProductType) => {
+  const handleGenerate = async (prompt: string, type: ProductType = "Unknown") => {
     setIsGenerating(true);
     setProductType(type);
     setError(null);
@@ -146,7 +165,7 @@ export default function App() {
       id: newVersionId,
       timestamp: Date.now(),
       content: "",
-      prompt: revisionPrompt,
+      prompt: revisionPrompt, // In chat layout we might not want to show this giant prompt
       productType: activeVersion.productType,
       referencedFilesCount: uploadedFiles.length,
     };
@@ -218,7 +237,7 @@ export default function App() {
               <title>${productType} - PRD</title>
               <style>
                 body { 
-                  font-family: 'Inter Display', 'Inter', -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif; 
+                  font-family: 'Geist Sans', -apple-system, sans-serif; 
                   line-height: 1.6; 
                   color: #333;
                   padding: 40px;
@@ -226,8 +245,8 @@ export default function App() {
                   margin: 0 auto;
                 }
                 h1 { 
-                  font-family: 'Instrument Serif', 'Georgia', serif; 
-                  font-weight: 400; 
+                  font-family: 'Geist Sans', -apple-system, sans-serif; 
+                  font-weight: 700; 
                   color: #111; 
                   margin-top: 24px; 
                   margin-bottom: 16px; 
@@ -243,7 +262,7 @@ export default function App() {
                   background-color: #f4f4f5; 
                   padding: 2px 6px; 
                   border-radius: 4px; 
-                  font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
+                  font-family: 'Geist Mono', ui-monospace, sans-serif;
                   font-size: 0.9em;
                 }
                 blockquote {
@@ -285,7 +304,7 @@ export default function App() {
   };
 
   return (
-    <div className="min-h-screen pt-20 pb-12 px-6 flex flex-col items-center">
+    <div className="min-h-screen bg-[#111111] flex flex-col font-geist">
       <Header
         onOpenSettings={() => setIsSettingsOpen(true)}
         onExportMd={handleExportMd}
@@ -297,50 +316,82 @@ export default function App() {
         onToggleLanguage={() =>
           setLanguage((lang) => (lang === "id" ? "en" : "id"))
         }
+        minimal={!hasMessage}
+        onToggleSidebar={() => setSidebarOpen(!sidebarOpen)}
       />
 
-      <div className="w-full max-w-[800px] relative z-10 flex flex-col items-center flex-grow">
-        {(!activeVersionId || versions.length === 0) && (
-          <TerminalConsole
-            onGenerate={handleGenerate}
-            isGenerating={isGenerating}
-            language={language}
-            files={uploadedFiles}
-            onFilesChange={setUploadedFiles}
-          />
-        )}
+      <div className="flex flex-1 pt-12 min-h-0 max-h-screen">
+        {/* Sidebar */}
+        <Sidebar
+          versions={versions}
+          activeVersionId={activeVersionId}
+          onSwitchVersion={(vid) => {
+            setActiveVersionId(vid);
+            setComments({});
+          }}
+          onNewPRD={handleNewPRD}
+          language={language}
+          isOpen={sidebarOpen}
+          onClose={() => setSidebarOpen(false)}
+        />
 
-        {error && (
-          <div className="w-full bg-[#1a1a1a] p-4 mb-4 border border-[#8a3a3a] rounded-[8px] text-[#8a3a3a] text-[15px] font-medium no-print">
-            {error}
+        {/* Chat Area */}
+        <div className="flex-1 flex flex-col relative overflow-hidden">
+          <div className="flex-1 overflow-y-auto px-6 pb-[180px]" id="chat-messages-container">
+            {!hasMessage ? (
+              <WelcomeScreen language={language} onQuickPrompt={(text) => setCurrentPrompt(text)} />
+            ) : (
+              <div className="max-w-[800px] mx-auto space-y-6 pt-8 pb-8">
+                {error && (
+                  <div className="w-full bg-[#1a1a1a] p-4 mb-4 border border-[#8a3a3a] rounded-[8px] text-[#8a3a3a] text-[15px] font-medium no-print">
+                    {error}
+                  </div>
+                )}
+                
+                {/* User Message */}
+                <div className="bg-[#222222] rounded-[8px] p-4 max-w-[85%] ml-auto shadow-sm border border-[#2a2a2a]">
+                  <p className="text-[14px] text-[#f5f5f5] whitespace-pre-wrap">{userPrompt.length > 300 && userPrompt.includes("### Revisions requested per section") ? (language === "en" ? "Revising PRD based on comments..." : "Merevisi PRD berdasarkan komentar...") : userPrompt}</p>
+                </div>
+
+                {/* AI Response — BlueprintSheet */}
+                <BlueprintSheet
+                  content={prdContent}
+                  comments={comments}
+                  isToCOpen={isToCOpen}
+                  setIsToCOpen={setIsToCOpen}
+                  onCommentChange={(secId, comment) => {
+                    setComments((prev) => {
+                      const newCom = { ...prev, [secId]: comment };
+                      if (!comment) delete newCom[secId];
+                      return newCom;
+                    });
+                  }}
+                  versions={versions}
+                  activeVersionId={activeVersionId}
+                  onSwitchVersion={(vid) => {
+                    setActiveVersionId(vid);
+                    setComments({});
+                  }}
+                  onRevise={handleRevise}
+                  isGenerating={isGenerating}
+                  language={language}
+                />
+              </div>
+            )}
           </div>
-        )}
 
-        {/* Output */}
-        {(activeVersionId || isGenerating) && (
-          <BlueprintSheet
-            content={prdContent}
-            comments={comments}
-            isToCOpen={isToCOpen}
-            setIsToCOpen={setIsToCOpen}
-            onCommentChange={(secId, comment) => {
-              setComments((prev) => {
-                const newCom = { ...prev, [secId]: comment };
-                if (!comment) delete newCom[secId];
-                return newCom;
-              });
-            }}
-            versions={versions}
-            activeVersionId={activeVersionId}
-            onSwitchVersion={(vid) => {
-              setActiveVersionId(vid);
-              setComments({});
-            }}
-            onRevise={handleRevise}
+          {/* Input — fixed bottom */}
+          <ChatInput
+            onSend={(text) => handleGenerate(text, "Unknown")}
             isGenerating={isGenerating}
             language={language}
+            onAttachClick={() => setShowUploader(!showUploader)}
+            hasFiles={uploadedFiles.length > 0}
+            initialPrompt={currentPrompt}
+            setInitialPrompt={setCurrentPrompt}
+            showQuickPrompts={!hasMessage}
           />
-        )}
+        </div>
       </div>
 
       <ApiKeyModal
@@ -357,21 +408,23 @@ export default function App() {
       />
 
       {/* Scroll to Top Button */}
-      <button
-        onClick={() => window.scrollTo({ top: 0, behavior: 'smooth' })}
-        className={`fixed bottom-[80px] right-[80px] z-35 w-[36px] h-[36px] rounded-full bg-[#222222] border border-[#333333] text-[#999999] hover:bg-[#333333] hover:text-[#f5f5f5] flex items-center justify-center transition-all duration-200 no-print ${
-          showScrollTop
-            ? "opacity-100 translate-y-0 pointer-events-auto"
-            : "opacity-0 translate-y-2 pointer-events-none"
-        }`}
-        title={language === "en" ? "Scroll to top" : "Kembali ke atas"}
-      >
-        <ArrowUp size={16} strokeWidth={1.5} />
-      </button>
+      {showScrollTop && (
+        <button
+          onClick={() => {
+            const container = document.getElementById('chat-messages-container');
+            if (container) container.scrollTo({ top: 0, behavior: 'smooth' });
+          }}
+          className={`fixed bottom-[100px] right-[40px] z-[45] w-[36px] h-[36px] rounded-full bg-[#222222] border border-[#333333] text-[#999999] hover:bg-[#333333] hover:text-[#f5f5f5] flex items-center justify-center transition-all duration-200 no-print`}
+          title={language === "en" ? "Scroll to top" : "Kembali ke atas"}
+        >
+          <ArrowUp size={16} strokeWidth={1.5} />
+        </button>
+      )}
+
       {/* Toast Notification */}
       <div 
-        className={`fixed bottom-6 left-1/2 -translate-x-1/2 z-[100] transition-all duration-300 pointer-events-none no-print
-          ${toastMessage ? "translate-y-0 opacity-100" : "translate-y-8 opacity-0"}`
+        className={`fixed top-16 left-1/2 -translate-x-1/2 z-[100] transition-all duration-300 pointer-events-none no-print
+          ${toastMessage ? "translate-y-0 opacity-100" : "-translate-y-4 opacity-0"}`
         }
       >
         <div className="bg-[#222222] border border-[#333333] text-[#f5f5f5] text-[13px] px-4 py-2.5 rounded shadow-xl flex items-center gap-2">
