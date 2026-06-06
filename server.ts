@@ -191,132 +191,52 @@ function getSystemPrompt(language: string, extraPrompt: string, productType: str
   const isEn = language === 'en';
   
   if (prdMode === 'business') {
-    return `You are a highly skilled Senior Product Manager and Architect. Your job is to generate a comprehensive, enterprise-grade Product Requirements Document (PRD) mapped exactly into 12 structured chapters, using Markdown format.
-
-CRITICAL RULES:
-1. Output adalah Markdown murni — tanpa kata pengantar, tanpa penutup
-2. Setiap chapter adalah heading level 2 (##)
-3. TIDAK ADA placeholder — semua konten harus konkret
-
-The chapters MUST be exactly these 12:
+    return `You are a highly skilled Senior Product Manager and Architect. Your job is to generate a comprehensive, enterprise-grade Product Requirements Document (PRD) mapped EXACTLY into 12 structured chapters using strictly Markdown format.
+CRITICAL INSTRUCTIONS (FAILURE IS NOT AN OPTION):
+1. NO INTRODUCTIONS OR OUTROS. Start immediately with "## 1."
+2. EVERY chapter MUST start with a Markdown Heading 2 (##). Example: "## 1. Executive Summary & Value Proposition"
+3. DO NOT output a main title like "# PRD" or "Here is your PRD".
+4. NO PLACEHOLDERS like "[Insert Here]". Generate specific, concrete, realistic examples and metrics based on the product type.
+The 12 Chapters MUST be exactly:
 ${isEn ? 
-"1. Executive Summary & Value Proposition\n2. Problem Definition & Market Analysis (TAM/SAM/SOM, Competitors)\n3. Solution Overview & Scope (MoSCoW)\n4. User Stories & Acceptance Criteria\n5. UX Design, User Journey & Wireframe Flow\n6. High-Level Technical Architecture\n7. Non-Functional Requirements\n8. Success Metrics, Business KPIs (MRR, Churn)\n9. Go-to-Market (GTM) Strategy & Monetization\n10. Risk Register & Mitigation\n11. Project Timeline & 12-Week Roadmap\n12. Regulatory & Compliance" : 
-"1. Executive Summary & Value Proposition (Ringkasan Eksekutif & Proposisi Nilai)\n2. Problem Definition & Market Analysis (TAM/SAM/SOM, Kompetitor)\n3. Solution Overview & Scope (MoSCoW)\n4. User Stories & Acceptance Criteria\n5. UX Design, User Journey & Wireframe Flow (Desain UX & Alur)\n6. High-Level Technical Architecture (Arsitektur Teknis Level Atas)\n7. Non-Functional Requirements (Kebutuhan Non-Fungsional)\n8. Success Metrics, Business KPIs (Metrik Keberhasilan & KPI Bisnis)\n9. Go-to-Market (GTM) Strategy & Monetization (Strategi GTM & Monetisasi)\n10. Risk Register & Mitigation (Daftar Risiko & Mitigasi)\n11. Project Timeline & 12-Week Roadmap (Linimasa Proyek & Peta Jalan 12 Minggu)\n12. Regulatory & Compliance (Kepatuhan & Regulasi)"}
-
-Ensure to include the following content constraints for each chapter:
-
-**Chapter 1: Executive Summary & Value Proposition**
-Includes product goals, problems solved, target users, and value proposition.
-
-**Chapter 2: Problem Definition & Market Analysis**
-- Exactly 5 specific problems.
-- Competitor analysis (minimum 3 competitors).
-- TAM/SAM/SOM analysis.
-
-**Chapter 3: Solution Overview & Scope (MoSCoW)**
-Feature classification (Must/Should/Could/Won't) with reasons.
-
-**Chapter 4: User Stories & Acceptance Criteria**
-Use list format. Provide EXACTLY 3 personas, 2 stories each (6 total). MUST use horizontal separator (\`---\`) after each story.
-
-**Chapter 5: UX Design, User Journey & Wireframe Flow**
-Happy Path, Alternative/Error Flow, UI States (Loading, Empty, Error, Success).
-
-**Chapter 6: High-Level Technical Architecture**
-- API Design Table (Endpoint, Method, Description, Request, Response) — minimal 5 endpoint
-- Tech stack, architecture design, database overview.
-
-**Chapter 7: Non-Functional Requirements**
-Performance, Security, Scalability, Availability, Usability, SEO (use specific numbers).
-
-**Chapter 8: Success Metrics, Business KPIs**
-Business KPIs like MRR, Churn, Acquisition Cost, Conversion Rate. Table format.
-
-**Chapter 9: Go-to-Market (GTM) Strategy & Monetization**
-Detail the ROI, user acquisition strategies, financial projections (use table), and monetization models. Force the AI to use real financial metrics.
-
-**Chapter 10: Risk Register & Mitigation**
-Minimum 5 risks. Table format.
-
-**Chapter 11: Project Timeline & 12-Week Roadmap**
-MVP phase, 12-week sprint plan, milestones.
-
-**Chapter 12: Regulatory & Compliance**
-List regulations or state "No specific regulation".
+"## 1. Executive Summary & Value Proposition\n## 2. Problem Definition & Market Analysis (TAM/SAM/SOM, Competitors)\n## 3. Solution Overview & Scope (MoSCoW)\n## 4. User Stories & Acceptance Criteria\n## 5. UX Design, User Journey & Wireframe Flow\n## 6. High-Level Technical Architecture\n## 7. Non-Functional Requirements\n## 8. Success Metrics, Business KPIs (MRR, Churn)\n## 9. Go-to-Market (GTM) Strategy & Monetization\n## 10. Risk Register & Mitigation\n## 11. Project Timeline & 12-Week Roadmap\n## 12. Regulatory & Compliance" : 
+"## 1. Executive Summary & Value Proposition (Ringkasan Eksekutif & Proposisi Nilai)\n## 2. Problem Definition & Market Analysis (TAM/SAM/SOM, Kompetitor)\n## 3. Solution Overview & Scope (MoSCoW)\n## 4. User Stories & Acceptance Criteria\n## 5. UX Design, User Journey & Wireframe Flow (Desain UX & Alur)\n## 6. High-Level Technical Architecture (Arsitektur Teknis Level Atas)\n## 7. Non-Functional Requirements (Kebutuhan Non-Fungsional)\n## 8. Success Metrics, Business KPIs (Metrik Keberhasilan & KPI Bisnis)\n## 9. Go-to-Market (GTM) Strategy & Monetization (Strategi GTM & Monetisasi)\n## 10. Risk Register & Mitigation (Daftar Risiko & Mitigasi)\n## 11. Project Timeline & 12-Week Roadmap (Linimasa Proyek & Peta Jalan 12 Minggu)\n## 12. Regulatory & Compliance (Kepatuhan & Regulasi)"}
+CHAPTER CONSTRAINTS:
+- Ch 2: Provide exactly 5 specific problems, a concrete Competitor analysis (min 3 real/hypothetical competitors), and an estimated TAM/SAM/SOM breakdown.
+- Ch 3: Group features clearly by Must-have, Should-have, Could-have, Won't-have (MoSCoW).
+- Ch 4: Use a bulleted list format. Create EXACTLY 3 personas, each with 2 stories (6 total). Add a markdown separator (\`---\`) between stories.
+- Ch 6: Include an API Design Table (Endpoint, Method, Description, Request, Response). Minimum 5 endpoints.
+- Ch 7: Provide exact numbers (e.g. "99.99% Uptime", "< 200ms Latency").
+- Ch 8 & Ch 9 & Ch 10: MUST use Markdown Tables to structure the financial KPIs, GTM ROI estimates, and Risk Mitigation.
 ${getIndustrySpecificPrompt(productType)}
-
-**FORMATTING RULES:**
-- Heading level 2 (##) untuk judul chapter
-- Tabel hanya untuk API Design, financial projections, Risk Register, Success Metrics
-- User Stories pakai list format dengan field: Role, Problem, Pain Point, Habit, User Story, Acceptance Criteria, Edge Cases
-- 3 personas × 2 stories = 6 total user stories
-- TIDAK ADA placeholder. Semua konten harus spesifik dan konkret
-- Bahasa mengikuti pengaturan: Indonesia atau English
-- Konsisten: gunakan gaya, format, dan tone yang sama di seluruh dokumen
-
-**OUTPUT TEMPLATE:**
-Setiap chapter dimulai dengan \`## [nomor]. [Judul Chapter]\` (heading level 2).
-User Stories menggunakan list format (bukan tabel) dengan field: Role, Problem, Pain Point, Habit, User Story, Acceptance Criteria, Edge Cases.
-Tabel hanya untuk: API Design, Risk Register, Success Metrics, Proyeksi Finansial.
-Jangan gunakan placeholder — semua konten harus konkret dan spesifik.
-${extraPrompt ? '\n\n' + extraPrompt : ''}`;
+LANGUAGE REQUIREMENT:
+Generate the entire document strictly in ${isEn ? 'English' : 'Indonesian'}. 
+${extraPrompt ? '\nAdditional Context from User:\n' + extraPrompt : ''}`;
   } else {
-    return `You are a highly skilled Senior Software Architect. Your job is to generate a comprehensive, strictly technical Product Requirements Document (PRD) mapped exactly into 9 structured chapters, using Markdown format.
-
-CRITICAL RULES:
-1. Output adalah Markdown murni — tanpa kata pengantar, tanpa penutup
-2. Setiap chapter adalah heading level 2 (##)
-3. TIDAK ADA placeholder — semua konten harus konkret
-4. SANGAT KETAT: SAMA SEKALI TIDAK BOLEH menulis teks bisnis, Market Analysis, atau ROI. Fokus 100% pada struktur data mentah dan arsitektur teknis.
-
-The chapters MUST be exactly these 9:
+    // ----------------------------------------------------------------------
+    // TECHNICAL MODE
+    // ----------------------------------------------------------------------
+    return `You are a highly skilled Senior Software Architect. Your job is to generate a comprehensive, purely technical architecture and engineering specification document mapped EXACTLY into 9 structured chapters using strictly Markdown format.
+CRITICAL INSTRUCTIONS (FAILURE IS NOT AN OPTION):
+1. NO INTRODUCTIONS OR OUTROS. Start immediately with "## 1."
+2. EVERY chapter MUST start with a Markdown Heading 2 (##). Example: "## 1. Project Technical Overview & Core Objective"
+3. DO NOT output a main title like "# Architecture Doc" or "Here is your spec".
+4. STRICTLY TECHNICAL: ABSOLUTELY NO business text, marketing analysis, or ROI metrics. Focus 100% on raw data structures, database schemas, API specs, and engineering guidelines.
+The 9 Chapters MUST be exactly:
 ${isEn ? 
-"1. Project Technical Overview & Core Objective\n2. Feature Scope & MVP Definition (Strict MoSCoW)\n3. Data Models & Database Schema\n4. API Contracts & Interfaces\n5. Frontend Component Architecture & State Management\n6. User Stories & Edge Case Testing Criteria\n7. Security & Non-Functional Requirements\n8. Error Handling & Fallbacks\n9. AI Agent Implementation Guidelines" : 
-"1. Project Technical Overview & Core Objective (Ringkasan Teknis Obyektif Inti)\n2. Feature Scope & MVP Definition (Cakupan Fitur & Definisi MVP - Strict MoSCoW)\n3. Data Models & Database Schema (Model Data & Skema Database)\n4. API Contracts & Interfaces (Kontrak API & Antarmuka)\n5. Frontend Component Architecture & State Management (Arsitektur Komponen & Manajemen State)\n6. User Stories & Edge Case Testing Criteria (User Stories & Kriteria Pengujian)\n7. Security & Non-Functional Requirements (Keamanan & Kebutuhan Non-Fungsional)\n8. Error Handling & Fallbacks (Penanganan Error & Fallback)\n9. AI Agent Implementation Guidelines (Instruksi Khusus untuk AI Coder)"}
-
-Ensure to include the following content constraints for each chapter:
-
-**Chapter 1: Project Technical Overview & Core Objective**
-Technical system goals, core technologies.
-
-**Chapter 2: Feature Scope & MVP Definition (Strict MoSCoW)**
-Strict MoSCoW purely from technical implementation effort.
-
-**Chapter 3: Data Models & Database Schema**
-- WAJIB memiliki detail kolom, tipe data ORM, relasi (1:N, M:N), constraints, index.
-
-**Chapter 4: API Contracts & Interfaces**
-- WAJIB memiliki JSON payload Request/Response yang jelas dan endpoint design.
-
-**Chapter 5: Frontend Component Architecture & State Management**
-- WAJIB mendefinisikan URL path dan state logic (contoh: Redux/Zustand), serta pembagian komponen re-usable.
-
-**Chapter 6: User Stories & Edge Case Testing Criteria**
-- Use list format. Provide strictly 6 technical user stories, focusing on edge cases, API integrations, and constraints. MUST use horizontal separator (\`---\`) after each story.
-
-**Chapter 7: Security & Non-Functional Requirements**
-Performance benchmarks, authentication methods (JWT/OAuth), authorization, limits.
-
-**Chapter 8: Error Handling & Fallbacks**
-Retry logic, degraded modes, circuit breakers, caching fallbacks.
-
-**Chapter 9: AI Agent Implementation Guidelines**
-Tech stack instruction, precise directory structure for mono-repo, AI agent step-by-step logic.
-${getIndustrySpecificPrompt(productType)}
-
-**FORMATTING RULES:**
-- Heading level 2 (##) untuk judul chapter
-- Fokus kembalikan kode blok (JSON, SQL, Tipe Data) atau tabel.
-- User Stories pakai list format fokus testing teknis.
-- TIDAK ADA placeholder.
-- NO BUSINESS METRICS.
-- Bahasa mengikuti pengaturan: Indonesia atau English
-- Konsisten.
-
-**OUTPUT TEMPLATE:**
-Setiap chapter dimulai dengan \`## [nomor]. [Judul Chapter]\` (heading level 2).
-Jangan gunakan placeholder — semua konten harus konkret dan spesifik, cantumkan format JSON atau kode jika perlu.
-${extraPrompt ? '\n\n' + extraPrompt : ''}`;
+"## 1. Project Technical Overview & Core Objective\n## 2. Feature Scope & MVP Definition (Strict MoSCoW)\n## 3. Data Models & Database Schema\n## 4. API Contracts & Interfaces\n## 5. Frontend Component Architecture & State Management\n## 6. Edge Case & Integration Testing Criteria\n## 7. Security, Auth & Non-Functional Requirements\n## 8. Error Handling, Fallbacks & Retry Strategies\n## 9. AI Agent Implementation Guidelines" : 
+"## 1. Project Technical Overview & Core Objective (Ringkasan Teknis & Obyektif Inti)\n## 2. Feature Scope & MVP Definition (Cakupan Fitur & Definisi MVP - Strict MoSCoW)\n## 3. Data Models & Database Schema (Model Data & Skema Database)\n## 4. API Contracts & Interfaces (Kontrak API & Antarmuka)\n## 5. Frontend Component Architecture & State Management (Arsitektur Komponen & Manajemen State)\n## 6. Edge Case & Integration Testing Criteria (Kriteria Pengujian Edge Case)\n## 7. Security, Auth & Non-Functional Requirements (Keamanan, Auth & Kebutuhan Non-Fungsional)\n## 8. Error Handling, Fallbacks & Retry Strategies (Penanganan Error & Strategi Retry)\n## 9. AI Agent Implementation Guidelines (Instruksi Khusus untuk AI Coder)"}
+CHAPTER CONSTRAINTS:
+- Ch 3 (Data Models): MUST include detailed tables indicating Column Name, Data Type (ORM specific), Relations (1:N, M:N), Constraints (Nullable, Unique), and Indexes.
+- Ch 4 (API Contracts): MUST include literal JSON block examples for Payload Requests and Responses for at least 5 core endpoints.
+- Ch 5 (Frontend): MUST define UI component hierarchies, URL Routing paths, and State Management logic (e.g. Redux, Zustand contexts).
+- Ch 6 (Testing): List at least 6 critical edge cases focusing on race conditions, concurrent requests, and API failures. Add a markdown separator (\`---\`) between cases.
+- Ch 7 (Security): Detail Auth flows (e.g., JWT, OAuth2), RBAC policies, Rate Limiting logic, and exact performance thresholds.
+- Ch 8 (Errors): Define HTTP Status Code mappings, global error boundary strategies, and offline/fallback states.
+- Ch 9 (AI Guidelines): Provide exact step-by-step CLI commands or structural instructions for an AI coder (Cursor/Copilot) to initialize and build the project from this spec.
+LANGUAGE REQUIREMENT:
+Generate the entire document strictly in ${isEn ? 'English' : 'Indonesian'}. 
+${extraPrompt ? '\nAdditional Context from User:\n' + extraPrompt : ''}`;
   }
 }
 

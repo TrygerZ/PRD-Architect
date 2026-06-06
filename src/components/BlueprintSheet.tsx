@@ -33,44 +33,41 @@ type Section = {
 
 export const getSections = (content: string): Section[] => {
   if (!content) return [];
-
   const lines = content.split("\n");
   const sections: Section[] = [];
-
   let currentContent: string[] = [];
-  let currentLevel = 0;
+  let currentLevel = 2; // Default level
   let currentHeading = "";
-
   for (let i = 0; i < lines.length; i++) {
     const line = lines[i];
-    const match = line.match(/^(#{2})\s+(.*)/);
-
+    // Regex diperlebar agar membaca Heading 1 (#) sampai 4 (####)
+    const match = line.match(/^(#{1,4})\s+(.*)/);
     if (match) {
       if (currentContent.length > 0) {
         sections.push({
           index: sections.length,
-          level: 2,
-          heading: currentHeading,
+          level: currentLevel,
+          heading: currentHeading || "Overview", // Cegah hilangnya teks awal
           content: currentContent.join("\n"),
         });
       }
+      currentLevel = match[1].length;
       currentHeading = match[2];
       currentContent = [line];
     } else {
       currentContent.push(line);
     }
   }
-
   if (currentContent.length > 0) {
     sections.push({
       index: sections.length,
-      level: 2,
-      heading: currentHeading,
+      level: currentLevel,
+      heading: currentHeading || "Overview",
       content: currentContent.join("\n"),
     });
   }
-
-  return sections.filter((s) => s.heading.trim().length > 0);
+  // JANGAN PERNAH menghapus section jika ada isinya, meskipun tanpa judul
+  return sections.filter((s) => s.content.trim().length > 0);
 };
 
 export function BlueprintSheet({
