@@ -70,7 +70,7 @@ export default function App() {
     if (storedModel) {
       setModel(storedModel);
     }
-  }, [activeVersionId]);
+  }, []);
 
   const activeVersion = versions.find((v) => v.id === activeVersionId);
   const prdContent = activeVersion?.content || "";
@@ -287,7 +287,7 @@ export default function App() {
     const url = URL.createObjectURL(blob);
     const a = document.createElement("a");
     a.href = url;
-    a.download = `PRD_${productType.replace(" ", "_")}_${new Date().getTime()}.md`;
+    a.download = `PRD_${productType.replace(/ /g, "_")}_${new Date().getTime()}.md`;
     a.click();
     URL.revokeObjectURL(url);
   };

@@ -392,6 +392,8 @@ app.post("/api/generate-prd", async (req, res) => {
       headers: fetchHeaders,
     };
 
+    let fallbackTimeout: NodeJS.Timeout | undefined;
+
     if (typeof AbortSignal !== 'undefined' && (AbortSignal as any).any) {
       if ((AbortSignal as any).timeout) {
         fetchOptions.signal = (AbortSignal as any).any([abortController.signal, (AbortSignal as any).timeout(60000)]);
@@ -401,7 +403,7 @@ app.post("/api/generate-prd", async (req, res) => {
     } else {
       fetchOptions.signal = abortController.signal;
       // Fallback timeout since AbortSignal.any is not available in older Node.js
-      setTimeout(() => abortController.abort(), 60000);
+      fallbackTimeout = setTimeout(() => abortController.abort(), 60000);
     }
 
     if (provider === "gemini") {
@@ -485,6 +487,8 @@ app.post("/api/generate-prd", async (req, res) => {
     console.error("Error generating PRD:", error);
     res.write(`data: ${JSON.stringify({ error: error instanceof Error ? error.message : "Internal server error" })}\n\n`);
     res.end();
+  } finally {
+    if (fallbackTimeout) clearTimeout(fallbackTimeout);
   }
 });
 

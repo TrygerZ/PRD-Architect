@@ -104,26 +104,7 @@ export function BlueprintSheet({
     return () => window.removeEventListener("keydown", handleKeyDown);
   }, [isFeedbackDrawerOpen]);
 
-  // Track progress
-  const [activeSectionIdx, setActiveSectionIdx] = useState(0);
-
-  useEffect(() => {
-    const container = scrollContainerRef?.current;
-    if (!container) return;
-    
-    const handleScroll = () => {
-      const headings = Array.from(container.querySelectorAll("[data-prd-content] h2"));
-      let currentIdx = 0;
-      for (let i = 0; i < headings.length; i++) {
-        const rect = headings[i].getBoundingClientRect();
-        if (rect.top <= 100) currentIdx = i;
-      }
-      setActiveSectionIdx(currentIdx);
-    };
-    
-    container.addEventListener("scroll", handleScroll);
-    return () => container.removeEventListener("scroll", handleScroll);
-  }, [sections]);
+  // Progress UI tracking removed to enhance scrolling performance.
 
   const activeVersion = versions.find(v => v.id === activeVersionId) || versions[versions.length - 1];
   const activeVersionIndex = activeVersion ? versions.findIndex(v => v.id === activeVersion.id) : 0;
