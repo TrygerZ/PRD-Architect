@@ -1,6 +1,7 @@
 import { motion } from "motion/react";
 import { getQuickPrompts } from "../utils/quickPrompts";
 import { PRDMode } from "../types";
+import { Briefcase, Code } from "lucide-react";
 
 interface WelcomeScreenProps {
   language: "en" | "id";
@@ -38,8 +39,9 @@ export function WelcomeScreen({ language, onQuickPrompt, prdMode, onChangeMode }
                 : "bg-[#1a1a1a] border-[#333333] hover:bg-[#222222] opacity-80"
             }`}
           >
-            <span className={`text-[15px] font-semibold ${prdMode === "business" ? "text-white" : "text-[#aaaaaa]"}`}>
-              💼 Business & Investor Mode
+            <span className={`text-[15px] font-semibold flex items-center justify-center gap-2 ${prdMode === "business" ? "text-white" : "text-[#aaaaaa]"}`}>
+              <Briefcase className="w-4 h-4" />
+              Business & Investor Mode
             </span>
             <span className="text-[13px] text-[#888888]">
               {language === "en" ? "Focus on business metrics, ROI, and GTM roadmap" : "Fokus pada metrik bisnis, ROI, dan GTM roadmap"}
@@ -55,8 +57,9 @@ export function WelcomeScreen({ language, onQuickPrompt, prdMode, onChangeMode }
                 : "bg-[#1a1a1a] border-[#333333] hover:bg-[#222222] opacity-80"
             }`}
           >
-            <span className={`text-[15px] font-semibold ${prdMode === "technical" ? "text-white" : "text-[#aaaaaa]"}`}>
-              💻 AI Agent & Developer Mode
+            <span className={`text-[15px] font-semibold flex items-center justify-center gap-2 ${prdMode === "technical" ? "text-white" : "text-[#aaaaaa]"}`}>
+              <Code className="w-4 h-4" />
+              AI Agent & Developer Mode
             </span>
             <span className="text-[13px] text-[#888888]">
               {language === "en" ? "Focus on database schemas, API payloads, and architecture" : "Fokus pada skema database, payload API, dan arsitektur"}
