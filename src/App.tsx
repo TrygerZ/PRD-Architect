@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 import { Header } from "./components/Header";
 import { WelcomeScreen } from "./components/WelcomeScreen";
 import { ChatInput } from "./components/ChatInput";
@@ -35,6 +35,8 @@ export default function App() {
   const [currentPrompt, setCurrentPrompt] = useState("");
   const [abortController, setAbortController] = useState<AbortController | null>(null);
 
+  const chatContainerRef = useRef<HTMLDivElement>(null);
+
   const handleCancel = () => {
     abortController?.abort();
     setAbortController(null);
@@ -67,21 +69,6 @@ export default function App() {
     const storedModel = localStorage.getItem("PRD_AI_MODEL");
     if (storedModel) {
       setModel(storedModel);
-    }
-    
-    // Scroll listener
-    const handleScroll = () => {
-      const chatContainer = document.getElementById('chat-messages-container');
-      if (chatContainer && chatContainer.scrollTop > 500) {
-        setShowScrollTop(true);
-      } else {
-        setShowScrollTop(false);
-      }
-    };
-    const chatContainer = document.getElementById('chat-messages-container');
-    if (chatContainer) {
-      chatContainer.addEventListener("scroll", handleScroll);
-      return () => chatContainer.removeEventListener("scroll", handleScroll);
     }
   }, [activeVersionId]);
 
@@ -136,7 +123,6 @@ export default function App() {
     } catch (err: any) {
       if (err.name === 'AbortError') {
         // Keep the partially generated output — don't delete it
-        setIsGenerating(false);
         return;
       }
       setError(
@@ -147,7 +133,9 @@ export default function App() {
       );
       console.error(err);
     } finally {
-      setIsGenerating(false);
+      if (!controller.signal.aborted) {
+        setIsGenerating(false);
+      }
     }
   };
 
@@ -190,7 +178,6 @@ export default function App() {
     } catch (err: any) {
       if (err.name === 'AbortError') {
         // Keep the partially generated output — don't delete it
-        setIsGenerating(false);
         return;
       }
       setError(
@@ -200,7 +187,9 @@ export default function App() {
             : "Terjadi kesalahan saat menambahkan konten."),
       );
     } finally {
-      setIsGenerating(false);
+      if (!controller.signal.aborted) {
+        setIsGenerating(false);
+      }
     }
   };
 
@@ -276,7 +265,6 @@ export default function App() {
     } catch (err: any) {
       if (err.name === 'AbortError') {
         // Keep the partially generated output — don't delete it
-        setIsGenerating(false);
         return;
       }
       setError(
@@ -287,7 +275,9 @@ export default function App() {
       );
       console.error(err);
     } finally {
-      setIsGenerating(false);
+      if (!controller.signal.aborted) {
+        setIsGenerating(false);
+      }
     }
   };
 
@@ -422,7 +412,12 @@ export default function App() {
 
         {/* Chat Area */}
         <div className="flex-1 flex flex-col relative overflow-hidden">
-          <div className="flex-1 overflow-y-auto px-4 sm:px-6 pb-[240px]" id="chat-messages-container">
+          <div 
+            ref={chatContainerRef}
+            className="flex-1 overflow-y-auto px-4 sm:px-6 pb-[240px]" 
+            id="chat-messages-container"
+            onScroll={(e) => setShowScrollTop(e.currentTarget.scrollTop > 500)}
+          >
             {showUploader && (
               <div className="max-w-[640px] mx-auto w-full mb-4 mt-4">
                 <FileUploader
@@ -451,6 +446,7 @@ export default function App() {
 
                 {/* AI Response — BlueprintSheet */}
                 <BlueprintSheet
+                  scrollContainerRef={chatContainerRef}
                   content={prdContent}
                   comments={comments}
                   onCommentChange={(secId, comment) => {
@@ -511,8 +507,7 @@ export default function App() {
       {showScrollTop && (
         <button
           onClick={() => {
-            const container = document.getElementById('chat-messages-container');
-            if (container) container.scrollTo({ top: 0, behavior: 'smooth' });
+            if (chatContainerRef.current) chatContainerRef.current.scrollTo({ top: 0, behavior: 'smooth' });
           }}
           className={`fixed bottom-[160px] right-[40px] z-[45] w-[36px] h-[36px] rounded-full bg-[#222222] border border-[#333333] text-[#999999] hover:bg-[#333333] hover:text-[#f5f5f5] flex items-center justify-center transition-all duration-200 no-print`}
           title={language === "en" ? "Scroll to top" : "Kembali ke atas"}

@@ -21,6 +21,7 @@ interface BlueprintSheetProps {
   onRevise?: () => void;
   isGenerating?: boolean;
   language: "id" | "en";
+  scrollContainerRef?: React.RefObject<HTMLElement | null>;
 }
 
 type Section = {
@@ -82,6 +83,7 @@ export function BlueprintSheet({
   onRevise,
   isGenerating,
   language,
+  scrollContainerRef,
 }: BlueprintSheetProps) {
   const sections = getSections(content);
   const totalComments = Object.values(comments).filter(
@@ -106,7 +108,7 @@ export function BlueprintSheet({
   const [activeSectionIdx, setActiveSectionIdx] = useState(0);
 
   useEffect(() => {
-    const container = document.getElementById('chat-messages-container');
+    const container = scrollContainerRef?.current;
     if (!container) return;
     
     const handleScroll = () => {

@@ -72,7 +72,7 @@ async function extractTextFromFile(filePath: string, mimeType: string, originalN
   try {
     if (mimeType === 'application/pdf') {
       const dataBuffer = fs.readFileSync(filePath);
-      const data = await pdfParse(dataBuffer);
+      const data = await pdfParse(dataBuffer, { max: 10 }); // Limit to 10 pages
       text = data.text;
     } else if (mimeType === 'application/vnd.openxmlformats-officedocument.wordprocessingml.document') {
       const result = await mammoth.extractRawText({ path: filePath });
@@ -95,7 +95,11 @@ async function extractTextFromFile(filePath: string, mimeType: string, originalN
       text = `[IMAGE: ${originalName}]`;
     } else {
       // Handle text/plain, text/markdown
-      text = fs.readFileSync(filePath, 'utf-8');
+      const fd = fs.openSync(filePath, 'r');
+      const buffer = Buffer.alloc(MAX_CHARS * 2); // Read enough bytes for max chars
+      const bytesRead = fs.readSync(fd, buffer, 0, buffer.length, null);
+      text = buffer.toString('utf-8', 0, bytesRead);
+      fs.closeSync(fd);
     }
   } catch (error) {
     console.error(`Error extracting text from ${originalName}:`, error);
@@ -125,6 +129,11 @@ app.post("/api/upload-files", (req, res) => {
       const uploadedResults = [];
 
       for (const file of files) {
+        // Prevent OOM by rejecting extremely large documents before they are read into memory
+        if (!file.mimetype.startsWith('image/') && file.size > 5 * 1024 * 1024) {
+          throw new Error(`File ${file.originalname} is too large. Max size for documents is 5MB.`);
+        }
+
         const content = await extractTextFromFile(file.path, file.mimetype, file.originalname);
         
         uploadedResults.push({
@@ -135,17 +144,24 @@ app.post("/api/upload-files", (req, res) => {
           content: content,
           charCount: content.length
         });
-
-        // Cleanup temp file
-        fs.unlink(file.path, (unlinkErr) => {
-          if (unlinkErr) console.error(`Failed to delete temp file ${file.path}:`, unlinkErr);
-        });
       }
 
       res.json(uploadedResults);
     } catch (error: any) {
       console.error("Upload error:", error);
       res.status(500).json({ error: error.message || "Failed to process files" });
+    } finally {
+      // Ensure all temp files are cleaned up even if an error occurs mid-processing
+      const files = req.files as Express.Multer.File[];
+      if (files) {
+        for (const file of files) {
+          fs.unlink(file.path, (unlinkErr) => {
+            if (unlinkErr && unlinkErr.code !== 'ENOENT') {
+              console.error(`Failed to delete temp file ${file.path}:`, unlinkErr);
+            }
+          });
+        }
+      }
     }
   });
 });
@@ -268,7 +284,6 @@ ${extraPrompt ? '\n\n' + extraPrompt : ''}`;
 }
 
 function getRevisionPrompt(language: string) {
-  const isEn = language === 'en';
   return `You are an editor revising an existing Product Requirements Document.
 
 CRITICAL INSTRUCTIONS:
@@ -284,7 +299,6 @@ CRITICAL INSTRUCTIONS:
 }
 
 function getAppendPrompt(language: string) {
-  const isEn = language === 'en';
   return `You are enhancing an existing Product Requirements Document.
 
 CRITICAL INSTRUCTIONS:
@@ -366,6 +380,30 @@ app.post("/api/generate-prd", async (req, res) => {
     };
     let fetchBody: any = {};
 
+    const abortController = new AbortController();
+    
+    // Handle client disconnect
+    req.on("close", () => {
+      abortController.abort();
+    });
+
+    let fetchOptions: RequestInit = {
+      method: "POST",
+      headers: fetchHeaders,
+    };
+
+    if (typeof AbortSignal !== 'undefined' && (AbortSignal as any).any) {
+      if ((AbortSignal as any).timeout) {
+        fetchOptions.signal = (AbortSignal as any).any([abortController.signal, (AbortSignal as any).timeout(60000)]);
+      } else {
+        fetchOptions.signal = abortController.signal;
+      }
+    } else {
+      fetchOptions.signal = abortController.signal;
+      // Fallback timeout since AbortSignal.any is not available in older Node.js
+      setTimeout(() => abortController.abort(), 60000);
+    }
+
     if (provider === "gemini") {
       fetchHeaders["Authorization"] = "Bearer " + customKey;
       fetchBody = {
@@ -394,11 +432,9 @@ app.post("/api/generate-prd", async (req, res) => {
       };
     }
 
-    const response = await fetch(endpoint, {
-      method: "POST",
-      headers: fetchHeaders,
-      body: JSON.stringify(fetchBody)
-    });
+    fetchOptions.body = JSON.stringify(fetchBody);
+
+    const response = await fetch(endpoint, fetchOptions);
 
     if (!response.ok) {
       const body = await response.text();
