@@ -40,8 +40,8 @@ export const getSections = (content: string): Section[] => {
   let currentHeading = "";
   for (let i = 0; i < lines.length; i++) {
     const line = lines[i];
-    // Regex diperlebar agar membaca Heading 1 (#) sampai 4 (####)
-    const match = line.match(/^(#{1,4})\s+(.*)/);
+    // Regex diperketat agar HANYA membaca Heading 2 (## )
+    const match = line.match(/^##\s+(.*)/);
     if (match) {
       if (currentContent.length > 0) {
         sections.push({
@@ -51,8 +51,8 @@ export const getSections = (content: string): Section[] => {
           content: currentContent.join("\n"),
         });
       }
-      currentLevel = match[1].length;
-      currentHeading = match[2];
+      currentLevel = 2;
+      currentHeading = match[1];
       currentContent = [line];
     } else {
       currentContent.push(line);
