@@ -51,7 +51,7 @@ const fileFilter = (req: any, file: Express.Multer.File, cb: multer.FileFilterCa
     'image/gif',
     'image/webp'
   ];
-  
+
   if (allowedMimeTypes.includes(file.mimetype) || file.originalname.endsWith('.md') || file.originalname.endsWith('.csv')) {
     cb(null, true);
   } else {
@@ -59,7 +59,7 @@ const fileFilter = (req: any, file: Express.Multer.File, cb: multer.FileFilterCa
   }
 };
 
-const upload = multer({ 
+const upload = multer({
   storage: storage,
   limits: { fileSize: 10 * 1024 * 1024 }, // 10MB
   fileFilter: fileFilter
@@ -78,7 +78,7 @@ async function extractTextFromFile(filePath: string, mimeType: string, originalN
       const result = await mammoth.extractRawText({ path: filePath });
       text = result.value;
     } else if (
-      mimeType === 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' || 
+      mimeType === 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' ||
       mimeType === 'application/vnd.ms-excel' ||
       mimeType === 'text/csv' ||
       originalName.endsWith('.csv') ||
@@ -135,7 +135,7 @@ app.post("/api/upload-files", (req, res) => {
         }
 
         const content = await extractTextFromFile(file.path, file.mimetype, file.originalname);
-        
+
         uploadedResults.push({
           id: crypto.randomUUID(),
           name: file.originalname,
@@ -189,7 +189,7 @@ function getIndustrySpecificPrompt(productType: string): string {
 
 function getSystemPrompt(language: string, extraPrompt: string, productType: string = "", prdMode: string = "business") {
   const isEn = language === 'en';
-  
+
   if (prdMode === 'business') {
     return `You are a highly skilled Senior Product Manager and Architect. Your job is to generate a comprehensive, enterprise-grade Product Requirements Document (PRD) mapped EXACTLY into 12 structured chapters using strictly Markdown format.
 CRITICAL INSTRUCTIONS (FAILURE IS NOT AN OPTION):
@@ -199,9 +199,9 @@ CRITICAL INSTRUCTIONS (FAILURE IS NOT AN OPTION):
 4. NO PLACEHOLDERS like "[Insert Here]". Generate specific, concrete, realistic examples and metrics based on the product type.
 5. NO OUTLINES OR PLANS. You must generate the ENTIRE document right now in one go.
 The 12 Chapters MUST be exactly:
-${isEn ? 
-"## 1. Executive Summary & Value Proposition\n## 2. Problem Definition & Market Analysis (TAM/SAM/SOM, Competitors)\n## 3. Solution Overview & Scope (MoSCoW)\n## 4. User Stories & Acceptance Criteria\n## 5. UX Design, User Journey & Wireframe Flow\n## 6. High-Level Technical Architecture\n## 7. Non-Functional Requirements\n## 8. Success Metrics, Business KPIs (MRR, Churn)\n## 9. Go-to-Market (GTM) Strategy & Monetization\n## 10. Risk Register & Mitigation\n## 11. Project Timeline & 12-Week Roadmap\n## 12. Regulatory & Compliance" : 
-"## 1. Executive Summary & Value Proposition (Ringkasan Eksekutif & Proposisi Nilai)\n## 2. Problem Definition & Market Analysis (TAM/SAM/SOM, Kompetitor)\n## 3. Solution Overview & Scope (MoSCoW)\n## 4. User Stories & Acceptance Criteria\n## 5. UX Design, User Journey & Wireframe Flow (Desain UX & Alur)\n## 6. High-Level Technical Architecture (Arsitektur Teknis Level Atas)\n## 7. Non-Functional Requirements (Kebutuhan Non-Fungsional)\n## 8. Success Metrics, Business KPIs (Metrik Keberhasilan & KPI Bisnis)\n## 9. Go-to-Market (GTM) Strategy & Monetization (Strategi GTM & Monetisasi)\n## 10. Risk Register & Mitigation (Daftar Risiko & Mitigasi)\n## 11. Project Timeline & 12-Week Roadmap (Linimasa Proyek & Peta Jalan 12 Minggu)\n## 12. Regulatory & Compliance (Kepatuhan & Regulasi)"}
+${isEn ?
+        "## 1. Executive Summary & Value Proposition\n## 2. Problem Definition & Market Analysis (TAM/SAM/SOM, Competitors)\n## 3. Solution Overview & Scope (MoSCoW)\n## 4. User Stories & Acceptance Criteria\n## 5. UX Design, User Journey & Wireframe Flow\n## 6. High-Level Technical Architecture\n## 7. Non-Functional Requirements\n## 8. Success Metrics, Business KPIs (MRR, Churn)\n## 9. Go-to-Market (GTM) Strategy & Monetization\n## 10. Risk Register & Mitigation\n## 11. Project Timeline & 12-Week Roadmap\n## 12. Regulatory & Compliance" :
+        "## 1. Executive Summary & Value Proposition (Ringkasan Eksekutif & Proposisi Nilai)\n## 2. Problem Definition & Market Analysis (TAM/SAM/SOM, Kompetitor)\n## 3. Solution Overview & Scope (MoSCoW)\n## 4. User Stories & Acceptance Criteria\n## 5. UX Design, User Journey & Wireframe Flow (Desain UX & Alur)\n## 6. High-Level Technical Architecture (Arsitektur Teknis Level Atas)\n## 7. Non-Functional Requirements (Kebutuhan Non-Fungsional)\n## 8. Success Metrics, Business KPIs (Metrik Keberhasilan & KPI Bisnis)\n## 9. Go-to-Market (GTM) Strategy & Monetization (Strategi GTM & Monetisasi)\n## 10. Risk Register & Mitigation (Daftar Risiko & Mitigasi)\n## 11. Project Timeline & 12-Week Roadmap (Linimasa Proyek & Peta Jalan 12 Minggu)\n## 12. Regulatory & Compliance (Kepatuhan & Regulasi)"}
 CHAPTER CONSTRAINTS:
 - Ch 2: Provide exactly 5 specific problems, a concrete Competitor analysis (min 3 real/hypothetical competitors), and an estimated TAM/SAM/SOM breakdown.
 - Ch 3: Group features clearly by Must-have, Should-have, Could-have, Won't-have (MoSCoW).
@@ -222,9 +222,9 @@ CRITICAL INSTRUCTIONS (FAILURE IS NOT AN OPTION):
 4. STRICTLY TECHNICAL: ABSOLUTELY NO business text, marketing analysis, or ROI metrics. Focus 100% on raw data structures, database schemas, API specs, and engineering guidelines.
 5. NO OUTLINES OR PLANS. You must generate the ENTIRE document right now in one go.
 The 9 Chapters MUST be exactly:
-${isEn ? 
-"## 1. Project Technical Overview & Core Objective\n## 2. Feature Scope & MVP Definition (Strict MoSCoW)\n## 3. Data Models & Database Schema\n## 4. API Contracts & Interfaces\n## 5. Frontend Component Architecture & State Management\n## 6. Edge Case & Integration Testing Criteria\n## 7. Security, Auth & Non-Functional Requirements\n## 8. Error Handling, Fallbacks & Retry Strategies\n## 9. AI Agent Implementation Guidelines" : 
-"## 1. Project Technical Overview & Core Objective (Ringkasan Teknis & Obyektif Inti)\n## 2. Feature Scope & MVP Definition (Cakupan Fitur & Definisi MVP - Strict MoSCoW)\n## 3. Data Models & Database Schema (Model Data & Skema Database)\n## 4. API Contracts & Interfaces (Kontrak API & Antarmuka)\n## 5. Frontend Component Architecture & State Management (Arsitektur Komponen & Manajemen State)\n## 6. Edge Case & Integration Testing Criteria (Kriteria Pengujian Edge Case)\n## 7. Security, Auth & Non-Functional Requirements (Keamanan, Auth & Kebutuhan Non-Fungsional)\n## 8. Error Handling, Fallbacks & Retry Strategies (Penanganan Error & Strategi Retry)\n## 9. AI Agent Implementation Guidelines (Instruksi Khusus untuk AI Coder)"}
+${isEn ?
+        "## 1. Project Technical Overview & Core Objective\n## 2. Feature Scope & MVP Definition (Strict MoSCoW)\n## 3. Data Models & Database Schema\n## 4. API Contracts & Interfaces\n## 5. Frontend Component Architecture & State Management\n## 6. Edge Case & Integration Testing Criteria\n## 7. Security, Auth & Non-Functional Requirements\n## 8. Error Handling, Fallbacks & Retry Strategies\n## 9. AI Agent Implementation Guidelines" :
+        "## 1. Project Technical Overview & Core Objective (Ringkasan Teknis & Obyektif Inti)\n## 2. Feature Scope & MVP Definition (Cakupan Fitur & Definisi MVP - Strict MoSCoW)\n## 3. Data Models & Database Schema (Model Data & Skema Database)\n## 4. API Contracts & Interfaces (Kontrak API & Antarmuka)\n## 5. Frontend Component Architecture & State Management (Arsitektur Komponen & Manajemen State)\n## 6. Edge Case & Integration Testing Criteria (Kriteria Pengujian Edge Case)\n## 7. Security, Auth & Non-Functional Requirements (Keamanan, Auth & Kebutuhan Non-Fungsional)\n## 8. Error Handling, Fallbacks & Retry Strategies (Penanganan Error & Strategi Retry)\n## 9. AI Agent Implementation Guidelines (Instruksi Khusus untuk AI Coder)"}
 CHAPTER CONSTRAINTS:
 - Ch 3 (Data Models): MUST include detailed tables indicating Column Name, Data Type (ORM specific), Relations (1:N, M:N), Constraints (Nullable, Unique), and Indexes.
 - Ch 4 (API Contracts): MUST include literal JSON block examples for Payload Requests and Responses for at least 5 core endpoints.
@@ -274,7 +274,7 @@ app.post("/api/generate-prd", async (req, res) => {
 
   try {
     const { prompt, customApiKey, provider = 'deepseek', model = 'deepseek-chat', language = 'id', productType, uploadedFiles, mode = 'initial', prdMode = 'business' } = req.body;
-    
+
     if (!prompt) {
       res.write(`data: ${JSON.stringify({ error: language === 'en' ? "Prompt is required" : "Prompt diperlukan" })}\n\n`);
       return res.end();
@@ -320,7 +320,7 @@ app.post("/api/generate-prd", async (req, res) => {
     }
 
     const customKey = customApiKey;
-    
+
     if (!customKey) {
       res.write(`data: ${JSON.stringify({ error: language === 'en' ? "API KEY not found. Please provide a custom key in Settings." : "API KEY tidak ditemukan. Silakan masukkan API Key di Pengaturan." })}\n\n`);
       res.end();
@@ -348,7 +348,7 @@ app.post("/api/generate-prd", async (req, res) => {
     let fetchBody: any = {};
 
     const abortController = new AbortController();
-    
+
     // Handle client disconnect (Gunakan res, BUKAN req)
     res.on("close", () => {
       console.log("CLIENT DISCONNECTED. Aborting fetch...");
