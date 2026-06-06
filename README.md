@@ -111,3 +111,7 @@ npm run start
 ```
 
 The server will bind to `0.0.0.0:3000` and serve the optimized static frontend alongside the API.
+
+## 📝 License
+
+This project is licensed under the [MIT License](LICENSE).
