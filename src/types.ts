@@ -1,4 +1,5 @@
 export type AIProvider = "deepseek" | "gemini";
+export type PRDMode = "business" | "technical";
 
 export type ProductType =
   | "e-commerce"
@@ -25,4 +26,5 @@ export interface PRDVersion {
   productType: ProductType;
   referencedFilesCount?: number;
   userDisplayPrompt?: string;
+  prdMode?: PRDMode;
 }

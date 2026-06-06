@@ -1,12 +1,15 @@
 import { motion } from "motion/react";
 import { getQuickPrompts } from "../utils/quickPrompts";
+import { PRDMode } from "../types";
 
 interface WelcomeScreenProps {
   language: "en" | "id";
   onQuickPrompt: (text: string) => void;
+  prdMode: PRDMode;
+  onChangeMode: (mode: PRDMode) => void;
 }
 
-export function WelcomeScreen({ language, onQuickPrompt }: WelcomeScreenProps) {
+export function WelcomeScreen({ language, onQuickPrompt, prdMode, onChangeMode }: WelcomeScreenProps) {
   return (
     <div className="w-full flex flex-col items-center justify-center flex-1 h-full pt-[5vh] sm:pt-[10vh]">
       <motion.div 
@@ -24,6 +27,42 @@ export function WelcomeScreen({ language, onQuickPrompt }: WelcomeScreenProps) {
             : "Jelaskan produk Anda. Dapatkan PRD komprehensif tingkat enterprise."}
         </p>
         <div className="w-12 h-[2px] bg-[#333333] mx-auto my-6"></div>
+
+        <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 mb-8 text-left w-full px-4 sm:px-0 mx-auto">
+          <button 
+            type="button"
+            onClick={() => onChangeMode("business")}
+            className={`p-4 rounded-xl border flex flex-col gap-1 transition-all duration-300 ${
+              prdMode === "business" 
+                ? "bg-[#112233]/40 border-[#4466ff] shadow-[0_0_15px_rgba(68,102,255,0.15)]" 
+                : "bg-[#1a1a1a] border-[#333333] hover:bg-[#222222] opacity-80"
+            }`}
+          >
+            <span className={`text-[15px] font-semibold ${prdMode === "business" ? "text-white" : "text-[#aaaaaa]"}`}>
+              💼 Business & Investor Mode
+            </span>
+            <span className="text-[13px] text-[#888888]">
+              {language === "en" ? "Focus on business metrics, ROI, and GTM roadmap" : "Fokus pada metrik bisnis, ROI, dan GTM roadmap"}
+            </span>
+          </button>
+
+          <button 
+            type="button"
+            onClick={() => onChangeMode("technical")}
+            className={`p-4 rounded-xl border flex flex-col gap-1 transition-all duration-300 ${
+              prdMode === "technical" 
+                ? "bg-[#221133]/40 border-[#a855f7] shadow-[0_0_15px_rgba(168,85,247,0.15)]" 
+                : "bg-[#1a1a1a] border-[#333333] hover:bg-[#222222] opacity-80"
+            }`}
+          >
+            <span className={`text-[15px] font-semibold ${prdMode === "technical" ? "text-white" : "text-[#aaaaaa]"}`}>
+              💻 AI Agent & Developer Mode
+            </span>
+            <span className="text-[13px] text-[#888888]">
+              {language === "en" ? "Focus on database schemas, API payloads, and architecture" : "Fokus pada skema database, payload API, dan arsitektur"}
+            </span>
+          </button>
+        </div>
       </motion.div>
 
       <motion.div

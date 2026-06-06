@@ -187,10 +187,11 @@ function getIndustrySpecificPrompt(productType: string): string {
   return "";
 }
 
-function getSystemPrompt(language: string, extraPrompt: string, productType: string = "") {
+function getSystemPrompt(language: string, extraPrompt: string, productType: string = "", prdMode: string = "business") {
   const isEn = language === 'en';
   
-  return `You are a highly skilled Senior Product Manager and Architect. Your job is to generate a comprehensive, enterprise-grade Product Requirements Document (PRD) mapped exactly into 12 structured chapters, using Markdown format.
+  if (prdMode === 'business') {
+    return `You are a highly skilled Senior Product Manager and Architect. Your job is to generate a comprehensive, enterprise-grade Product Requirements Document (PRD) mapped exactly into 12 structured chapters, using Markdown format.
 
 CRITICAL RULES:
 1. Output adalah Markdown murni — tanpa kata pengantar, tanpa penutup
@@ -199,34 +200,12 @@ CRITICAL RULES:
 
 The chapters MUST be exactly these 12:
 ${isEn ? 
-`1. Executive Summary
-2. Problem Definition & Market Analysis
-3. Solution Overview & Scope (MoSCoW)
-4. User Stories & Acceptance Criteria
-5. UX Design & Flow
-6. Technical Specs & Architecture
-7. Non-Functional Requirements
-8. Success Metrics & KPIs
-9. Risk Register & Mitigation
-10. Regulatory & Compliance
-11. Project Timeline & Roadmap
-12. AI Agent Implementation Guidelines` : 
-`1. Executive Summary (Ringkasan Eksekutif)
-2. Problem Definition & Market Analysis (Definisi Masalah & Analisis Pasar)
-3. Solution Overview & Scope (MoSCoW)
-4. User Stories & Acceptance Criteria
-5. UX Design & Flow (Desain & Alur UX)
-6. Technical Specs & Architecture (Spesifikasi Teknis & Arsitektur)
-7. Non-Functional Requirements (Kebutuhan Non-Fungsional)
-8. Success Metrics & KPIs (Metrik Keberhasilan & KPI)
-9. Risk Register & Mitigation (Daftar Risiko & Mitigasi)
-10. Regulatory & Compliance (Kepatuhan & Regulasi)
-11. Project Timeline & Roadmap (Linimasa Proyek & Peta Jalan)
-12. AI Agent Implementation Guidelines (Instruksi Khusus untuk AI Coder)`}
+"1. Executive Summary & Value Proposition\n2. Problem Definition & Market Analysis (TAM/SAM/SOM, Competitors)\n3. Solution Overview & Scope (MoSCoW)\n4. User Stories & Acceptance Criteria\n5. UX Design, User Journey & Wireframe Flow\n6. High-Level Technical Architecture\n7. Non-Functional Requirements\n8. Success Metrics, Business KPIs (MRR, Churn)\n9. Go-to-Market (GTM) Strategy & Monetization\n10. Risk Register & Mitigation\n11. Project Timeline & 12-Week Roadmap\n12. Regulatory & Compliance" : 
+"1. Executive Summary & Value Proposition (Ringkasan Eksekutif & Proposisi Nilai)\n2. Problem Definition & Market Analysis (TAM/SAM/SOM, Kompetitor)\n3. Solution Overview & Scope (MoSCoW)\n4. User Stories & Acceptance Criteria\n5. UX Design, User Journey & Wireframe Flow (Desain UX & Alur)\n6. High-Level Technical Architecture (Arsitektur Teknis Level Atas)\n7. Non-Functional Requirements (Kebutuhan Non-Fungsional)\n8. Success Metrics, Business KPIs (Metrik Keberhasilan & KPI Bisnis)\n9. Go-to-Market (GTM) Strategy & Monetization (Strategi GTM & Monetisasi)\n10. Risk Register & Mitigation (Daftar Risiko & Mitigasi)\n11. Project Timeline & 12-Week Roadmap (Linimasa Proyek & Peta Jalan 12 Minggu)\n12. Regulatory & Compliance (Kepatuhan & Regulasi)"}
 
 Ensure to include the following content constraints for each chapter:
 
-**Chapter 1: Executive Summary**
+**Chapter 1: Executive Summary & Value Proposition**
 Includes product goals, problems solved, target users, and value proposition.
 
 **Chapter 2: Problem Definition & Market Analysis**
@@ -240,35 +219,35 @@ Feature classification (Must/Should/Could/Won't) with reasons.
 **Chapter 4: User Stories & Acceptance Criteria**
 Use list format. Provide EXACTLY 3 personas, 2 stories each (6 total). MUST use horizontal separator (\`---\`) after each story.
 
-**Chapter 5: UX Design & Flow**
+**Chapter 5: UX Design, User Journey & Wireframe Flow**
 Happy Path, Alternative/Error Flow, UI States (Loading, Empty, Error, Success).
 
-**Chapter 6: Technical Specs & Architecture**
+**Chapter 6: High-Level Technical Architecture**
 - API Design Table (Endpoint, Method, Description, Request, Response) — minimal 5 endpoint
-- Tech stack, architecture design, database design
+- Tech stack, architecture design, database overview.
 
 **Chapter 7: Non-Functional Requirements**
 Performance, Security, Scalability, Availability, Usability, SEO (use specific numbers).
 
-**Chapter 8: Success Metrics & KPIs**
-Business (3), Technical (2), User Satisfaction (1). Table format.
+**Chapter 8: Success Metrics, Business KPIs**
+Business KPIs like MRR, Churn, Acquisition Cost, Conversion Rate. Table format.
 
-**Chapter 9: Risk Register & Mitigation**
+**Chapter 9: Go-to-Market (GTM) Strategy & Monetization**
+Detail the ROI, user acquisition strategies, financial projections (use table), and monetization models. Force the AI to use real financial metrics.
+
+**Chapter 10: Risk Register & Mitigation**
 Minimum 5 risks. Table format.
 
-**Chapter 10: Regulatory & Compliance**
-List regulations or state "No specific regulation".
-
-**Chapter 11: Project Timeline & Roadmap**
+**Chapter 11: Project Timeline & 12-Week Roadmap**
 MVP phase, 12-week sprint plan, milestones.
 
-**Chapter 12: AI Agent Implementation Guidelines**
-Tech stack recommendation, directory structure, core data types, AI agent roadmap (phases).
+**Chapter 12: Regulatory & Compliance**
+List regulations or state "No specific regulation".
 ${getIndustrySpecificPrompt(productType)}
 
 **FORMATTING RULES:**
 - Heading level 2 (##) untuk judul chapter
-- Tabel hanya untuk API Design, Risk Register, Success Metrics
+- Tabel hanya untuk API Design, financial projections, Risk Register, Success Metrics
 - User Stories pakai list format dengan field: Role, Problem, Pain Point, Habit, User Story, Acceptance Criteria, Edge Cases
 - 3 personas × 2 stories = 6 total user stories
 - TIDAK ADA placeholder. Semua konten harus spesifik dan konkret
@@ -278,9 +257,67 @@ ${getIndustrySpecificPrompt(productType)}
 **OUTPUT TEMPLATE:**
 Setiap chapter dimulai dengan \`## [nomor]. [Judul Chapter]\` (heading level 2).
 User Stories menggunakan list format (bukan tabel) dengan field: Role, Problem, Pain Point, Habit, User Story, Acceptance Criteria, Edge Cases.
-Tabel hanya untuk: API Design, Risk Register, Success Metrics.
+Tabel hanya untuk: API Design, Risk Register, Success Metrics, Proyeksi Finansial.
 Jangan gunakan placeholder — semua konten harus konkret dan spesifik.
 ${extraPrompt ? '\n\n' + extraPrompt : ''}`;
+  } else {
+    return `You are a highly skilled Senior Software Architect. Your job is to generate a comprehensive, strictly technical Product Requirements Document (PRD) mapped exactly into 9 structured chapters, using Markdown format.
+
+CRITICAL RULES:
+1. Output adalah Markdown murni — tanpa kata pengantar, tanpa penutup
+2. Setiap chapter adalah heading level 2 (##)
+3. TIDAK ADA placeholder — semua konten harus konkret
+4. SANGAT KETAT: SAMA SEKALI TIDAK BOLEH menulis teks bisnis, Market Analysis, atau ROI. Fokus 100% pada struktur data mentah dan arsitektur teknis.
+
+The chapters MUST be exactly these 9:
+${isEn ? 
+"1. Project Technical Overview & Core Objective\n2. Feature Scope & MVP Definition (Strict MoSCoW)\n3. Data Models & Database Schema\n4. API Contracts & Interfaces\n5. Frontend Component Architecture & State Management\n6. User Stories & Edge Case Testing Criteria\n7. Security & Non-Functional Requirements\n8. Error Handling & Fallbacks\n9. AI Agent Implementation Guidelines" : 
+"1. Project Technical Overview & Core Objective (Ringkasan Teknis Obyektif Inti)\n2. Feature Scope & MVP Definition (Cakupan Fitur & Definisi MVP - Strict MoSCoW)\n3. Data Models & Database Schema (Model Data & Skema Database)\n4. API Contracts & Interfaces (Kontrak API & Antarmuka)\n5. Frontend Component Architecture & State Management (Arsitektur Komponen & Manajemen State)\n6. User Stories & Edge Case Testing Criteria (User Stories & Kriteria Pengujian)\n7. Security & Non-Functional Requirements (Keamanan & Kebutuhan Non-Fungsional)\n8. Error Handling & Fallbacks (Penanganan Error & Fallback)\n9. AI Agent Implementation Guidelines (Instruksi Khusus untuk AI Coder)"}
+
+Ensure to include the following content constraints for each chapter:
+
+**Chapter 1: Project Technical Overview & Core Objective**
+Technical system goals, core technologies.
+
+**Chapter 2: Feature Scope & MVP Definition (Strict MoSCoW)**
+Strict MoSCoW purely from technical implementation effort.
+
+**Chapter 3: Data Models & Database Schema**
+- WAJIB memiliki detail kolom, tipe data ORM, relasi (1:N, M:N), constraints, index.
+
+**Chapter 4: API Contracts & Interfaces**
+- WAJIB memiliki JSON payload Request/Response yang jelas dan endpoint design.
+
+**Chapter 5: Frontend Component Architecture & State Management**
+- WAJIB mendefinisikan URL path dan state logic (contoh: Redux/Zustand), serta pembagian komponen re-usable.
+
+**Chapter 6: User Stories & Edge Case Testing Criteria**
+- Use list format. Provide strictly 6 technical user stories, focusing on edge cases, API integrations, and constraints. MUST use horizontal separator (\`---\`) after each story.
+
+**Chapter 7: Security & Non-Functional Requirements**
+Performance benchmarks, authentication methods (JWT/OAuth), authorization, limits.
+
+**Chapter 8: Error Handling & Fallbacks**
+Retry logic, degraded modes, circuit breakers, caching fallbacks.
+
+**Chapter 9: AI Agent Implementation Guidelines**
+Tech stack instruction, precise directory structure for mono-repo, AI agent step-by-step logic.
+${getIndustrySpecificPrompt(productType)}
+
+**FORMATTING RULES:**
+- Heading level 2 (##) untuk judul chapter
+- Fokus kembalikan kode blok (JSON, SQL, Tipe Data) atau tabel.
+- User Stories pakai list format fokus testing teknis.
+- TIDAK ADA placeholder.
+- NO BUSINESS METRICS.
+- Bahasa mengikuti pengaturan: Indonesia atau English
+- Konsisten.
+
+**OUTPUT TEMPLATE:**
+Setiap chapter dimulai dengan \`## [nomor]. [Judul Chapter]\` (heading level 2).
+Jangan gunakan placeholder — semua konten harus konkret dan spesifik, cantumkan format JSON atau kode jika perlu.
+${extraPrompt ? '\n\n' + extraPrompt : ''}`;
+  }
 }
 
 function getRevisionPrompt(language: string) {
@@ -317,7 +354,7 @@ app.post("/api/generate-prd", async (req, res) => {
   res.setHeader("Connection", "keep-alive");
 
   try {
-    const { prompt, customApiKey, provider = 'deepseek', model = 'deepseek-chat', language = 'id', productType, uploadedFiles, mode = 'initial' } = req.body;
+    const { prompt, customApiKey, provider = 'deepseek', model = 'deepseek-chat', language = 'id', productType, uploadedFiles, mode = 'initial', prdMode = 'business' } = req.body;
     
     if (!prompt) {
       res.write(`data: ${JSON.stringify({ error: language === 'en' ? "Prompt is required" : "Prompt diperlukan" })}\n\n`);
@@ -369,10 +406,10 @@ app.post("/api/generate-prd", async (req, res) => {
 
     let finalPrompt;
     if (mode === 'initial') {
-      finalPrompt = getSystemPrompt(language, "", productType);
+      finalPrompt = getSystemPrompt(language, "", productType, prdMode);
     } else {
       // Gabungkan: full system prompt + mode instructions di akhir
-      finalPrompt = getSystemPrompt(language, "", productType) + '\n\n' + modeInstructions;
+      finalPrompt = getSystemPrompt(language, "", productType, prdMode) + '\n\n' + modeInstructions;
     }
 
     let fetchHeaders: any = {
@@ -382,8 +419,9 @@ app.post("/api/generate-prd", async (req, res) => {
 
     const abortController = new AbortController();
     
-    // Handle client disconnect
-    req.on("close", () => {
+    // Handle client disconnect (Gunakan res, BUKAN req)
+    res.on("close", () => {
+      console.log("CLIENT DISCONNECTED. Aborting fetch...");
       abortController.abort();
     });
 
@@ -392,19 +430,7 @@ app.post("/api/generate-prd", async (req, res) => {
       headers: fetchHeaders,
     };
 
-    let fallbackTimeout: NodeJS.Timeout | undefined;
-
-    if (typeof AbortSignal !== 'undefined' && (AbortSignal as any).any) {
-      if ((AbortSignal as any).timeout) {
-        fetchOptions.signal = (AbortSignal as any).any([abortController.signal, (AbortSignal as any).timeout(60000)]);
-      } else {
-        fetchOptions.signal = abortController.signal;
-      }
-    } else {
-      fetchOptions.signal = abortController.signal;
-      // Fallback timeout since AbortSignal.any is not available in older Node.js
-      fallbackTimeout = setTimeout(() => abortController.abort(), 60000);
-    }
+    fetchOptions.signal = abortController.signal;
 
     if (provider === "gemini") {
       fetchHeaders["Authorization"] = "Bearer " + customKey;
@@ -469,7 +495,9 @@ app.post("/api/generate-prd", async (req, res) => {
           }
           try {
             const data = JSON.parse(dataStr);
-            const chunkText = data.choices?.[0]?.delta?.content;
+            const chunkText = data.choices?.[0]?.delta?.content || 
+                              data.candidates?.[0]?.content?.parts?.[0]?.text || 
+                              data.choices?.[0]?.delta?.reasoning_content;
             if (chunkText) {
               res.write(`data: ${JSON.stringify({ text: chunkText })}\n\n`);
             }
@@ -484,11 +512,16 @@ app.post("/api/generate-prd", async (req, res) => {
     res.end();
 
   } catch (error) {
+    if (error instanceof Error && error.name === 'AbortError') {
+      console.log('Request aborted.'); // Log quietly
+      // Send DONE to tell client to stop reading gracefully
+      res.write(`data: [DONE]\n\n`);
+      res.end();
+      return;
+    }
     console.error("Error generating PRD:", error);
     res.write(`data: ${JSON.stringify({ error: error instanceof Error ? error.message : "Internal server error" })}\n\n`);
     res.end();
-  } finally {
-    if (fallbackTimeout) clearTimeout(fallbackTimeout);
   }
 });
 

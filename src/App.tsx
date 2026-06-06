@@ -5,7 +5,7 @@ import { ChatInput } from "./components/ChatInput";
 import { BlueprintSheet, getSections } from "./components/BlueprintSheet";
 import { ApiKeyModal } from "./components/ApiKeyModal";
 import { generatePRD } from "./services/geminiService";
-import { ProductType, PRDVersion, UploadedFile, AIProvider } from "./types";
+import { ProductType, PRDVersion, UploadedFile, AIProvider, PRDMode } from "./types";
 import { ArrowUp } from "lucide-react";
 import { FileUploader } from "./components/FileUploader";
 
@@ -34,6 +34,7 @@ export default function App() {
   const [sidebarOpen, setSidebarOpen] = useState(false);
   const [currentPrompt, setCurrentPrompt] = useState("");
   const [abortController, setAbortController] = useState<AbortController | null>(null);
+  const [prdMode, setPrdMode] = useState<PRDMode>("business");
 
   const chatContainerRef = useRef<HTMLDivElement>(null);
 
@@ -96,6 +97,7 @@ export default function App() {
       userDisplayPrompt: prompt,
       productType: type,
       referencedFilesCount: uploadedFiles.length,
+      prdMode: prdMode,
     };
 
     setVersions((prev) => [...prev, newVersion]);
@@ -111,6 +113,7 @@ export default function App() {
         type,
         uploadedFiles,
         "initial",
+        prdMode,
         controller.signal,
         (chunk) => {
           setVersions((prev) =>
@@ -121,7 +124,7 @@ export default function App() {
         },
       );
     } catch (err: any) {
-      if (err.name === 'AbortError') {
+      if (err.name === 'AbortError' || err.message === 'This operation was aborted') {
         // Keep the partially generated output — don't delete it
         return;
       }
@@ -163,6 +166,7 @@ export default function App() {
       userDisplayPrompt: newPrompt,
       productType: activeVersion.productType,
       referencedFilesCount: uploadedFiles.length,
+      prdMode: activeVersion.prdMode || "business",
     };
 
     setVersions((prev) => [...prev, newVersion]);
@@ -170,13 +174,13 @@ export default function App() {
 
     try {
       await generatePRD(appendPrompt, customApiKey, provider, model, language,
-        activeVersion.productType, uploadedFiles, "append", controller.signal, (chunk) => {
+        activeVersion.productType, uploadedFiles, "append", activeVersion.prdMode || "business", controller.signal, (chunk) => {
           setVersions((prev) => prev.map((v) =>
             v.id === newVersionId ? { ...v, content: v.content + chunk } : v
           ));
         });
     } catch (err: any) {
-      if (err.name === 'AbortError') {
+      if (err.name === 'AbortError' || err.message === 'This operation was aborted') {
         // Keep the partially generated output — don't delete it
         return;
       }
@@ -236,6 +240,7 @@ export default function App() {
       userDisplayPrompt: language === "en" ? "Revising PRD based on comments..." : "Merevisi PRD berdasarkan komentar...",
       productType: activeVersion.productType,
       referencedFilesCount: uploadedFiles.length,
+      prdMode: activeVersion.prdMode || "business",
     };
 
     setVersions((prev) => [...prev, newVersion]);
@@ -251,6 +256,7 @@ export default function App() {
         activeVersion.productType,
         uploadedFiles,
         "revision",
+        activeVersion.prdMode || "business",
         controller.signal,
         (chunk) => {
           setVersions((prev) =>
@@ -263,7 +269,7 @@ export default function App() {
       // Clear comments after successful revision
       setComments({});
     } catch (err: any) {
-      if (err.name === 'AbortError') {
+      if (err.name === 'AbortError' || err.message === 'This operation was aborted') {
         // Keep the partially generated output — don't delete it
         return;
       }
@@ -428,7 +434,12 @@ export default function App() {
               </div>
             )}
             {!hasMessage ? (
-              <WelcomeScreen language={language} onQuickPrompt={(text) => setCurrentPrompt(text)} />
+              <WelcomeScreen 
+                language={language} 
+                onQuickPrompt={(text) => setCurrentPrompt(text)} 
+                prdMode={prdMode}
+                onChangeMode={setPrdMode}
+              />
             ) : (
               <div className="max-w-[800px] mx-auto space-y-6 pt-8 pb-8">
                 {error && (
