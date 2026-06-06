@@ -197,6 +197,7 @@ CRITICAL INSTRUCTIONS (FAILURE IS NOT AN OPTION):
 2. EVERY chapter MUST start with a Markdown Heading 2 (##). Example: "## 1. Executive Summary & Value Proposition"
 3. DO NOT output a main title like "# PRD" or "Here is your PRD".
 4. NO PLACEHOLDERS like "[Insert Here]". Generate specific, concrete, realistic examples and metrics based on the product type.
+5. NO OUTLINES OR PLANS. You must generate the ENTIRE document right now in one go.
 The 12 Chapters MUST be exactly:
 ${isEn ? 
 "## 1. Executive Summary & Value Proposition\n## 2. Problem Definition & Market Analysis (TAM/SAM/SOM, Competitors)\n## 3. Solution Overview & Scope (MoSCoW)\n## 4. User Stories & Acceptance Criteria\n## 5. UX Design, User Journey & Wireframe Flow\n## 6. High-Level Technical Architecture\n## 7. Non-Functional Requirements\n## 8. Success Metrics, Business KPIs (MRR, Churn)\n## 9. Go-to-Market (GTM) Strategy & Monetization\n## 10. Risk Register & Mitigation\n## 11. Project Timeline & 12-Week Roadmap\n## 12. Regulatory & Compliance" : 
@@ -204,24 +205,22 @@ ${isEn ?
 CHAPTER CONSTRAINTS:
 - Ch 2: Provide exactly 5 specific problems, a concrete Competitor analysis (min 3 real/hypothetical competitors), and an estimated TAM/SAM/SOM breakdown.
 - Ch 3: Group features clearly by Must-have, Should-have, Could-have, Won't-have (MoSCoW).
-- Ch 4: Use a bulleted list format. Create EXACTLY 3 personas, each with 2 stories (6 total). Add a markdown separator (\`---\`) between stories.
+- Ch 4: Use a bulleted list format. Create EXACTLY 3 personas, each with 2 stories (6 total). Add a markdown separator (---) between stories.
 - Ch 6: Include an API Design Table (Endpoint, Method, Description, Request, Response). Minimum 5 endpoints.
 - Ch 7: Provide exact numbers (e.g. "99.99% Uptime", "< 200ms Latency").
 - Ch 8 & Ch 9 & Ch 10: MUST use Markdown Tables to structure the financial KPIs, GTM ROI estimates, and Risk Mitigation.
-${getIndustrySpecificPrompt(productType)}
 LANGUAGE REQUIREMENT:
-Generate the entire document strictly in ${isEn ? 'English' : 'Indonesian'}. 
+Generate the entire document strictly in ${isEn ? 'English' : 'Indonesian'}.
 ${extraPrompt ? '\nAdditional Context from User:\n' + extraPrompt : ''}`;
   } else {
-    // ----------------------------------------------------------------------
     // TECHNICAL MODE
-    // ----------------------------------------------------------------------
     return `You are a highly skilled Senior Software Architect. Your job is to generate a comprehensive, purely technical architecture and engineering specification document mapped EXACTLY into 9 structured chapters using strictly Markdown format.
 CRITICAL INSTRUCTIONS (FAILURE IS NOT AN OPTION):
 1. NO INTRODUCTIONS OR OUTROS. Start immediately with "## 1."
 2. EVERY chapter MUST start with a Markdown Heading 2 (##). Example: "## 1. Project Technical Overview & Core Objective"
 3. DO NOT output a main title like "# Architecture Doc" or "Here is your spec".
 4. STRICTLY TECHNICAL: ABSOLUTELY NO business text, marketing analysis, or ROI metrics. Focus 100% on raw data structures, database schemas, API specs, and engineering guidelines.
+5. NO OUTLINES OR PLANS. You must generate the ENTIRE document right now in one go.
 The 9 Chapters MUST be exactly:
 ${isEn ? 
 "## 1. Project Technical Overview & Core Objective\n## 2. Feature Scope & MVP Definition (Strict MoSCoW)\n## 3. Data Models & Database Schema\n## 4. API Contracts & Interfaces\n## 5. Frontend Component Architecture & State Management\n## 6. Edge Case & Integration Testing Criteria\n## 7. Security, Auth & Non-Functional Requirements\n## 8. Error Handling, Fallbacks & Retry Strategies\n## 9. AI Agent Implementation Guidelines" : 
@@ -230,7 +229,7 @@ CHAPTER CONSTRAINTS:
 - Ch 3 (Data Models): MUST include detailed tables indicating Column Name, Data Type (ORM specific), Relations (1:N, M:N), Constraints (Nullable, Unique), and Indexes.
 - Ch 4 (API Contracts): MUST include literal JSON block examples for Payload Requests and Responses for at least 5 core endpoints.
 - Ch 5 (Frontend): MUST define UI component hierarchies, URL Routing paths, and State Management logic (e.g. Redux, Zustand contexts).
-- Ch 6 (Testing): List at least 6 critical edge cases focusing on race conditions, concurrent requests, and API failures. Add a markdown separator (\`---\`) between cases.
+- Ch 6 (Testing): List at least 6 critical edge cases focusing on race conditions, concurrent requests, and API failures. Add a markdown separator (---) between cases.
 - Ch 7 (Security): Detail Auth flows (e.g., JWT, OAuth2), RBAC policies, Rate Limiting logic, and exact performance thresholds.
 - Ch 8 (Errors): Define HTTP Status Code mappings, global error boundary strategies, and offline/fallback states.
 - Ch 9 (AI Guidelines): Provide exact step-by-step CLI commands or structural instructions for an AI coder (Cursor/Copilot) to initialize and build the project from this spec.
@@ -293,7 +292,18 @@ app.post("/api/generate-prd", async (req, res) => {
       });
     }
 
-    const finalUserPrompt = prompt + fileContext;
+    let finalUserPrompt = prompt + fileContext;
+    // --- FORCED EXECUTION DIRECTIVE (SOLUSI BASA-BASI) ---
+    // Berlaku secara universal untuk Business maupun Technical
+    if (mode === 'initial') {
+      const firstHeading = prdMode === 'business' 
+        ? "## 1. Executive Summary" 
+        : "## 1. Project Technical Overview";
+      const forcedDirectiveEn = `\n\nCRITICAL REMINDER: Do NOT give me an outline, plan, or introduction. You MUST generate the ENTIRE comprehensive document right now. Start your response immediately with "${firstHeading}" and NOTHING ELSE. Output the full raw Markdown.`;
+      const forcedDirectiveId = `\n\nPENGINGAT KRITIS: JANGAN berikan saya outline, rencana, atau kata pengantar. Anda HARUS menghasilkan KESELURUHAN dokumen secara utuh sekarang juga. Mulai respons Anda langsung dengan "${firstHeading}" dan TANPA BASA-BASI APA PUN. Output harus berupa Markdown murni.`;
+      
+      finalUserPrompt += language === 'en' ? forcedDirectiveEn : forcedDirectiveId;
+    }
 
     let apiKeyEnvName = "";
     let endpoint = "";
@@ -415,11 +425,11 @@ app.post("/api/generate-prd", async (req, res) => {
           }
           try {
             const data = JSON.parse(dataStr);
-            const chunkText = data.choices?.[0]?.delta?.content || 
-                              data.candidates?.[0]?.content?.parts?.[0]?.text || 
-                              data.choices?.[0]?.delta?.reasoning_content;
-            if (chunkText) {
-              res.write(`data: ${JSON.stringify({ text: chunkText })}\n\n`);
+            const contentText = data.choices?.[0]?.delta?.content || data.candidates?.[0]?.content?.parts?.[0]?.text || "";
+            const reasoningText = data.choices?.[0]?.delta?.reasoning_content || "";
+
+            if (contentText || reasoningText) {
+              res.write(`data: ${JSON.stringify({ text: contentText, reasoning: reasoningText })}\n\n`);
             }
           } catch (e) {
             console.error("Custom provider parse error", e, dataStr);
