@@ -25,19 +25,22 @@
 
 ## ⚡ Overview
 
-**PRD Architect** is a modern, full-stack application designed to dramatically accelerate the product planning phase. By taking a simple product idea as input, it automatically generates a highly structured, enterprise-grade **Product Requirements Document (PRD)**.
+**PRD Architect** is a modern, full-stack application designed to dramatically accelerate the product planning phase. By taking a simple product idea as input, it automatically generates a highly structured, enterprise-grade Product Requirements Document (PRD) or Technical Specification Document.
 
-The generated document strictly adheres to a 12-chapter industry-standard structure, ensuring that everything from user personas and technical specifications to risk analysis, budget estimates, and AI coding guidelines is covered comprehensively.
+It features a **Dual-Mode** generation engine:
+- **💼 Business & Investor Mode (12 Chapters)**: Focuses on TAM/SAM/SOM, MoSCoW scoping, financial KPIs, competitor analysis, Risk mitigation, and 12-week roadmap.
+- **💻 Technical & AI Agent Mode (9 Chapters)**: Focuses strictly on Data Models (ORM), API Contracts (JSON payloads), Frontend Component Architecture, Error Handling, Edge Cases, and AI Agent Implementation Guidelines.
 
 ## ✨ Features
 
-- 🧠 **Bring Your Own Model (BYOM)**: Seamlessly switch between AI providers (DeepSeek, Gemini) and select specific models via the in-app Settings UI.
-- 📐 **Enterprise Structure**: Enforces a strict 12-chapter format (including dedicated AI Agent Implementation Guidelines), generating consistent and high-quality PRDs out of the box.
-- ⚡ **Real-time Streaming Output**: Watch your document take shape in real-time with responsive Markdown rendering.
+- 🌓 **Dual-Mode Generation**: Clean toggle between high-level Business/Investor strategies and deep Technical specifications.
+- 🧠 **Bring Your Own Model (BYOM)**: Seamlessly switch between AI providers (DeepSeek, Gemini, including DeepSeek Reasoner) and select specific models via the in-app Settings UI.
+- ⚡ **Highly Stable Real-time Streaming**: Built with robust connection handling that supports infinite generation times—perfect for deep reasoning models (R1) without arbitrary timeouts.
+- 📏 **Precision Markdown Parsing**: Accurately segregates and renders complex Markdown documents in the UI purely based on primary chapter headings.
 - 💬 **Interactive Revisions**: Leave feedback on the generated document to incrementally refine and polish the PRD, complete with a version control system to switch between generation attempts.
 - 📄 **Advanced File Context Support**: Upload reference files (PDF, DOCX, XLSX, Excel, CSV, text, and Images) to provide robust additional context and enrich the generated document.
 - 🌏 **Bilingual Support & Quick Prompts**: Full generation, system prompts, and pre-built quick prompt starters supported seamlessly in both English and Indonesian.
-- 🎨 **Cyberpunk Minimalist UI**: A sleek, dark-themed interface built for focus, speed, and aesthetics (now featuring sleek loading skeletons).
+- 🎨 **Minimalist UI**: A sleek, dark-themed interface built for focus, speed, and aesthetics with Lucide React icons replacing standard emojis.
 - 📤 **Export Ready**: Instantly copy to clipboard, download as Markdown (`.md`), or print directly to PDF.
 
 ## 🛠️ Tech Stack
