@@ -27,7 +27,7 @@ export function ChatInput({
   const textareaRef = useRef<HTMLTextAreaElement>(null);
 
   useEffect(() => {
-    if (initialPrompt && initialPrompt !== prompt) {
+    if (initialPrompt) {
       setPrompt(initialPrompt);
     }
   }, [initialPrompt]);
@@ -61,15 +61,16 @@ export function ChatInput({
   }, [prompt]);
 
   return (
-    <div className="absolute bottom-0 left-0 right-0 bg-[#111111] border-t border-[#2a2a2a] p-4 z-40">
+    <div className="absolute bottom-0 left-0 right-0 bg-[var(--color-bg)] border-t border-[var(--color-border)] p-4 z-40">
       <div className="max-w-[800px] mx-auto w-full">
         <form onSubmit={handleSubmit} className="relative w-full mb-3">
           {onAttachClick && (
             <button
               type="button"
               onClick={onAttachClick}
-              className={`absolute left-[10px] top-1/2 -translate-y-1/2 flex items-center justify-center w-[32px] h-[32px] rounded-[8px] transition-all duration-200 bg-transparent ${
-                hasFiles ? "text-[#f5f5f5] bg-[#222222]" : "text-[#666666] hover:text-[#999999] hover:bg-[#222222]"
+              aria-label={language === "en" ? "Attach files" : "Lampirkan file"}
+              className={`absolute left-[10px] top-1/2 -translate-y-1/2 flex items-center justify-center w-[32px] h-[32px] rounded-[8px] transition-all duration-200 bg-transparent focus-visible:ring-2 focus-visible:ring-[var(--color-interactive)] focus-visible:outline-none ${
+                hasFiles ? "text-[var(--color-text-primary)] bg-[var(--color-surface-elevated)]" : "text-[var(--color-text-muted)] hover:text-[var(--color-text-secondary)] hover:bg-[var(--color-surface-elevated)]"
               }`}
             >
               <Paperclip size={18} strokeWidth={1.5} />
@@ -87,7 +88,7 @@ export function ChatInput({
                 ? "Describe the product you want to build..."
                 : "Jelaskan produk yang ingin kamu bangun..."
             }
-            className="w-full bg-[#1a1a1a] text-[#f5f5f5] placeholder:text-[#555555] outline-none resize-none min-h-[48px] max-h-[200px] font-mono text-[14px] border border-[#333333] focus:border-[#6666ff] rounded-[12px] p-3 pl-12 pr-[88px] transition-all duration-200"
+            className="w-full bg-[var(--color-surface)] text-[var(--color-text-primary)] placeholder:text-[var(--color-text-muted)] outline-none resize-none min-h-[48px] max-h-[200px] font-mono text-[14px] border border-[#333333] focus:border-[var(--color-interactive)] rounded-[8px] p-3 pl-12 pr-[88px] transition-all duration-200"
             disabled={isGenerating}
             rows={1}
           />
@@ -97,7 +98,8 @@ export function ChatInput({
               <button
                 type="button"
                 onClick={onCancel}
-                className="flex items-center justify-center w-[36px] h-[36px] rounded-[8px] border border-[#8a3a3a] text-[#8a3a3a] hover:bg-[#8a3a3a] hover:text-white transition-all duration-200"
+                className="flex items-center justify-center w-[36px] h-[36px] rounded-[8px] border border-[#8a3a3a] text-[#8a3a3a] hover:bg-[#8a3a3a] hover:text-white transition-all duration-200 focus-visible:ring-2 focus-visible:ring-[var(--color-interactive)] focus-visible:outline-none"
+                aria-label={language === "en" ? "Cancel" : "Batal"}
                 title={language === "en" ? "Cancel" : "Batal"}
               >
                 <Pause size={16} strokeWidth={1.5} />
@@ -106,7 +108,8 @@ export function ChatInput({
             <button
               type="submit"
               disabled={!prompt.trim() || isGenerating}
-              className="flex items-center justify-center w-[36px] h-[36px] rounded-[8px] bg-[#f5f5f5] text-[#111111] hover:bg-[#e5e5e5] disabled:opacity-30 disabled:cursor-not-allowed transition-all duration-200"
+              className="flex items-center justify-center w-[36px] h-[36px] rounded-[8px] bg-[var(--color-text-primary)] text-[#111111] hover:bg-[#e5e5e5] disabled:opacity-30 disabled:cursor-not-allowed transition-all duration-200 focus-visible:ring-2 focus-visible:ring-[var(--color-interactive)] focus-visible:outline-none"
+              aria-label={language === "en" ? (isGenerating ? "Generating" : "Send") : (isGenerating ? "Menghasilkan" : "Kirim")}
               title={language === "en" ? "Generate" : "Buat PRD"}
             >
               {isGenerating ? (
@@ -127,7 +130,7 @@ export function ChatInput({
                   key={qp.id}
                   type="button"
                   onClick={() => setPrompt(qp.text)}
-                  className="flex items-center justify-center gap-1.5 text-[11px] sm:text-[12px] px-2 py-1.5 border border-[#2a2a2a] rounded-[6px] bg-transparent text-[#999999] hover:bg-[#222222] hover:border-[#555555] hover:text-[#f5f5f5] transition-all duration-200 whitespace-nowrap"
+                  className="flex items-center justify-center gap-1.5 text-[11px] sm:text-[12px] px-2 py-1.5 border border-[var(--color-border)] rounded-[6px] bg-transparent text-[var(--color-text-secondary)] hover:bg-[var(--color-surface-elevated)] hover:border-[var(--color-text-muted)] hover:text-[var(--color-text-primary)] transition-all duration-200 whitespace-nowrap"
                 >
                   <Icon size={14} strokeWidth={1.5} />
                   <span>{qp.label}</span>

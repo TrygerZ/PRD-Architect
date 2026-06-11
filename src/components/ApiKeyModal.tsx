@@ -72,33 +72,33 @@ export function ApiKeyModal({
   return (
     <AnimatePresence>
       {isOpen && (
-        <div className="fixed inset-0 z-[100] flex items-center justify-center bg-[#111111]/80 p-4 print:hidden backdrop-blur-sm">
+        <div className="fixed inset-0 z-[100] flex items-center justify-center bg-[var(--color-bg)]/80 p-4 print:hidden backdrop-blur-sm">
           <motion.div
             initial={{ opacity: 0, scale: 0.95, y: 10 }}
             animate={{ opacity: 1, scale: 1, y: 0 }}
             exit={{ opacity: 0, scale: 0.95, y: 10 }}
             transition={{ duration: 0.2, ease: "easeOut" }}
-            className="w-full max-w-[480px] bg-[#1a1a1a] p-8 border border-[#2a2a2a] rounded-[12px] shadow-2xl relative"
+            className="w-full max-w-[480px] bg-[var(--color-surface)] p-8 border border-[var(--color-border)] rounded-[8px] shadow-2xl relative"
           >
             <button
               onClick={onClose}
-              className="absolute top-6 right-6 text-[#555555] hover:text-[#f5f5f5] transition-all duration-200 ease bg-transparent hover:bg-[#222222] p-1.5 rounded-[6px]"
+              className="absolute top-6 right-6 text-[var(--color-text-muted)] hover:text-[var(--color-text-primary)] transition-all duration-200 ease bg-transparent hover:bg-[var(--color-surface-elevated)] p-1.5 rounded-[6px]"
             >
               <X size={20} strokeWidth={1.5} />
             </button>
 
-            <div className="flex items-center gap-3 mb-8 pb-4 border-b border-[#2a2a2a]">
-              <div className="w-[32px] h-[32px] rounded-[6px] bg-[#222222] border border-[#2a2a2a] flex items-center justify-center">
-                <Key className="text-[#999999]" size={16} strokeWidth={1.5} />
+            <div className="flex items-center gap-3 mb-8 pb-4 border-b border-[var(--color-border)]">
+              <div className="w-[32px] h-[32px] rounded-[6px] bg-[var(--color-surface-elevated)] border border-[var(--color-border)] flex items-center justify-center">
+                <Key className="text-[var(--color-text-secondary)]" size={16} strokeWidth={1.5} />
               </div>
-              <h2 className="text-[18px] font-semibold text-[#f5f5f5]">
+              <h2 className="text-[18px] font-semibold text-[var(--color-text-primary)]">
                 {language === "en" ? "Settings" : "Pengaturan"}
               </h2>
             </div>
             
             <div className="space-y-6">
               <div>
-                <label htmlFor="ai-provider" className="block text-[13px] font-medium text-[#999999] mb-2">
+                <label htmlFor="ai-provider" className="block text-[13px] font-medium text-[var(--color-text-secondary)] mb-2">
                   {language === "en" ? "AI Provider" : "Penyedia AI"}
                 </label>
                 <div className="relative">
@@ -106,19 +106,19 @@ export function ApiKeyModal({
                     id="ai-provider"
                     value={provider}
                     onChange={(e) => handleProviderChange(e.target.value as AIProvider)}
-                    className="w-full bg-[#111111] border border-[#2a2a2a] p-3 rounded-[6px] text-[#f5f5f5] text-[13px] focus:border-[#6666ff] focus:outline-none transition-all duration-200 ease appearance-none pr-10"
+                    className="w-full bg-[var(--color-bg)] border border-[var(--color-border)] p-3 rounded-[6px] text-[var(--color-text-primary)] text-[13px] focus:border-[var(--color-interactive)] focus:outline-none transition-all duration-200 ease appearance-none pr-10"
                   >
-                    <option value="gemini" className="bg-[#111111]">Gemini</option>
-                    <option value="deepseek" className="bg-[#111111]">DeepSeek</option>
+                    <option value="gemini" className="bg-[var(--color-bg)]">Gemini</option>
+                    <option value="deepseek" className="bg-[var(--color-bg)]">DeepSeek</option>
                   </select>
-                  <div className="absolute right-3 top-1/2 -translate-y-1/2 pointer-events-none text-[#555555]">
+                  <div className="absolute right-3 top-1/2 -translate-y-1/2 pointer-events-none text-[var(--color-text-muted)]">
                     <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"><path d="m6 9 6 6 6-6"/></svg>
                   </div>
                 </div>
               </div>
 
               <div>
-                <label htmlFor="ai-model" className="block text-[13px] font-medium text-[#999999] mb-2">
+                <label htmlFor="ai-model" className="block text-[13px] font-medium text-[var(--color-text-secondary)] mb-2">
                   {language === "en" ? "AI Model" : "Model AI"}
                 </label>
                 <div className="relative">
@@ -126,22 +126,22 @@ export function ApiKeyModal({
                     id="ai-model"
                     value={model}
                     onChange={(e) => setModel(e.target.value)}
-                    className="w-full bg-[#111111] border border-[#2a2a2a] p-3 rounded-[6px] text-[#f5f5f5] text-[13px] focus:border-[#6666ff] focus:outline-none transition-all duration-200 ease appearance-none pr-10"
+                    className="w-full bg-[var(--color-bg)] border border-[var(--color-border)] p-3 rounded-[6px] text-[var(--color-text-primary)] text-[13px] focus:border-[var(--color-interactive)] focus:outline-none transition-all duration-200 ease appearance-none pr-10"
                   >
                     {MODELS[provider].map((m) => (
-                      <option key={m} value={m} className="bg-[#111111]">
+                      <option key={m} value={m} className="bg-[var(--color-bg)]">
                         {m}
                       </option>
                     ))}
                   </select>
-                  <div className="absolute right-3 top-1/2 -translate-y-1/2 pointer-events-none text-[#555555]">
+                  <div className="absolute right-3 top-1/2 -translate-y-1/2 pointer-events-none text-[var(--color-text-muted)]">
                     <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"><path d="m6 9 6 6 6-6"/></svg>
                   </div>
                 </div>
               </div>
 
               <div className="mb-8">
-                <label htmlFor="custom-api-key" className="block text-[13px] font-medium text-[#999999] mb-2">
+                <label htmlFor="custom-api-key" className="block text-[13px] font-medium text-[var(--color-text-secondary)] mb-2">
                   {language === "en" ? "Custom API Key" : "Custom API Key"}
                 </label>
                 <input
@@ -151,15 +151,15 @@ export function ApiKeyModal({
                   onChange={(e) => setApiKey(e.target.value)}
                   autoComplete="off"
                   placeholder={language === "en" ? "Optional. Leave blank to use app default..." : "Opsional. Kosongkan untuk bawaan sistem..."}
-                  className="w-full bg-[#111111] border border-[#2a2a2a] p-3 rounded-[6px] text-[#f5f5f5] font-mono text-[13px] focus:border-[#6666ff] focus:outline-none transition-all duration-200 ease placeholder:text-[#555555]"
+                  className="w-full bg-[var(--color-bg)] border border-[var(--color-border)] p-3 rounded-[6px] text-[var(--color-text-primary)] font-mono text-[13px] focus:border-[var(--color-interactive)] focus:outline-none transition-all duration-200 ease placeholder:text-[var(--color-text-muted)]"
                 />
-                <div className="mt-3 bg-[#222222] border border-[#2a2a2a] rounded-[6px] p-3 flex gap-2.5 items-start">
+                <div className="mt-3 bg-[var(--color-surface-elevated)] border border-[var(--color-border)] rounded-[6px] p-3 flex gap-2.5 items-start">
                   <AlertTriangle
                     size={14}
                     strokeWidth={1.5}
                     className="shrink-0 mt-0.5 text-[#8a7a2a]"
                   />
-                  <p className="text-[12px] text-[#999999] leading-relaxed">
+                  <p className="text-[12px] text-[var(--color-text-secondary)] leading-relaxed">
                     {language === "en"
                       ? "Overrides the system default key. Your key is stored securely in your browser's local storage."
                       : "Berlaku untuk provider di atas dan menggantikan key sistem. Tersimpan secara lokal di browser kamu."}
@@ -168,10 +168,10 @@ export function ApiKeyModal({
               </div>
             </div>
 
-            <div className="flex justify-between items-center mt-8 pt-4 border-t border-[#2a2a2a]">
+            <div className="flex justify-between items-center mt-8 pt-4 border-t border-[var(--color-border)]">
               <button
                 onClick={handleClear}
-                className="text-[13px] font-medium text-[#555555] hover:text-[#f5f5f5] bg-transparent hover:bg-[#222222] transition-all duration-200 ease px-3 py-1.5 rounded-[6px]"
+                className="text-[13px] font-medium text-[var(--color-text-muted)] hover:text-[var(--color-text-primary)] bg-transparent hover:bg-[var(--color-surface-elevated)] transition-all duration-200 ease px-3 py-1.5 rounded-[6px]"
                 title={language === "en" ? "Clear Key" : "Hapus Key"}
               >
                 {language === "en" ? "Clear Key" : "Hapus Key"}
@@ -180,7 +180,7 @@ export function ApiKeyModal({
               <button
                 onClick={handleSave}
                 disabled={saved}
-                className="flex items-center gap-2 text-[13px] font-medium px-4 py-2 rounded-[6px] transition-all duration-200 ease bg-[#f5f5f5] text-[#111111] hover:bg-[#e5e5e5] disabled:opacity-50 disabled:cursor-not-allowed"
+                className="flex items-center gap-2 text-[13px] font-medium px-4 py-2 rounded-[6px] transition-all duration-200 ease bg-[var(--color-text-primary)] text-[var(--color-bg)] hover:bg-[var(--color-text-primary)] disabled:opacity-50 disabled:cursor-not-allowed"
               >
                 {saved ? (
                   <>

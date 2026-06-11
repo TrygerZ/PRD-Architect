@@ -12,6 +12,7 @@
   --color-interactive: #6666ff;
   --color-interactive-hover: #8888ff;
   --color-interactive-subtle: rgba(102, 102, 255, 0.1);
+  --color-border-subtle: #333333;
 
   --font-geist: 'Geist Sans', system-ui, -apple-system, sans-serif;
   --font-mono: 'Geist Mono', 'JetBrains Mono', monospace;
@@ -61,6 +62,16 @@ html {
 }
 ::-webkit-scrollbar-thumb:hover {
   background: var(--color-text-muted);
+}
+
+/* Reduced motion */
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+    scroll-behavior: auto !important;
+  }
 }
 
 /* Cursor blink */

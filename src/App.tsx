@@ -386,7 +386,7 @@ export default function App() {
   };
 
   return (
-    <div className="min-h-screen bg-[#111111] flex flex-col font-geist">
+    <div className="min-h-screen bg-[var(--color-bg)] flex flex-col font-geist">
       <Header
         onOpenSettings={() => setIsSettingsOpen(true)}
         onExportMd={handleExportMd}
@@ -436,21 +436,24 @@ export default function App() {
             {!hasMessage ? (
               <WelcomeScreen 
                 language={language} 
-                onQuickPrompt={(text) => setCurrentPrompt(text)} 
+                onQuickPrompt={(text) => {
+                  setCurrentPrompt(text);
+                  setTimeout(() => setCurrentPrompt(''), 100);
+                }} 
                 prdMode={prdMode}
                 onChangeMode={setPrdMode}
               />
             ) : (
               <div className="max-w-[800px] mx-auto space-y-6 pt-8 pb-8">
                 {error && (
-                  <div className="w-full bg-[#1a1a1a] p-4 mb-4 border border-[#8a3a3a] rounded-[8px] text-[#8a3a3a] text-[15px] font-medium no-print">
+                  <div role="alert" className="w-full bg-[var(--color-surface)] p-4 mb-4 border border-[#8a3a3a] rounded-[8px] text-[#8a3a3a] text-[15px] font-medium no-print">
                     {error}
                   </div>
                 )}
                 
                 {/* User Message */}
-                <div className="bg-[#222222] rounded-[8px] p-3 sm:p-4 max-w-[95%] sm:max-w-[85%] ml-auto shadow-sm border border-[#2a2a2a]">
-                  <p className="text-[14px] text-[#f5f5f5] whitespace-pre-wrap">
+                <div className="bg-[var(--color-surface-elevated)] rounded-[8px] p-3 sm:p-4 max-w-[95%] sm:max-w-[85%] ml-auto shadow-sm border border-[var(--color-border)]">
+                  <p className="text-[14px] text-[var(--color-text-primary)] whitespace-pre-wrap">
                     {activeVersion?.userDisplayPrompt || userPrompt}
                   </p>
                 </div>
@@ -520,7 +523,8 @@ export default function App() {
           onClick={() => {
             if (chatContainerRef.current) chatContainerRef.current.scrollTo({ top: 0, behavior: 'smooth' });
           }}
-          className={`fixed bottom-[160px] right-[40px] z-[45] w-[36px] h-[36px] rounded-full bg-[#222222] border border-[#333333] text-[#999999] hover:bg-[#333333] hover:text-[#f5f5f5] flex items-center justify-center transition-all duration-200 no-print`}
+          className={`fixed bottom-[60px] right-[40px] z-[45] w-[36px] h-[36px] rounded-full bg-[var(--color-surface-elevated)] border border-[var(--color-border)] text-[var(--color-text-secondary)] hover:bg-[var(--color-border-subtle)] hover:text-[var(--color-text-primary)] flex items-center justify-center transition-all duration-200 no-print will-change-transform focus-visible:ring-2 focus-visible:ring-[var(--color-interactive)] focus-visible:outline-none`}
+          aria-label={language === "en" ? "Scroll to top" : "Kembali ke atas"}
           title={language === "en" ? "Scroll to top" : "Kembali ke atas"}
         >
           <ArrowUp size={16} strokeWidth={1.5} />
@@ -533,7 +537,7 @@ export default function App() {
           ${toastMessage ? "translate-y-0 opacity-100" : "-translate-y-4 opacity-0"}`
         }
       >
-        <div className="bg-[#222222] border border-[#333333] text-[#f5f5f5] text-[13px] px-4 py-2.5 rounded shadow-xl flex items-center gap-2">
+        <div className="bg-[var(--color-surface-elevated)] border border-[var(--color-border-subtle)] text-[var(--color-text-primary)] text-[13px] px-4 py-2.5 rounded shadow-xl flex items-center gap-2">
           {toastMessage}
         </div>
       </div>

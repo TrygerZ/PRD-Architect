@@ -19,15 +19,15 @@ export function WelcomeScreen({ language, onQuickPrompt, prdMode, onChangeMode }
         transition={{ duration: 0.4 }}
         className="text-center w-full max-w-[640px]"
       >
-        <h1 className="text-[36px] sm:text-[48px] font-[700] text-[#f5f5f5] mb-2 tracking-tight">
+        <h1 className="text-[36px] sm:text-[48px] font-[700] text-[var(--color-text-primary)] mb-2 tracking-tight">
           PRD Architect
         </h1>
-        <p className="text-[15px] text-[#999999]">
+        <p className="text-[15px] text-[var(--color-text-secondary)]">
           {language === "en" 
             ? "Describe your product. Get a comprehensive, enterprise-grade PRD."
             : "Jelaskan produk Anda. Dapatkan PRD komprehensif tingkat enterprise."}
         </p>
-        <div className="w-12 h-[2px] bg-[#333333] mx-auto my-6"></div>
+        <div className="w-12 h-[2px] bg-[var(--color-border)] mx-auto my-6"></div>
 
         <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 mb-8 text-left w-full px-4 sm:px-0 mx-auto">
           <button 
@@ -36,14 +36,14 @@ export function WelcomeScreen({ language, onQuickPrompt, prdMode, onChangeMode }
             className={`p-4 rounded-xl border flex flex-col gap-1 transition-all duration-300 ${
               prdMode === "business" 
                 ? "bg-[#112233]/40 border-[#4466ff] shadow-[0_0_15px_rgba(68,102,255,0.15)]" 
-                : "bg-[#1a1a1a] border-[#333333] hover:bg-[#222222] opacity-80"
+                : "bg-[var(--color-surface)] border-[var(--color-border)] hover:bg-[var(--color-surface-elevated)] opacity-80"
             }`}
           >
-            <span className={`text-[15px] font-semibold flex items-center justify-center gap-2 ${prdMode === "business" ? "text-white" : "text-[#aaaaaa]"}`}>
+            <span className={`text-[15px] font-semibold flex items-center justify-center gap-2 ${prdMode === "business" ? "text-white" : "text-[var(--color-text-secondary)]"}`}>
               <Briefcase className="w-4 h-4" />
               Business & Investor Mode
             </span>
-            <span className="text-[13px] text-[#888888]">
+            <span className="text-[13px] text-[var(--color-text-secondary)]">
               {language === "en" ? "Focus on business metrics, ROI, and GTM roadmap" : "Fokus pada metrik bisnis, ROI, dan GTM roadmap"}
             </span>
           </button>
@@ -54,14 +54,14 @@ export function WelcomeScreen({ language, onQuickPrompt, prdMode, onChangeMode }
             className={`p-4 rounded-xl border flex flex-col gap-1 transition-all duration-300 ${
               prdMode === "technical" 
                 ? "bg-[#221133]/40 border-[#a855f7] shadow-[0_0_15px_rgba(168,85,247,0.15)]" 
-                : "bg-[#1a1a1a] border-[#333333] hover:bg-[#222222] opacity-80"
+                : "bg-[var(--color-surface)] border-[var(--color-border)] hover:bg-[var(--color-surface-elevated)] opacity-80"
             }`}
           >
-            <span className={`text-[15px] font-semibold flex items-center justify-center gap-2 ${prdMode === "technical" ? "text-white" : "text-[#aaaaaa]"}`}>
+            <span className={`text-[15px] font-semibold flex items-center justify-center gap-2 ${prdMode === "technical" ? "text-white" : "text-[var(--color-text-secondary)]"}`}>
               <Code className="w-4 h-4" />
               AI Agent & Developer Mode
             </span>
-            <span className="text-[13px] text-[#888888]">
+            <span className="text-[13px] text-[var(--color-text-secondary)]">
               {language === "en" ? "Focus on database schemas, API payloads, and architecture" : "Fokus pada skema database, payload API, dan arsitektur"}
             </span>
           </button>
@@ -87,9 +87,9 @@ export function WelcomeScreen({ language, onQuickPrompt, prdMode, onChangeMode }
               }}
               type="button"
               onClick={() => onQuickPrompt(qp.text)}
-              className="flex flex-col items-center justify-center text-center p-3 sm:p-4 border border-[#2a2a2a] rounded-[8px] bg-transparent text-[#999999] hover:bg-[#222222] hover:border-[#555555] hover:text-[#f5f5f5] transition-all duration-200"
+              className="flex flex-col items-center justify-center text-center p-3 sm:p-4 border border-[var(--color-border)] rounded-[8px] bg-transparent text-[var(--color-text-secondary)] hover:bg-[var(--color-surface-elevated)] hover:border-[var(--color-text-muted)] hover:text-[var(--color-text-primary)] transition-all duration-200"
             >
-              <Icon size={16} strokeWidth={1.5} className="mb-2 text-[#555555] group-hover:text-[#999999]" />
+              <Icon size={16} strokeWidth={1.5} className="mb-2 text-[var(--color-text-muted)] group-hover:text-[var(--color-text-secondary)]" />
               <span className="text-[13px] leading-[1.3]">{qp.label}</span>
             </motion.button>
           );

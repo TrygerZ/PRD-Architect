@@ -73,27 +73,37 @@ export function FileUploader({
     if (validFiles.length === 0) return;
 
     setIsUploading(true);
-    const formData = new FormData();
-    validFiles.forEach((file) => {
-      formData.append("files", file);
-    });
 
     try {
-      const response = await fetch("/api/upload-files", {
-        method: "POST",
-        body: formData,
-      });
-
-      if (!response.ok) {
-        const errorData = await response.json();
-        throw new Error(errorData.error || "Failed to upload files");
+      // Read files locally using FileReader instead of uploading to server
+      const localResults: UploadedFile[] = [];
+      for (const file of validFiles) {
+        const content = await new Promise<string>((resolve) => {
+          const reader = new FileReader();
+          reader.onload = () => resolve(reader.result as string);
+          reader.onerror = () => resolve(`[Error reading ${file.name}]`);
+          if (file.type === 'application/pdf') {
+            // For PDFs, just store the filename as we can't parse on client
+            resolve(`[PDF: ${file.name}]`);
+          } else if (file.type.startsWith('image/')) {
+            reader.readAsDataURL(file);
+          } else {
+            reader.readAsText(file);
+          }
+        });
+        localResults.push({
+          id: Date.now().toString() + Math.random().toString(36).slice(2),
+          name: file.name,
+          size: file.size,
+          type: file.type,
+          content: content,
+          charCount: content.length,
+        });
       }
-
-      const uploadedResults: UploadedFile[] = await response.json();
-      onFilesChange([...files, ...uploadedResults]);
+      onFilesChange([...files, ...localResults]);
     } catch (err: any) {
-      console.error("Upload Error:", err);
-      setError(err.message || "An error occurred during upload");
+      console.error("File Read Error:", err);
+      setError(err.message || "An error occurred while reading files");
     } finally {
       setIsUploading(false);
     }
@@ -126,21 +136,21 @@ export function FileUploader({
 
   const getFileIcon = (type: string) => {
     if (type.includes("image"))
-      return <ImageIcon strokeWidth={1.5} className="w-4 h-4 text-[#999999]" />;
+      return <ImageIcon strokeWidth={1.5} className="w-4 h-4 text-[var(--color-text-secondary)]" />;
     if (
       type.includes("spreadsheet") ||
       type.includes("excel") ||
       type.includes("csv")
     )
-      return <FileSpreadsheet strokeWidth={1.5} className="w-4 h-4 text-[#999999]" />;
-    return <FileText strokeWidth={1.5} className="w-4 h-4 text-[#999999]" />;
+      return <FileSpreadsheet strokeWidth={1.5} className="w-4 h-4 text-[var(--color-text-secondary)]" />;
+    return <FileText strokeWidth={1.5} className="w-4 h-4 text-[var(--color-text-secondary)]" />;
   };
 
   return (
     <div className="w-full flex flex-col gap-4">
       <div
         className={`w-full border border-dashed rounded-[8px] py-8 px-6 flex flex-col items-center justify-center transition-colors cursor-pointer
-          ${isDragging ? "border-[#f5f5f5] bg-[#222222]" : "border-[#333333] hover:border-[#666666] bg-transparent"}
+          ${isDragging ? "border-[var(--color-text-primary)] bg-[var(--color-surface-elevated)]" : "border-[var(--color-border)] hover:border-[var(--color-text-secondary)] bg-transparent"}
           ${isUploading ? "opacity-50 pointer-events-none" : ""}`}
         onDragOver={onDragOver}
         onDragLeave={onDragLeave}
@@ -159,18 +169,18 @@ export function FileUploader({
           }}
         />
         {isUploading ? (
-          <div className="flex flex-col items-center gap-2 text-[#999999]">
+          <div className="flex flex-col items-center gap-2 text-[var(--color-text-secondary)]">
             <Loader2 className="w-6 h-6 animate-spin" strokeWidth={1.5} />
             <span className="font-mono text-sm">{t.uploading}</span>
           </div>
         ) : (
-          <div className="flex flex-col items-center gap-2 text-center text-[#999999]">
+          <div className="flex flex-col items-center gap-2 text-center text-[var(--color-text-secondary)]">
             <Upload
               strokeWidth={1.5}
-              className={`w-6 h-6 mb-2 ${isDragging ? "text-[#f5f5f5]" : "text-[#555555]"}`}
+              className={`w-6 h-6 mb-2 ${isDragging ? "text-[var(--color-text-primary)]" : "text-[var(--color-text-muted)]"}`}
             />
-            <span className="font-medium text-[15px] text-[#999999]">{t.dropHere}</span>
-            <span className="text-xs font-mono text-[#555555]">
+            <span className="font-medium text-[15px] text-[var(--color-text-secondary)]">{t.dropHere}</span>
+            <span className="text-xs font-mono text-[var(--color-text-muted)]">
               {t.supportedFormats}
             </span>
           </div>
@@ -201,18 +211,18 @@ export function FileUploader({
                 animate={{ opacity: 1 }}
                 exit={{ opacity: 0 }}
                 transition={{ duration: 0.2 }}
-                className="flex items-center justify-between p-3 rounded-[6px] bg-[#1a1a1a] border border-[#2a2a2a] group hover:border-[#333333] transition-colors"
+                className="flex items-center justify-between p-3 rounded-[6px] bg-[var(--color-surface)] border border-[var(--color-border)] group hover:border-[var(--color-border)] transition-colors"
               >
                 <div className="flex items-center gap-3 overflow-hidden">
                   {getFileIcon(file.type)}
                   <div className="flex flex-col min-w-0">
                     <span
-                      className="text-sm font-medium text-[#f5f5f5] truncate"
+                      className="text-sm font-medium text-[var(--color-text-primary)] truncate"
                       title={file.name}
                     >
                       {file.name}
                     </span>
-                    <span className="text-[12px] font-mono text-[#555555]">
+                    <span className="text-[12px] font-mono text-[var(--color-text-muted)]">
                       {(file.size / 1024).toFixed(1)} KB •{" "}
                       {file.charCount.toLocaleString()} {t.chars}
                     </span>
@@ -223,7 +233,8 @@ export function FileUploader({
                     e.stopPropagation();
                     removeFile(file.id);
                   }}
-                  className="p-1.5 rounded-md hover:bg-[#222222] text-[#555555] hover:text-[#ef4444] transition-colors"
+                  aria-label={language === "en" ? "Remove file" : "Hapus file"}
+                  className="p-1.5 rounded-md hover:bg-[var(--color-surface-elevated)] text-[var(--color-text-muted)] hover:text-[#ef4444] transition-colors"
                 >
                   <X className="w-4 h-4" strokeWidth={1.5} />
                 </button>

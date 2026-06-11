@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, memo } from "react";
 import ReactMarkdown from "react-markdown";
 import remarkGfm from "remark-gfm";
 import {
@@ -70,7 +70,7 @@ export const getSections = (content: string): Section[] => {
   return sections.filter((s) => s.content.trim().length > 0);
 };
 
-export function BlueprintSheet({
+export const BlueprintSheet = memo(function BlueprintSheet({
   content,
   comments = {},
   onCommentChange,
@@ -115,9 +115,11 @@ export function BlueprintSheet({
     });
   };
 
-  const expandedCount = sections.filter((_, i) => !collapsedStates[`sec_${i}`]).length;
   const totalSections = sections.length;
-  const progress = totalSections > 0 ? (expandedCount / totalSections) * 100 : 0;
+  // Show content completeness: 100% when done, indeterminate while generating
+  const isComplete = content.length > 0 && !isGenerating;
+  const showProgress = content.length > 0;
+  const progress = isComplete ? 100 : (isGenerating && content.length > 0 ? 75 : 0);
 
   const toggleSection = (sectionId: string) => {
     setCollapsedStates(prev => ({
@@ -136,11 +138,12 @@ export function BlueprintSheet({
       {/* FAB button */}
       <button
         onClick={() => setIsFeedbackDrawerOpen(!isFeedbackDrawerOpen)}
-        className={`fixed bottom-[130px] sm:bottom-[110px] right-[40px] z-[40] w-[48px] h-[48px] rounded-full flex items-center justify-center transition-all duration-200 ease shadow-lg no-print ${
+        className={`fixed bottom-[100px] sm:bottom-[100px] right-[40px] z-[50] w-[48px] h-[48px] rounded-full flex items-center justify-center transition-all duration-200 ease shadow-lg no-print will-change-transform focus-visible:ring-2 focus-visible:ring-[var(--color-interactive)] focus-visible:outline-none ${
           isFeedbackDrawerOpen 
-            ? "bg-[#2a2a2a] text-[#f5f5f5]" 
-            : "bg-[#f5f5f5] hover:bg-[#e5e5e5] text-[#111111]"
+            ? "bg-[var(--color-border)] text-[var(--color-text-primary)]" 
+            : "bg-[var(--color-text-primary)] hover:bg-[var(--color-text-primary)] text-[var(--color-bg)]"
         }`}
+        aria-label={language === "en" ? (isFeedbackDrawerOpen ? "Close feedback" : "Open feedback") : (isFeedbackDrawerOpen ? "Tutup umpan balik" : "Buka umpan balik")}
         style={!isFeedbackDrawerOpen ? { boxShadow: "0 4px 16px rgba(0, 0, 0, 0.4)" } : {}}
       >
         {isFeedbackDrawerOpen ? (
@@ -152,14 +155,14 @@ export function BlueprintSheet({
 
       {/* Slide-in Feedback Drawer */}
       <div
-        className={`fixed top-0 right-0 bottom-0 w-[400px] max-w-[100vw] bg-[#1a1a1a] border-l border-[#2a2a2a] z-30 transition-transform duration-200 ease overflow-y-auto no-print ${
+        className={`fixed top-0 right-0 bottom-0 w-[400px] max-w-[100vw] bg-[var(--color-surface)] border-l border-[var(--color-border)] z-[40] transition-transform duration-200 ease overflow-y-auto no-print ${
           isFeedbackDrawerOpen ? "translate-x-0" : "translate-x-full"
         }`}
       >
         <div className="p-6">
-          <div className="flex items-center justify-between mb-8 pb-4 border-b border-[#2a2a2a]">
-            <h2 className="text-[18px] font-semibold text-[#f5f5f5] flex items-center gap-2">
-              <MessageSquareText size={16} strokeWidth={1.5} className="text-[#999999]" />
+          <div className="flex items-center justify-between mb-8 pb-4 border-b border-[var(--color-border)]">
+            <h2 className="text-[18px] font-semibold text-[var(--color-text-primary)] flex items-center gap-2">
+              <MessageSquareText size={16} strokeWidth={1.5} className="text-[var(--color-text-secondary)]" />
               {language === "en" ? "Feedback" : "Umpan Balik"}
             </h2>
             <button
@@ -167,8 +170,8 @@ export function BlueprintSheet({
               disabled={isGenerating || totalComments === 0}
               className={`px-3 py-1.5 rounded-[6px] text-[13px] font-medium transition-all duration-200 ease flex items-center gap-2 disabled:opacity-40 disabled:cursor-not-allowed ${
                 totalComments > 0 
-                  ? "bg-[#f5f5f5] text-[#111111] hover:bg-[#e5e5e5]" 
-                  : "bg-transparent text-[#555555]"
+                  ? "bg-[var(--color-text-primary)] text-[var(--color-bg)] hover:bg-[var(--color-text-primary)]" 
+                  : "bg-transparent text-[var(--color-text-muted)]"
               }`}
             >
               <RefreshCw className={`w-4 h-4 ${isGenerating ? "animate-spin" : ""}`} strokeWidth={1.5} />
@@ -202,31 +205,31 @@ export function BlueprintSheet({
           {/* Version Info Header */}
           <div className="flex items-center justify-between mb-4">
             <div className="flex items-center gap-2">
-              <GitBranch size={14} strokeWidth={1.5} className="text-[#555555]" />
-              <span className="text-[13px] text-[#999999]">Version {activeVersionIndex + 1}</span>
-              <span className="text-[11px] font-mono text-[#555555]">{formatDate(activeVersion.timestamp)}</span>
+              <GitBranch size={14} strokeWidth={1.5} className="text-[var(--color-text-muted)]" />
+              <span className="text-[13px] text-[var(--color-text-secondary)]">Version {activeVersionIndex + 1}</span>
+              <time dateTime={new Date(activeVersion.timestamp).toISOString()} className="text-[11px] font-mono text-[var(--color-text-muted)]">{formatDate(activeVersion.timestamp)}</time>
             </div>
             <div className="flex items-center gap-2">
               <select 
-                className="bg-transparent text-[13px] text-[#999999] border border-[#2a2a2a] rounded-[6px] px-2 py-1 focus:outline-none focus:border-[#6666ff]"
+                className="bg-transparent text-[13px] text-[var(--color-text-secondary)] border border-[var(--color-border)] rounded-[6px] px-2 py-1 focus:outline-none focus:border-[var(--color-interactive)] focus-visible:ring-2 focus-visible:ring-[var(--color-interactive)]"
                 value={activeVersionId || ""}
                 onChange={(e) => onSwitchVersion?.(e.target.value)}
               >
                 {versions.map((v, i) => (
-                  <option key={v.id} value={v.id} className="bg-[#111111] text-[#f5f5f5]">Version {i + 1}</option>
+                  <option key={v.id} value={v.id} className="bg-[var(--color-bg)] text-[var(--color-text-primary)]">Version {i + 1}</option>
                 ))}
               </select>
             </div>
           </div>
           
           {/* Progress Bar Header */}
-          {sections.length > 0 && (
+          {showProgress && totalSections > 0 && (
             <div className="flex items-center gap-4 px-1 mb-6">
-              <div className="flex-1 h-[2px] bg-[#2a2a2a] rounded overflow-hidden">
-                <div className="h-full bg-[#6666ff] transition-all duration-300" style={{width: `${progress}%`}} />
+              <div className="flex-1 h-[2px] bg-[var(--color-border)] rounded overflow-hidden">
+                <div className={`h-full bg-[var(--color-interactive)] transition-all duration-300 ${isGenerating ? 'animate-pulse' : ''}`} style={{width: `${progress}%`}} />
               </div>
-              <span className="text-[11px] font-mono text-[#555555] whitespace-nowrap">
-                {expandedCount} / {totalSections} sections
+              <span className="text-[11px] font-mono text-[var(--color-text-muted)] whitespace-nowrap">
+                {isComplete ? (language === "en" ? "Complete" : "Selesai") : (language === "en" ? "Generating..." : "Menghasilkan...")}
               </span>
             </div>
           )}
@@ -259,9 +262,9 @@ export function BlueprintSheet({
       )}
     </div>
   );
-}
+});
 
-function SheetSection({
+const SheetSection = memo(function SheetSection({
   section,
   sectionId,
   index,
@@ -288,38 +291,43 @@ function SheetSection({
   };
 
   return (
-    <div className="bg-[#1a1a1a] border border-[#2a2a2a] rounded-[12px] overflow-hidden mb-4 print:bg-transparent print:border-none print:shadow-none print:p-0">
+    <div className="bg-[var(--color-surface)] border border-[var(--color-border)] rounded-[8px] overflow-hidden mb-4 print:bg-transparent print:border-none print:shadow-none print:p-0">
       {/* Header — click to collapse */}
       <div 
-        className={`flex items-center justify-between px-5 py-4 border-b border-[#2a2a2a] cursor-pointer select-none transition-colors no-print ${isCollapsed ? 'bg-[#1a1a1a] hover:bg-[#222222]' : 'bg-[#222222] hover:bg-[#2a2a2a]'}`}
+        className={`flex items-center justify-between px-5 py-4 border-b border-[var(--color-border)] cursor-pointer select-none transition-colors no-print ${isCollapsed ? 'bg-[var(--color-surface)] hover:bg-[var(--color-surface-elevated)]' : 'bg-[var(--color-surface-elevated)] hover:bg-[var(--color-surface-elevated)]'}`}
         onClick={onToggleCollapse}
+        role="button"
+        tabIndex={0}
+        onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); onToggleCollapse(); } }}
+        aria-expanded={!isCollapsed}
+        aria-controls={`section-content-${sectionId}`}
       >
         <div className="flex items-center gap-3">
-          <ChevronDown className={`w-4 h-4 text-[#555555] transition-transform duration-200 ${isCollapsed ? '-rotate-90' : ''}`} strokeWidth={1.5} />
-          <h2 className="text-[#f5f5f5] text-[14px] font-semibold">{section.heading}</h2>
+          <ChevronDown className={`w-4 h-4 text-[var(--color-text-muted)] transition-transform duration-200 ${isCollapsed ? '-rotate-90' : ''}`} strokeWidth={1.5} aria-hidden="true" />
+          <h2 className="text-[var(--color-text-primary)] text-[14px] font-semibold" id={sectionId}>{section.heading}</h2>
         </div>
         <div className="flex items-center gap-2">
-          <span className="text-[11px] font-mono text-[#555555]">{index + 1}/{total}</span>
+          <span className="text-[11px] font-mono text-[var(--color-text-muted)]">{index + 1}/{total}</span>
         </div>
       </div>
 
       {/* Content — collapsible */}
-      <div className={`transition-all duration-300 overflow-hidden ${isCollapsed ? 'max-h-0' : 'max-h-[8000px]'} print:max-h-none`}>
+      <div id={`section-content-${sectionId}`} className={`transition-all duration-300 overflow-hidden ${isCollapsed ? 'max-h-0' : 'max-h-[8000px]'} print:max-h-none`} role="region">
         <div className="px-5 py-4">
           <div
             id={sectionId}
             className="w-full prose prose-invert max-w-none 
-              prose-headings:font-normal prose-headings:text-[#f5f5f5]
+              prose-headings:font-normal prose-headings:text-[var(--color-text-primary)]
               prose-h1:text-[36px] sm:prose-h1:text-[48px] prose-h1:mt-8 prose-h1:mb-4 prose-h1:leading-[1.15]
               prose-h2:hidden
               prose-h3:text-[18px] prose-h3:mt-8 prose-h3:font-semibold
-              prose-p:text-[#999999] prose-p:text-[15px] prose-p:leading-[1.6] prose-p:mb-4
+              prose-p:text-[var(--color-text-secondary)] prose-p:text-[15px] prose-p:leading-[1.6] prose-p:mb-4
               prose-a:text-[#6666ff] hover:prose-a:text-[#8888ff] prose-a:no-underline transition-colors
-              prose-li:text-[#999999] prose-li:text-[15px] prose-li:my-1
-              prose-strong:text-[#f5f5f5] prose-strong:font-medium
+              prose-li:text-[var(--color-text-secondary)] prose-li:text-[15px] prose-li:my-1
+              prose-strong:text-[var(--color-text-primary)] prose-strong:font-medium
               prose-ul:pl-6 prose-ul:mb-6 prose-ol:pl-6 prose-ol:mb-6
-              prose-hr:border-[#2a2a2a] prose-hr:my-8
-              prose-blockquote:border-l-2 prose-blockquote:border-[#555555] prose-blockquote:pl-4 prose-blockquote:text-[#555555]
+              prose-hr:border-[var(--color-border)] prose-hr:my-8
+              prose-blockquote:border-l-2 prose-blockquote:border-[var(--color-text-muted)] prose-blockquote:pl-4 prose-blockquote:text-[var(--color-text-muted)]
               print:prose-p:text-black print:prose-li:text-black print:prose-headings:text-black print:prose-strong:text-black
             "
           >
@@ -333,32 +341,32 @@ function SheetSection({
                   </h3>
                 ),
                 table: ({ node, ...props }) => (
-                  <div className="w-full overflow-x-auto my-6 rounded-[8px] border border-[#2a2a2a] bg-[#1a1a1a] print:border-gray-300 print:bg-transparent print:shadow-none">
+                  <div className="w-full overflow-x-auto my-6 rounded-[8px] border border-[var(--color-border)] bg-[var(--color-surface)] print:border-gray-300 print:bg-transparent print:shadow-none">
                     <table className="w-full text-sm text-left border-collapse" {...props} />
                   </div>
                 ),
                 thead: ({ node, ...props }) => (
-                  <thead className="bg-[#222222] text-[#f5f5f5] border-b border-[#2a2a2a] print:bg-gray-100 print:text-black print:border-gray-300" {...props} />
+                  <thead className="bg-[var(--color-surface-elevated)] text-[var(--color-text-primary)] border-b border-[var(--color-border)] print:bg-gray-100 print:text-black print:border-gray-300" {...props} />
                 ),
                 th: ({ node, ...props }) => (
                   <th className="px-4 py-3 font-semibold whitespace-nowrap text-[13px]" {...props} />
                 ),
                 tbody: ({ node, ...props }) => (
-                  <tbody className="divide-y divide-[#2a2a2a] print:divide-gray-200" {...props} />
+                  <tbody className="divide-y divide-[var(--color-border)] print:divide-gray-200" {...props} />
                 ),
                 td: ({ node, ...props }) => (
-                  <td className="px-4 py-3 align-top leading-relaxed text-[#999999] print:text-black min-w-[120px] text-[13px]" {...props} />
+                  <td className="px-4 py-3 align-top leading-relaxed text-[var(--color-text-secondary)] print:text-black min-w-[120px] text-[13px]" {...props} />
                 ),
                 pre: ({ node, children, ...props }) => (
-                  <div className="relative my-6 rounded-[8px] border border-[#2a2a2a] bg-[#1a1a1a] overflow-hidden print:bg-gray-50 print:border-gray-300">
-                    <div className="px-4 py-2 border-b border-[#2a2a2a] bg-[#222222] flex items-center justify-between">
+                  <div className="relative my-6 rounded-[8px] border border-[var(--color-border)] bg-[var(--color-surface)] overflow-hidden print:bg-gray-50 print:border-gray-300">
+                    <div className="px-4 py-2 border-b border-[var(--color-border)] bg-[var(--color-surface-elevated)] flex items-center justify-between">
                        <div className="flex gap-1.5">
-                         <div className="w-3 h-3 rounded-full bg-[#333333]"></div>
-                         <div className="w-3 h-3 rounded-full bg-[#333333]"></div>
-                         <div className="w-3 h-3 rounded-full bg-[#333333]"></div>
+                         <div className="w-3 h-3 rounded-full bg-[var(--color-border-subtle)]"></div>
+                         <div className="w-3 h-3 rounded-full bg-[var(--color-border-subtle)]"></div>
+                         <div className="w-3 h-3 rounded-full bg-[var(--color-border-subtle)]"></div>
                        </div>
                     </div>
-                    <pre className="p-4 overflow-x-auto m-0 bg-transparent text-[13px] font-mono text-[#f5f5f5] print:text-black" {...props}>
+                    <pre className="p-4 overflow-x-auto m-0 bg-transparent text-[13px] font-mono text-[var(--color-text-primary)] print:text-black" {...props}>
                       {children}
                     </pre>
                   </div>
@@ -368,13 +376,13 @@ function SheetSection({
                   const isInline = !match && !String(children).includes("\n");
                   if (isInline) {
                     return (
-                      <code className="px-1.5 py-0.5 mx-0.5 rounded-[4px] bg-[#222222] border border-[#2a2a2a] text-[13px] font-mono text-[#cccccc] print:bg-gray-100 print:text-black" {...props}>
+                      <code className="px-1.5 py-0.5 mx-0.5 rounded-[4px] bg-[var(--color-surface-elevated)] border border-[var(--color-border)] text-[13px] font-mono text-[var(--color-text-secondary)] print:bg-gray-100 print:text-black" {...props}>
                         {children}
                       </code>
                     );
                   }
                   return (
-                    <code className={`font-mono text-[13px] text-[#f5f5f5] ${className || ""}`} {...props}>
+                    <code className={`font-mono text-[13px] text-[var(--color-text-primary)] ${className || ""}`} {...props}>
                       {children}
                     </code>
                   );
@@ -387,16 +395,18 @@ function SheetSection({
         </div>
 
         {/* Footer — actions */}
-        <div className="flex items-center justify-end gap-3 px-5 py-3 border-t border-[#2a2a2a] no-print">
+        <div className="flex items-center justify-end gap-3 px-5 py-3 border-t border-[var(--color-border)] no-print">
           <button 
-            className="text-[12px] text-[#555555] hover:text-[#999999] transition-colors flex items-center gap-1.5" 
+            className="text-[12px] text-[var(--color-text-muted)] hover:text-[var(--color-text-secondary)] transition-colors flex items-center gap-1.5 focus-visible:ring-2 focus-visible:ring-[var(--color-interactive)] focus-visible:outline-none" 
             onClick={copySection}
+            aria-label={language === "en" ? "Copy section" : "Salin bagian"}
           >
             <ClipboardCopy size={14} strokeWidth={1.5} /> {language === "en" ? "Copy" : "Salin"}
           </button>
           <button 
-            className="text-[12px] text-[#555555] hover:text-[#999999] transition-colors flex items-center gap-1.5"
+            className="text-[12px] text-[var(--color-text-muted)] hover:text-[var(--color-text-secondary)] transition-colors flex items-center gap-1.5 focus-visible:ring-2 focus-visible:ring-[var(--color-interactive)] focus-visible:outline-none"
             onClick={onOpenFeedback}
+            aria-label="Feedback"
           >
             <MessageSquareText size={14} strokeWidth={1.5} /> Feedback
           </button>
@@ -404,7 +414,7 @@ function SheetSection({
       </div>
     </div>
   );
-}
+});
 
 function FeedbackCard({
   section,
@@ -425,8 +435,8 @@ function FeedbackCard({
   }, [comment]);
 
   return (
-    <div className="bg-[#1a1a1a] border border-[#2a2a2a] rounded-[8px] p-4 text-left">
-      <div className="font-medium text-[13px] text-[#f5f5f5] mb-2 truncate" title={section.heading}>
+    <div className="bg-[var(--color-surface)] border border-[var(--color-border)] rounded-[8px] p-4 text-left">
+      <div className="font-medium text-[13px] text-[var(--color-text-primary)] mb-2 truncate" title={section.heading}>
         {section.heading}
       </div>
 
@@ -436,7 +446,8 @@ function FeedbackCard({
             autoFocus
             value={tempComment}
             onChange={(e) => setTempComment(e.target.value)}
-            className="flex-grow w-full bg-[#111111] border border-[#2a2a2a] text-[#f5f5f5] text-[13px] p-3 rounded-[6px] focus:outline-none focus:border-[#6666ff] transition-all duration-200 ease min-h-[100px] resize-y"
+            className="flex-grow w-full bg-[var(--color-bg)] border border-[var(--color-border)] text-[var(--color-text-primary)] text-[13px] p-3 rounded-[6px] focus:outline-none focus:border-[var(--color-interactive)] transition-all duration-200 ease min-h-[100px] resize-y"
+            aria-label={language === "en" ? "Feedback for section" : "Umpan balik untuk bagian"}
             placeholder={
               language === "en"
                 ? "Add your feedback here..."
@@ -449,7 +460,7 @@ function FeedbackCard({
                 setIsEditing(false);
                 setTempComment(comment);
               }}
-              className="px-3 py-1.5 text-[13px] text-[#999999] hover:text-[#f5f5f5] hover:bg-[#2a2a2a] transition-all duration-200 ease rounded-[6px] font-medium"
+              className="px-3 py-1.5 text-[13px] text-[var(--color-text-secondary)] hover:text-[var(--color-text-primary)] hover:bg-[var(--color-surface-elevated)] transition-all duration-200 ease rounded-[6px] font-medium"
             >
               {language === "en" ? "Cancel" : "Batal"}
             </button>
@@ -458,7 +469,7 @@ function FeedbackCard({
                 setIsEditing(false);
                 onCommentChange(tempComment);
               }}
-              className="px-3 py-1.5 text-[13px] bg-[#f5f5f5] text-[#111111] font-medium rounded-[6px] hover:bg-[#e5e5e5] transition-all duration-200 ease"
+              className="px-3 py-1.5 text-[13px] bg-[var(--color-text-primary)] text-[var(--color-bg)] font-medium rounded-[6px] hover:bg-[var(--color-text-primary)] transition-all duration-200 ease"
             >
               {language === "en" ? "Save" : "Simpan"}
             </button>
@@ -469,8 +480,8 @@ function FeedbackCard({
           onClick={() => setIsEditing(true)}
           className={`text-[13px] rounded-[6px] transition-all duration-200 ease cursor-pointer border mt-2 ${
             comment 
-              ? "text-[#cccccc] p-3 bg-[#111111] border-[#2a2a2a] hover:border-[#555555]" 
-              : "text-[#555555] p-3 border-dashed border-[#2a2a2a] bg-transparent hover:border-[#555555] hover:text-[#999999]"
+              ? "text-[#cccccc] p-3 bg-[var(--color-bg)] border-[var(--color-border)] hover:border-[var(--color-text-muted)]" 
+              : "text-[var(--color-text-muted)] p-3 border-dashed border-[var(--color-border)] bg-transparent hover:border-[var(--color-text-muted)] hover:text-[var(--color-text-secondary)]"
           }`}
         >
           {comment ? (
@@ -490,15 +501,15 @@ function LoadingSkeleton() {
   return (
     <div className="space-y-4 no-print w-full">
       {[1, 2, 3].map((i) => (
-        <div key={i} className="bg-[#1a1a1a] border border-[#2a2a2a] rounded-[12px] overflow-hidden mb-4 animate-pulse">
-          <div className="h-[48px] bg-[#222222] border-b border-[#2a2a2a] flex items-center px-5">
-            <div className="w-4 h-4 rounded bg-[#333333] mr-3" />
-            <div className="h-4 bg-[#333333] rounded w-1/3" />
+        <div key={i} className="bg-[var(--color-surface)] border border-[var(--color-border)] rounded-[8px] overflow-hidden mb-4 animate-pulse">
+          <div className="h-[48px] bg-[var(--color-surface-elevated)] border-b border-[var(--color-border)] flex items-center px-5">
+            <div className="w-4 h-4 rounded bg-[var(--color-border-subtle)] mr-3" />
+            <div className="h-4 bg-[var(--color-border-subtle)] rounded w-1/3" />
           </div>
           <div className="p-5 space-y-3">
-            <div className="h-3 bg-[#222222] rounded w-full" />
-            <div className="h-3 bg-[#222222] rounded w-3/4" />
-            <div className="h-3 bg-[#222222] rounded w-1/2" />
+            <div className="h-3 bg-[var(--color-surface-elevated)] rounded w-full" />
+            <div className="h-3 bg-[var(--color-surface-elevated)] rounded w-3/4" />
+            <div className="h-3 bg-[var(--color-surface-elevated)] rounded w-1/2" />
           </div>
         </div>
       ))}
