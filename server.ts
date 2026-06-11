@@ -1,26 +1,35 @@
 import express from "express";
 import path from "path";
 import fs from "fs";
+import fsp from "fs/promises";
 import os from "os";
-import { createServer as createViteServer } from "vite";
 import dotenv from "dotenv";
 
 import multer from "multer";
-import { createRequire } from "module";
-const require = createRequire(import.meta.url);
-const pdfParse = require("pdf-parse");
-
 import mammoth from "mammoth";
 import * as xlsx from "xlsx";
 import crypto from "crypto";
+import cors from "cors";
+import rateLimit from "express-rate-limit";
+import helmet from "helmet";
 
 dotenv.config();
 
 const app = express();
-const PORT = 3000;
+const PORT = parseInt(process.env.PORT || "3000", 10);
+
+app.use(cors({ origin: true, credentials: true }));
+app.use(helmet({ contentSecurityPolicy: false }));
 
 app.use(express.json({ limit: '50mb' }));
 app.use(express.urlencoded({ extended: true, limit: '50mb' }));
+
+const apiLimiter = rateLimit({
+  windowMs: 60 * 1000, // 1 minute
+  max: 10,
+  message: { error: "Too many requests. Please slow down." }
+});
+app.use("/api/", apiLimiter);
 
 const uploadDir = path.join(os.tmpdir(), "uploads");
 if (!fs.existsSync(uploadDir)) {
@@ -71,9 +80,11 @@ async function extractTextFromFile(filePath: string, mimeType: string, originalN
 
   try {
     if (mimeType === 'application/pdf') {
-      const dataBuffer = fs.readFileSync(filePath);
-      const data = await pdfParse(dataBuffer, { max: 10 }); // Limit to 10 pages
-      text = data.text;
+      const dataBuffer = await fsp.readFile(filePath);
+      const { PDFParse } = await import("pdf-parse");
+      const parser = new PDFParse({ data: dataBuffer });
+      const result = await parser.getText({ first: 10 }); // Limit to 10 pages
+      text = result.text;
     } else if (mimeType === 'application/vnd.openxmlformats-officedocument.wordprocessingml.document') {
       const result = await mammoth.extractRawText({ path: filePath });
       text = result.value;
@@ -95,11 +106,8 @@ async function extractTextFromFile(filePath: string, mimeType: string, originalN
       text = `[IMAGE: ${originalName}]`;
     } else {
       // Handle text/plain, text/markdown
-      const fd = fs.openSync(filePath, 'r');
-      const buffer = Buffer.alloc(MAX_CHARS * 2); // Read enough bytes for max chars
-      const bytesRead = fs.readSync(fd, buffer, 0, buffer.length, null);
-      text = buffer.toString('utf-8', 0, bytesRead);
-      fs.closeSync(fd);
+      const buffer = await fsp.readFile(filePath, { encoding: 'utf-8' });
+      text = buffer.substring(0, MAX_CHARS);
     }
   } catch (error) {
     console.error(`Error extracting text from ${originalName}:`, error);
@@ -128,12 +136,16 @@ app.post("/api/upload-files", (req, res) => {
 
       const uploadedResults = [];
 
+      // Pre-validate all files before processing
       for (const file of files) {
-        // Prevent OOM by rejecting extremely large documents before they are read into memory
         if (!file.mimetype.startsWith('image/') && file.size > 5 * 1024 * 1024) {
-          throw new Error(`File ${file.originalname} is too large. Max size for documents is 5MB.`);
+          // Clean up temp files
+          files.forEach(f => { fs.unlink(f.path, () => {}); });
+          return res.status(400).json({ error: `File "${file.originalname}" exceeds the 5MB limit for documents.` });
         }
+      }
 
+      for (const file of files) {
         const content = await extractTextFromFile(file.path, file.mimetype, file.originalname);
         
         uploadedResults.push({
@@ -271,13 +283,27 @@ app.post("/api/generate-prd", async (req, res) => {
   res.setHeader("Content-Type", "text/event-stream");
   res.setHeader("Cache-Control", "no-cache");
   res.setHeader("Connection", "keep-alive");
+  res.flushHeaders();
 
   try {
-    const { prompt, customApiKey, provider = 'deepseek', model = 'deepseek-chat', language = 'id', productType, uploadedFiles, mode = 'initial', prdMode = 'business' } = req.body;
-    
+    const { prompt, customApiKey, provider = 'deepseek', model = 'deepseek-v4-flash', language = 'id', productType, uploadedFiles, mode = 'initial', prdMode = 'business' } = req.body;
+
+    // Validate provider
+    const VALID_PROVIDERS = ["deepseek", "gemini"];
+    if (!VALID_PROVIDERS.includes(provider)) {
+      if (!res.writableEnded) {
+        res.write(`data: ${JSON.stringify({ error: `Invalid provider "${provider}". Must be one of: ${VALID_PROVIDERS.join(", ")}` })}\n\n`);
+        res.end();
+      }
+      return;
+    }
+
     if (!prompt) {
-      res.write(`data: ${JSON.stringify({ error: language === 'en' ? "Prompt is required" : "Prompt diperlukan" })}\n\n`);
-      return res.end();
+      if (!res.writableEnded) {
+        res.write(`data: ${JSON.stringify({ error: language === 'en' ? "Prompt is required" : "Prompt diperlukan" })}\n\n`);
+        res.end();
+      }
+      return;
     }
 
     let fileContext = '';
@@ -319,11 +345,15 @@ app.post("/api/generate-prd", async (req, res) => {
       if (!modelName) modelName = "deepseek-v4-flash";
     }
 
-    const customKey = customApiKey;
-    
-    if (!customKey) {
-      res.write(`data: ${JSON.stringify({ error: language === 'en' ? "API KEY not found. Please provide a custom key in Settings." : "API KEY tidak ditemukan. Silakan masukkan API Key di Pengaturan." })}\n\n`);
-      res.end();
+    // Server-side API key fallback
+    const serverKey = process.env[apiKeyEnvName];
+    const apiKey = customApiKey || serverKey;
+
+    if (!apiKey) {
+      if (!res.writableEnded) {
+        res.write(`data: ${JSON.stringify({ error: language === 'en' ? "API KEY not found. Please provide a custom key in Settings or set " + apiKeyEnvName + " in .env file." : "API KEY tidak ditemukan. Silakan masukkan API Key di Pengaturan atau set " + apiKeyEnvName + " di file .env." })}\n\n`);
+        res.end();
+      }
       return;
     }
 
@@ -363,7 +393,7 @@ app.post("/api/generate-prd", async (req, res) => {
     fetchOptions.signal = abortController.signal;
 
     if (provider === "gemini") {
-      fetchHeaders["Authorization"] = "Bearer " + customKey;
+      fetchHeaders["Authorization"] = "Bearer " + apiKey;
       fetchBody = {
         model: modelName,
         messages: [
@@ -375,7 +405,7 @@ app.post("/api/generate-prd", async (req, res) => {
         temperature: 0.1,
       };
     } else {
-      fetchHeaders["Authorization"] = "Bearer " + customKey;
+      fetchHeaders["Authorization"] = "Bearer " + apiKey;
       fetchBody = {
         model: modelName,
         messages: [
@@ -443,20 +473,43 @@ app.post("/api/generate-prd", async (req, res) => {
 
   } catch (error) {
     if (error instanceof Error && error.name === 'AbortError') {
-      console.log('Request aborted.'); // Log quietly
-      // Send DONE to tell client to stop reading gracefully
-      res.write(`data: [DONE]\n\n`);
-      res.end();
+      console.log('Request aborted.');
+      if (!res.writableEnded) {
+        res.write(`data: [DONE]\n\n`);
+        res.end();
+      }
       return;
     }
     console.error("Error generating PRD:", error);
-    res.write(`data: ${JSON.stringify({ error: error instanceof Error ? error.message : "Internal server error" })}\n\n`);
-    res.end();
+    if (!res.writableEnded) {
+      res.write(`data: ${JSON.stringify({ error: error instanceof Error ? error.message : "Internal server error" })}\n\n`);
+      res.end();
+    }
   }
 });
 
+async function main() {
+  await startServer();
+
+  const server = app.listen(PORT, "0.0.0.0", () => {
+    console.log(`Server running on http://localhost:${PORT}`);
+  });
+
+  process.on('SIGTERM', () => {
+    console.log('SIGTERM received. Shutting down gracefully...');
+    server.close(() => process.exit(0));
+  });
+  process.on('SIGINT', () => {
+    console.log('SIGINT received. Shutting down gracefully...');
+    server.close(() => process.exit(0));
+  });
+}
+
+main();
+
 async function startServer() {
   if (process.env.NODE_ENV !== "production") {
+    const { createServer: createViteServer } = await import("vite");
     const vite = await createViteServer({
       server: { middlewareMode: true },
       appType: "spa",
@@ -469,10 +522,4 @@ async function startServer() {
       res.sendFile(path.join(distPath, 'index.html'));
     });
   }
-
-  app.listen(PORT, "0.0.0.0", () => {
-    console.log(`Server running on http://localhost:${PORT}`);
-  });
 }
-
-startServer();

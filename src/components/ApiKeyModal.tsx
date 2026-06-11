@@ -19,7 +19,7 @@ export function ApiKeyModal({
   onSave,
   language,
   initialProvider = "deepseek",
-  initialModel = "deepseek-chat",
+  initialModel = "deepseek-v4-flash",
 }: ApiKeyModalProps) {
   const [apiKey, setApiKey] = useState("");
   const [provider, setProvider] = useState<AIProvider>(initialProvider);
