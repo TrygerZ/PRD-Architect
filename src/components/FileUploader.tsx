@@ -75,22 +75,45 @@ export function FileUploader({
     setIsUploading(true);
 
     try {
-      // Read files locally using FileReader instead of uploading to server
+      // Baca file: PDF via server-side parsing, non-PDF via FileReader client-side
       const localResults: UploadedFile[] = [];
       for (const file of validFiles) {
-        const content = await new Promise<string>((resolve) => {
-          const reader = new FileReader();
-          reader.onload = () => resolve(reader.result as string);
-          reader.onerror = () => resolve(`[Error reading ${file.name}]`);
-          if (file.type === 'application/pdf') {
-            // For PDFs, just store the filename as we can't parse on client
-            resolve(`[PDF: ${file.name}]`);
-          } else if (file.type.startsWith('image/')) {
-            reader.readAsDataURL(file);
-          } else {
-            reader.readAsText(file);
+        let content: string;
+
+        if (file.type === 'application/pdf') {
+          // Upload PDF ke server untuk parsing teks dengan pdf-parse
+          const formData = new FormData();
+          formData.append('files', file);
+          formData.append('language', language); // Kirim preferensi bahasa untuk error messages (BUG L5)
+          try {
+            const response = await fetch('/api/upload-files', {
+              method: 'POST',
+              body: formData,
+            });
+            if (!response.ok) {
+              const errData = await response.json().catch(() => ({}));
+              throw new Error(errData.error || `Server error ${response.status}`);
+            }
+            const results = await response.json();
+            content = results[0]?.content || `[Error: Tidak ada konten dari ${file.name}]`;
+          } catch (uploadErr: any) {
+            console.error(`Gagal parsing PDF ${file.name}:`, uploadErr);
+            content = `[Error parsing PDF ${file.name}: ${uploadErr.message}]`;
           }
-        });
+        } else {
+          // File non-PDF: baca secara client-side dengan FileReader
+          content = await new Promise<string>((resolve) => {
+            const reader = new FileReader();
+            reader.onload = () => resolve(reader.result as string);
+            reader.onerror = () => resolve(`[Error reading ${file.name}]`);
+            if (file.type.startsWith('image/')) {
+              reader.readAsDataURL(file);
+            } else {
+              reader.readAsText(file);
+            }
+          });
+        }
+
         localResults.push({
           id: Date.now().toString() + Math.random().toString(36).slice(2),
           name: file.name,

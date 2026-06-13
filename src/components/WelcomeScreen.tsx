@@ -87,7 +87,7 @@ export function WelcomeScreen({ language, onQuickPrompt, prdMode, onChangeMode }
               }}
               type="button"
               onClick={() => onQuickPrompt(qp.text)}
-              className="flex flex-col items-center justify-center text-center p-3 sm:p-4 border border-[var(--color-border)] rounded-[8px] bg-transparent text-[var(--color-text-secondary)] hover:bg-[var(--color-surface-elevated)] hover:border-[var(--color-text-muted)] hover:text-[var(--color-text-primary)] transition-all duration-200"
+              className="group flex flex-col items-center justify-center text-center p-3 sm:p-4 border border-[var(--color-border)] rounded-[8px] bg-transparent text-[var(--color-text-secondary)] hover:bg-[var(--color-surface-elevated)] hover:border-[var(--color-text-muted)] hover:text-[var(--color-text-primary)] transition-all duration-200"
             >
               <Icon size={16} strokeWidth={1.5} className="mb-2 text-[var(--color-text-muted)] group-hover:text-[var(--color-text-secondary)]" />
               <span className="text-[13px] leading-[1.3]">{qp.label}</span>

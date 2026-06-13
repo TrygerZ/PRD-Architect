@@ -182,7 +182,8 @@ export const BlueprintSheet = memo(function BlueprintSheet({
           </div>
 
           <div className="space-y-4">
-            {sections.map((section, index) => {
+            {/* Hanya render feedback cards jika drawer terbuka (lazy rendering untuk hemat render cycle) */}
+            {isFeedbackDrawerOpen && sections.map((section, index) => {
               const sectionId = `sec_${index}`;
               const currentComment = comments[sectionId] || "";
 

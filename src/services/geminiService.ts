@@ -48,7 +48,7 @@ export const generatePRD = async (
   let buffer = "";
   let batchedChunk = "";
   let lastFlush = Date.now();
-  let flushTimeout: any = null;
+  let flushTimeout: ReturnType<typeof setTimeout> | null = null;
 
   const flush = () => {
     if (batchedChunk) {

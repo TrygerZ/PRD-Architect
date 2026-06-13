@@ -38,6 +38,10 @@ export default function App() {
 
   const chatContainerRef = useRef<HTMLDivElement>(null);
 
+  // Ref untuk menghindari stale closure — selalu merefleksikan activeVersion terbaru
+  // saat handleAppend / handleRevise dipanggil setelah pergantian versi cepat
+  const activeVersionRef = useRef(versions.find((v) => v.id === activeVersionId));
+
   const handleCancel = () => {
     abortController?.abort();
     setAbortController(null);
@@ -58,7 +62,7 @@ export default function App() {
   };
 
   useEffect(() => {
-    // Load API key from local storage on init
+    // Load API key dari local storage saat init
     const stored = localStorage.getItem("PRD_CUSTOM_API_KEY");
     if (stored) {
       setCustomApiKey(stored);
@@ -71,19 +75,36 @@ export default function App() {
     if (storedModel) {
       setModel(storedModel);
     }
+    // Load preferensi bahasa dari localStorage (default "id")
+    const storedLang = localStorage.getItem("PRD_LANGUAGE") as "id" | "en";
+    if (storedLang === "id" || storedLang === "en") {
+      setLanguage(storedLang);
+    }
   }, []);
 
   const activeVersion = versions.find((v) => v.id === activeVersionId);
+  // Selalu sinkronkan ref dengan activeVersion terbaru (untuk handleAppend/handleRevise)
+  activeVersionRef.current = activeVersion;
   const prdContent = activeVersion?.content || "";
   const hasMessage = !!activeVersionId || versions.length > 0;
   const userPrompt = activeVersion?.prompt || "";
 
-  const handleGenerate = async (prompt: string, type: ProductType = "Unknown") => {
+  // ============================================================
+  // Helper executeGeneration — menghindari duplikasi kode ~70% di
+  // handleGenerate, handleAppend, dan handleRevise (BUG L1)
+  // ============================================================
+  const executeGeneration = async (
+    finalPrompt: string,
+    displayPrompt: string,
+    mode: "initial" | "append" | "revision",
+    productType: ProductType,
+    prdMode: PRDMode,
+    onSuccess?: () => void,
+  ) => {
     setIsGenerating(true);
-    setProductType(type);
     setError(null);
-    setComments({}); // reset comments on new base generation
 
+    // Batalkan controller sebelumnya jika masih aktif
     abortController?.abort();
     const controller = new AbortController();
     setAbortController(controller);
@@ -93,11 +114,11 @@ export default function App() {
       id: newVersionId,
       timestamp: Date.now(),
       content: "",
-      prompt: prompt,
-      userDisplayPrompt: prompt,
-      productType: type,
+      prompt: finalPrompt,
+      userDisplayPrompt: displayPrompt,
+      productType,
       referencedFilesCount: uploadedFiles.length,
-      prdMode: prdMode,
+      prdMode,
     };
 
     setVersions((prev) => [...prev, newVersion]);
@@ -105,14 +126,14 @@ export default function App() {
 
     try {
       await generatePRD(
-        prompt,
+        finalPrompt,
         customApiKey,
         provider,
         model,
         language,
-        type,
+        productType,
         uploadedFiles,
-        "initial",
+        mode,
         prdMode,
         controller.signal,
         (chunk) => {
@@ -123,9 +144,11 @@ export default function App() {
           );
         },
       );
+      // Jalankan callback setelah sukses (contoh: hapus komentar setelah revisi)
+      onSuccess?.();
     } catch (err: any) {
       if (err.name === 'AbortError' || err.message === 'This operation was aborted') {
-        // Keep the partially generated output — don't delete it
+        // Biarkan output yang sudah ter-generate sebagian — jangan hapus
         return;
       }
       setError(
@@ -142,82 +165,49 @@ export default function App() {
     }
   };
 
+  const handleGenerate = async (prompt: string, type: ProductType = "Unknown") => {
+    setProductType(type);
+    setComments({}); // reset komentar saat generate baru
+    await executeGeneration(prompt, prompt, "initial", type, prdMode);
+  };
+
   const handleAppend = async (newPrompt: string) => {
-    if (!activeVersion) {
+    // Gunakan ref untuk mendapatkan activeVersion terbaru (hindari stale closure)
+    const currentActive = activeVersionRef.current;
+    if (!currentActive) {
       handleGenerate(newPrompt, "Unknown");
       return;
     }
 
-    setIsGenerating(true);
-    setError(null);
-
-    abortController?.abort();
-    const controller = new AbortController();
-    setAbortController(controller);
-
     const appendPrompt = language === "en"
-      ? `I have an existing PRD. Please ADD the following to it:\n\n### EXISTING PRD:\n${activeVersion.content}\n\n### ADDITIONAL REQUEST:\n${newPrompt}`
-      : `Saya punya PRD yang sudah ada. Tolong TAMBAHKAN berikut:\n\n### PRD SAAT INI:\n${activeVersion.content}\n\n### PERMINTAAN TAMBAHAN:\n${newPrompt}`;
+      ? `I have an existing PRD. Please ADD the following to it:\n\n### EXISTING PRD:\n${currentActive.content}\n\n### ADDITIONAL REQUEST:\n${newPrompt}`
+      : `Saya punya PRD yang sudah ada. Tolong TAMBAHKAN berikut:\n\n### PRD SAAT INI:\n${currentActive.content}\n\n### PERMINTAAN TAMBAHAN:\n${newPrompt}`;
 
-    const newVersionId = Date.now().toString();
-    const newVersion: PRDVersion = {
-      id: newVersionId, timestamp: Date.now(), content: "",
-      prompt: appendPrompt,
-      userDisplayPrompt: newPrompt,
-      productType: activeVersion.productType,
-      referencedFilesCount: uploadedFiles.length,
-      prdMode: activeVersion.prdMode || "business",
-    };
-
-    setVersions((prev) => [...prev, newVersion]);
-    setActiveVersionId(newVersionId);
-
-    try {
-      await generatePRD(appendPrompt, customApiKey, provider, model, language,
-        activeVersion.productType, uploadedFiles, "append", activeVersion.prdMode || "business", controller.signal, (chunk) => {
-          setVersions((prev) => prev.map((v) =>
-            v.id === newVersionId ? { ...v, content: v.content + chunk } : v
-          ));
-        });
-    } catch (err: any) {
-      if (err.name === 'AbortError' || err.message === 'This operation was aborted') {
-        // Keep the partially generated output — don't delete it
-        return;
-      }
-      setError(
-        err.message ||
-          (language === "en"
-            ? "An unexpected error occurred while appending."
-            : "Terjadi kesalahan saat menambahkan konten."),
-      );
-    } finally {
-      if (!controller.signal.aborted) {
-        setIsGenerating(false);
-      }
-    }
+    await executeGeneration(
+      appendPrompt,
+      newPrompt,
+      "append",
+      currentActive.productType,
+      currentActive.prdMode || "business",
+    );
   };
 
   const handleRevise = async () => {
-    if (!activeVersion || Object.keys(comments).length === 0) return;
+    // Gunakan ref untuk mendapatkan activeVersion terbaru (hindari stale closure)
+    const currentActive = activeVersionRef.current;
+    if (!currentActive || Object.keys(comments).length === 0) return;
 
-    setIsGenerating(true);
-    setError(null);
-
-    abortController?.abort();
-    const controller = new AbortController();
-    setAbortController(controller);
-
-    // Build revision prompt
+    // Bangun prompt revisi dari komentar per bagian
     let revisionPrompt =
       language === "en"
-        ? `I want to revise the current PRD based on specific feedback for certain sections.\n\n### Current PRD:\n${activeVersion.content}\n\n### Revisions requested per section:\n`
-        : `Saya ingin merevisi PRD saat ini berdasarkan feedback spesifik untuk beberapa bagian.\n\n### PRD Saat Ini:\n${activeVersion.content}\n\n### Permintaan revisi per bagian:\n`;
+        ? `I want to revise the current PRD based on specific feedback for certain sections.\n\n### Current PRD:\n${currentActive.content}\n\n### Revisions requested per section:\n`
+        : `Saya ingin merevisi PRD saat ini berdasarkan feedback spesifik untuk beberapa bagian.\n\n### PRD Saat Ini:\n${currentActive.content}\n\n### Permintaan revisi per bagian:\n`;
 
     Object.entries(comments).forEach(([sectionId, comment]) => {
       let sectionHeading = sectionId;
       const secIdx = parseInt(sectionId.split("_")[1], 10);
       if (!isNaN(secIdx)) {
-        const parsedSections = getSections(activeVersion.content);
+        const parsedSections = getSections(currentActive.content);
         if (parsedSections[secIdx] && parsedSections[secIdx].heading) {
           sectionHeading = parsedSections[secIdx].heading
             .substring(0, 60)
@@ -231,60 +221,14 @@ export default function App() {
         ? `\nApply ONLY the revisions listed above. Keep ALL other sections exactly as they are — do not rewrite them.`
         : `\nTerapkan HANYA revisi yang disebutkan di atas. Biarkan SEMUA bagian lainnya persis seperti aslinya — jangan menulis ulang.`;
 
-    const newVersionId = Date.now().toString();
-    const newVersion: PRDVersion = {
-      id: newVersionId,
-      timestamp: Date.now(),
-      content: "",
-      prompt: revisionPrompt, // In chat layout we might not want to show this giant prompt
-      userDisplayPrompt: language === "en" ? "Revising PRD based on comments..." : "Merevisi PRD berdasarkan komentar...",
-      productType: activeVersion.productType,
-      referencedFilesCount: uploadedFiles.length,
-      prdMode: activeVersion.prdMode || "business",
-    };
-
-    setVersions((prev) => [...prev, newVersion]);
-    setActiveVersionId(newVersionId);
-
-    try {
-      await generatePRD(
-        revisionPrompt,
-        customApiKey,
-        provider,
-        model,
-        language,
-        activeVersion.productType,
-        uploadedFiles,
-        "revision",
-        activeVersion.prdMode || "business",
-        controller.signal,
-        (chunk) => {
-          setVersions((prev) =>
-            prev.map((v) =>
-              v.id === newVersionId ? { ...v, content: v.content + chunk } : v,
-            ),
-          );
-        },
-      );
-      // Clear comments after successful revision
-      setComments({});
-    } catch (err: any) {
-      if (err.name === 'AbortError' || err.message === 'This operation was aborted') {
-        // Keep the partially generated output — don't delete it
-        return;
-      }
-      setError(
-        err.message ||
-          (language === "en"
-            ? "An unexpected error occurred during PRD revision."
-            : "Terjadi kesalahan tidak terduga saat merevisi PRD."),
-      );
-      console.error(err);
-    } finally {
-      if (!controller.signal.aborted) {
-        setIsGenerating(false);
-      }
-    }
+    await executeGeneration(
+      revisionPrompt,
+      language === "en" ? "Revising PRD based on comments..." : "Merevisi PRD berdasarkan komentar...",
+      "revision",
+      currentActive.productType,
+      currentActive.prdMode || "business",
+      () => setComments({}), // hapus komentar setelah revisi berhasil
+    );
   };
 
   const handleExportMd = () => {
@@ -395,7 +339,11 @@ export default function App() {
         hasData={prdContent.length > 0}
         language={language}
         onToggleLanguage={() =>
-          setLanguage((lang) => (lang === "id" ? "en" : "id"))
+          setLanguage((lang) => {
+            const newLang = lang === "id" ? "en" : "id";
+            localStorage.setItem("PRD_LANGUAGE", newLang); // Persist ke localStorage
+            return newLang;
+          })
         }
         minimal={!hasMessage}
         onToggleSidebar={() => setSidebarOpen(!sidebarOpen)}

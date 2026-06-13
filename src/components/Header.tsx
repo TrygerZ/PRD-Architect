@@ -83,7 +83,7 @@ export function Header({
         )}
         <button
           onClick={onToggleLanguage}
-          className="text-[var(--color-text-secondary)] hover:text-[var(--color-text-primary)] transition-all duration-200 ease text-[13px] font-mono hidden sm:block px-2 py-1.5 rounded-[6px] hover:bg-[var(--color-surface-elevated)] focus-visible:ring-2 focus-visible:ring-[var(--color-interactive)] focus-visible:outline-none"
+          className="text-[var(--color-text-secondary)] hover:text-[var(--color-text-primary)] transition-all duration-200 ease text-[13px] font-mono px-2 py-1.5 rounded-[6px] hover:bg-[var(--color-surface-elevated)] focus-visible:ring-2 focus-visible:ring-[var(--color-interactive)] focus-visible:outline-none"
           aria-label={language === "en" ? "Toggle Language" : "Ganti Bahasa"}
           title={
             language === "en"

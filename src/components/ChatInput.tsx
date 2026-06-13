@@ -40,16 +40,12 @@ export function ChatInput({
   };
 
   const handleKeyDown = (e: React.KeyboardEvent<HTMLTextAreaElement>) => {
-    const isMobile = 'ontouchstart' in window;
-    if (isMobile) {
-      // Mobile: Enter = newline (no Shift key available)
-      return;
-    }
-    // Desktop: Enter = submit, Shift+Enter = newline
+    // Enter = submit, Shift+Enter = newline (berlaku untuk desktop & mobile)
     if (e.key === 'Enter' && !e.shiftKey) {
       e.preventDefault();
       handleSubmit(e);
     }
+    // Shift+Enter: biarkan default behavior (newline) — tidak perlu handle khusus
   };
 
   // Auto-resize

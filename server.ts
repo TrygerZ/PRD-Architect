@@ -15,11 +15,39 @@ import helmet from "helmet";
 
 dotenv.config();
 
+// Lacak semua AbortController upstream yang sedang aktif untuk graceful shutdown (BUG L6)
+const activeGenerations = new Set<AbortController>();
+
 const app = express();
 const PORT = parseInt(process.env.PORT || "3000", 10);
 
-app.use(cors({ origin: true, credentials: true }));
-app.use(helmet({ contentSecurityPolicy: false }));
+// CORS: development merefleksikan semua origin, production dibatasi ke origin yang diizinkan
+app.use(cors({ 
+  origin: process.env.NODE_ENV === 'production' 
+    ? ['http://localhost:3000'] // TODO: tambahkan domain production di sini
+    : true, 
+  credentials: true 
+}));
+// CSP: aktifkan Content-Security-Policy dasar untuk mitigasi XSS
+// 'unsafe-inline' diperlukan untuk Vite HMR (development) dan Tailwind CSS
+app.use(helmet({
+  contentSecurityPolicy: {
+    directives: {
+      defaultSrc: ["'self'"],
+      scriptSrc: ["'self'", "'unsafe-inline'"],       // 'unsafe-inline' untuk Vite HMR di dev
+      styleSrc: ["'self'", "'unsafe-inline'"],         // 'unsafe-inline' untuk Tailwind CSS
+      imgSrc: ["'self'", "data:", "https:"],
+      connectSrc: [
+        "'self'",
+        "https://api.deepseek.com",
+        "https://generativelanguage.googleapis.com",
+      ],
+      fontSrc: ["'self'"],
+      objectSrc: ["'none'"],
+      frameSrc: ["'none'"],
+    },
+  },
+}));
 
 app.use(express.json({ limit: '50mb' }));
 app.use(express.urlencoded({ extended: true, limit: '50mb' }));
@@ -27,7 +55,7 @@ app.use(express.urlencoded({ extended: true, limit: '50mb' }));
 const apiLimiter = rateLimit({
   windowMs: 60 * 1000, // 1 minute
   max: 10,
-  message: { error: "Too many requests. Please slow down." }
+  message: { error: "Too many requests. Please slow down. / Terlalu banyak permintaan. Harap pelan-pelan." }
 });
 app.use("/api/", apiLimiter);
 
@@ -119,9 +147,16 @@ async function extractTextFromFile(filePath: string, mimeType: string, originalN
 
 app.post("/api/upload-files", (req, res) => {
   upload.array('files', 5)(req, res, async (err: any) => {
+    // Ekstrak bahasa dari form field (BUG L5 — kirim 'language' dari frontend via FormData)
+    const language = (req.body?.language === 'en' || req.body?.language === 'id') ? req.body.language : 'en';
+
     if (err instanceof multer.MulterError) {
       if (err.code === 'LIMIT_FILE_SIZE') {
-        return res.status(400).json({ error: "One or more files exceed the 10MB limit." });
+        return res.status(400).json({
+          error: language === 'en'
+            ? "One or more files exceed the 10MB limit."
+            : "Satu atau lebih file melebihi batas 10MB."
+        });
       }
       return res.status(400).json({ error: err.message });
     } else if (err) {
@@ -131,7 +166,9 @@ app.post("/api/upload-files", (req, res) => {
     try {
       const files = req.files as Express.Multer.File[];
       if (!files || files.length === 0) {
-        return res.status(400).json({ error: "No files uploaded" });
+        return res.status(400).json({
+          error: language === 'en' ? "No files uploaded" : "Tidak ada file yang diunggah"
+        });
       }
 
       const uploadedResults = [];
@@ -141,7 +178,11 @@ app.post("/api/upload-files", (req, res) => {
         if (!file.mimetype.startsWith('image/') && file.size > 5 * 1024 * 1024) {
           // Clean up temp files
           files.forEach(f => { fs.unlink(f.path, () => {}); });
-          return res.status(400).json({ error: `File "${file.originalname}" exceeds the 5MB limit for documents.` });
+          return res.status(400).json({
+            error: language === 'en'
+              ? `File "${file.originalname}" exceeds the 5MB limit for documents.`
+              : `File "${file.originalname}" melebihi batas 5MB untuk dokumen.`
+          });
         }
       }
 
@@ -161,7 +202,9 @@ app.post("/api/upload-files", (req, res) => {
       res.json(uploadedResults);
     } catch (error: any) {
       console.error("Upload error:", error);
-      res.status(500).json({ error: error.message || "Failed to process files" });
+      res.status(500).json({
+        error: error.message || (language === 'en' ? "Failed to process files" : "Gagal memproses file")
+      });
     } finally {
       // Ensure all temp files are cleaned up even if an error occurs mid-processing
       const files = req.files as Express.Multer.File[];
@@ -252,6 +295,20 @@ ${extraPrompt ? '\nAdditional Context from User:\n' + extraPrompt : ''}`;
 }
 
 function getRevisionPrompt(language: string) {
+  if (language === 'id') {
+    return `Anda adalah editor yang merevisi Product Requirements Document yang sudah ada.
+
+INSTRUKSI KRITIS:
+1. OUTPUT DOKUMEN MARKDOWN LENGKAP dengan HANYA revisi yang diminta
+2. Fokus HANYA pada bagian yang disebutkan dalam feedback di bawah
+3. Biarkan SEMUA bagian yang tidak diubah PERSIS kata-per-kata — jangan menulis ulang
+4. Hanya modifikasi konten yang secara spesifik terkait feedback yang diberikan
+5. Pertahankan gaya penulisan, nada, dan format yang SAMA
+6. Output murni Markdown — tanpa pembukaan, tanpa catatan, tanpa penjelasan
+7. JANGAN menambahkan bagian baru kecuali diminta secara eksplisit
+8. JANGAN menghapus konten yang ada kecuali feedback secara spesifik meminta
+9. Output Anda akan MENGGANTIKAN seluruh dokumen yang ada, jadi Anda HARUS menyertakan SEMUANYA`;
+  }
   return `You are an editor revising an existing Product Requirements Document.
 
 CRITICAL INSTRUCTIONS:
@@ -267,6 +324,18 @@ CRITICAL INSTRUCTIONS:
 }
 
 function getAppendPrompt(language: string) {
+  if (language === 'id') {
+    return `Anda sedang melengkapi Product Requirements Document yang sudah ada.
+
+INSTRUKSI KRITIS:
+1. OUTPUT DOKUMEN MARKDOWN LENGKAP dengan informasi yang diminta DITAMBAHKAN
+2. JANGAN mengubah atau me-regenerasi konten yang sudah ada — biarkan PERSIS kata-per-kata
+3. Sisipkan konten baru di bagian yang paling relevan
+4. Pertahankan gaya penulisan, nada, dan format yang SAMA — jangan memformat ulang apa pun
+5. Output murni Markdown — tanpa pembukaan, tanpa catatan, tanpa penjelasan
+6. PERTAHANKAN SEMUA konten yang ada persis seperti aslinya — reproduksi dengan setia
+7. Output Anda akan MENGGANTIKAN seluruh dokumen yang ada, jadi Anda HARUS menyertakan SEMUANYA`;
+  }
   return `You are enhancing an existing Product Requirements Document.
 
 CRITICAL INSTRUCTIONS:
@@ -285,14 +354,17 @@ app.post("/api/generate-prd", async (req, res) => {
   res.setHeader("Connection", "keep-alive");
   res.flushHeaders();
 
+  let abortController: AbortController | null = null;
+  // Ekstrak language di luar try agar accessible di catch block (BUG L5)
+  const language: "id" | "en" = (req.body?.language === 'en' || req.body?.language === 'id') ? req.body.language : 'id';
   try {
-    const { prompt, customApiKey, provider = 'deepseek', model = 'deepseek-v4-flash', language = 'id', productType, uploadedFiles, mode = 'initial', prdMode = 'business' } = req.body;
+    const { prompt, customApiKey, provider = 'deepseek', model = 'deepseek-v4-flash', productType, uploadedFiles, mode = 'initial', prdMode = 'business' } = req.body;
 
     // Validate provider
     const VALID_PROVIDERS = ["deepseek", "gemini"];
     if (!VALID_PROVIDERS.includes(provider)) {
       if (!res.writableEnded) {
-        res.write(`data: ${JSON.stringify({ error: `Invalid provider "${provider}". Must be one of: ${VALID_PROVIDERS.join(", ")}` })}\n\n`);
+        res.write(`data: ${JSON.stringify({ error: language === 'en' ? `Invalid provider "${provider}". Must be one of: ${VALID_PROVIDERS.join(", ")}` : `Provider "${provider}" tidak valid. Harus salah satu dari: ${VALID_PROVIDERS.join(", ")}` })}\n\n`);
         res.end();
       }
       return;
@@ -337,6 +409,7 @@ app.post("/api/generate-prd", async (req, res) => {
 
     if (provider === "gemini") {
       apiKeyEnvName = "GEMINI_API_KEY";
+      // OpenAI-compatible endpoint (stable as of 2025 — Google Generative Language API)
       endpoint = "https://generativelanguage.googleapis.com/v1beta/openai/chat/completions";
       if (!modelName) modelName = "gemini-2.5-flash";
     } else {
@@ -364,20 +437,19 @@ app.post("/api/generate-prd", async (req, res) => {
       modeInstructions = getAppendPrompt(language);
     }
 
+    // Dapatkan prompt spesifik industri (E-Commerce, SaaS, Fintech, dll.)
+    const industryPrompt = getIndustrySpecificPrompt(productType);
+
     let finalPrompt;
     if (mode === 'initial') {
-      finalPrompt = getSystemPrompt(language, "", productType, prdMode);
+      finalPrompt = getSystemPrompt(language, industryPrompt, productType, prdMode);
     } else {
       // Gabungkan: full system prompt + mode instructions di akhir
-      finalPrompt = getSystemPrompt(language, "", productType, prdMode) + '\n\n' + modeInstructions;
+      finalPrompt = getSystemPrompt(language, industryPrompt, productType, prdMode) + '\n\n' + modeInstructions;
     }
 
-    let fetchHeaders: any = {
-      "Content-Type": "application/json",
-    };
-    let fetchBody: any = {};
-
-    const abortController = new AbortController();
+    abortController = new AbortController();
+    activeGenerations.add(abortController); // Lacak untuk graceful shutdown (BUG L6)
     
     // Handle client disconnect (Gunakan res, BUKAN req)
     res.on("close", () => {
@@ -385,15 +457,16 @@ app.post("/api/generate-prd", async (req, res) => {
       abortController.abort();
     });
 
-    let fetchOptions: RequestInit = {
-      method: "POST",
-      headers: fetchHeaders,
+    // 1. Konfigurasi semua header terlebih dahulu
+    let fetchHeaders: any = {
+      "Content-Type": "application/json",
+      "Authorization": "Bearer " + apiKey,
     };
 
-    fetchOptions.signal = abortController.signal;
+    // 2. Siapkan body request
+    let fetchBody: any = {};
 
     if (provider === "gemini") {
-      fetchHeaders["Authorization"] = "Bearer " + apiKey;
       fetchBody = {
         model: modelName,
         messages: [
@@ -405,7 +478,6 @@ app.post("/api/generate-prd", async (req, res) => {
         temperature: 0.1,
       };
     } else {
-      fetchHeaders["Authorization"] = "Bearer " + apiKey;
       fetchBody = {
         model: modelName,
         messages: [
@@ -420,7 +492,13 @@ app.post("/api/generate-prd", async (req, res) => {
       };
     }
 
-    fetchOptions.body = JSON.stringify(fetchBody);
+    // 3. Buat fetchOptions SETELAH semua header dan body selesai dikonfigurasi
+    let fetchOptions: RequestInit = {
+      method: "POST",
+      headers: fetchHeaders,
+      signal: abortController.signal,
+      body: JSON.stringify(fetchBody),
+    };
 
     const response = await fetch(endpoint, fetchOptions);
 
@@ -482,8 +560,13 @@ app.post("/api/generate-prd", async (req, res) => {
     }
     console.error("Error generating PRD:", error);
     if (!res.writableEnded) {
-      res.write(`data: ${JSON.stringify({ error: error instanceof Error ? error.message : "Internal server error" })}\n\n`);
+      res.write(`data: ${JSON.stringify({ error: error instanceof Error ? error.message : (language === 'en' ? "Internal server error" : "Kesalahan server internal") })}\n\n`);
       res.end();
+    }
+  } finally {
+    // Bersihkan AbortController dari tracking (BUG L6)
+    if (abortController) {
+      activeGenerations.delete(abortController);
     }
   }
 });
@@ -495,13 +578,34 @@ async function main() {
     console.log(`Server running on http://localhost:${PORT}`);
   });
 
+  // Graceful shutdown — batalkan semua koneksi upstream yang masih aktif (BUG L6)
+  const gracefulShutdown = () => {
+    console.log(`Shutting down... ${activeGenerations.size} active upstream connection(s) will be aborted.`);
+    // Abort semua koneksi upstream ke AI provider yang masih aktif
+    for (const controller of activeGenerations) {
+      controller.abort();
+    }
+    activeGenerations.clear();
+
+    server.close(() => {
+      console.log('HTTP server closed.');
+      process.exit(0);
+    });
+
+    // Force exit setelah 10 detik jika server masih belum tertutup (menghindari hanging)
+    setTimeout(() => {
+      console.error('Forced shutdown after timeout — some connections may still be hanging.');
+      process.exit(1);
+    }, 10000);
+  };
+
   process.on('SIGTERM', () => {
-    console.log('SIGTERM received. Shutting down gracefully...');
-    server.close(() => process.exit(0));
+    console.log('SIGTERM received.');
+    gracefulShutdown();
   });
   process.on('SIGINT', () => {
-    console.log('SIGINT received. Shutting down gracefully...');
-    server.close(() => process.exit(0));
+    console.log('SIGINT received.');
+    gracefulShutdown();
   });
 }
 
