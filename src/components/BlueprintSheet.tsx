@@ -1,4 +1,4 @@
-import { useState, useEffect, memo, useCallback, useMemo } from "react";
+import React, { useState, useEffect, memo, useCallback, useMemo } from "react";
 import ReactMarkdown from "react-markdown";
 import remarkGfm from "remark-gfm";
 import {
@@ -22,7 +22,6 @@ interface BlueprintSheetProps {
   onRevise?: () => void;
   isGenerating?: boolean;
   language: "id" | "en";
-  scrollContainerRef?: React.RefObject<HTMLElement | null>;
 }
 
 type Section = {
@@ -81,7 +80,6 @@ export const BlueprintSheet = memo(function BlueprintSheet({
   onRevise,
   isGenerating,
   language,
-  scrollContainerRef,
 }: BlueprintSheetProps) {
   const sections = useMemo(() => getSections(content), [content]);
   const totalComments = Object.values(comments).filter(
@@ -134,13 +132,12 @@ export const BlueprintSheet = memo(function BlueprintSheet({
       {/* FAB button */}
       <button
         onClick={() => setIsFeedbackDrawerOpen(!isFeedbackDrawerOpen)}
-        className={`fixed bottom-[100px] sm:bottom-[100px] right-[40px] z-[50] w-[48px] h-[48px] rounded-full flex items-center justify-center transition-all duration-200 ease shadow-lg no-print will-change-transform focus-visible:ring-2 focus-visible:ring-[var(--color-interactive)] focus-visible:outline-none ${
+className={`fixed bottom-[100px] sm:bottom-[100px] right-[16px] sm:right-[40px] z-[50] w-[48px] h-[48px] rounded-full flex items-center justify-center transition-[color,transform,opacity] duration-200 ease no-print will-change-transform focus-visible:ring-2 focus-visible:ring-[var(--color-interactive)] focus-visible:outline-none active:scale-[0.97] active:opacity-80 ${
           isFeedbackDrawerOpen 
-            ? "bg-[var(--color-border)] text-[var(--color-text-primary)]" 
-            : "bg-[var(--color-text-primary)] hover:bg-[var(--color-text-primary)] text-[var(--color-bg)]"
+            ? "bg-[var(--color-border)] text-[var(--color-text-primary)] shadow-none" 
+            : "bg-[var(--color-text-primary)] hover:bg-[var(--color-text-primary)] text-[var(--color-bg)] shadow-fab"
         }`}
         aria-label={language === "en" ? (isFeedbackDrawerOpen ? "Close feedback" : "Open feedback") : (isFeedbackDrawerOpen ? "Tutup umpan balik" : "Buka umpan balik")}
-        style={!isFeedbackDrawerOpen ? { boxShadow: "0 4px 16px rgba(0, 0, 0, 0.4)" } : {}}
       >
         {isFeedbackDrawerOpen ? (
           <X size={20} strokeWidth={1.5} />
@@ -164,7 +161,7 @@ export const BlueprintSheet = memo(function BlueprintSheet({
             <button
               onClick={onRevise}
               disabled={isGenerating || totalComments === 0}
-              className={`px-3 py-1.5 rounded-[6px] text-[13px] font-medium transition-all duration-200 ease flex items-center gap-2 disabled:opacity-40 disabled:cursor-not-allowed ${
+              className={`px-3 py-2 text-[13px] font-medium transition-[color,transform,opacity] duration-200 ease flex items-center gap-2 disabled:opacity-40 disabled:cursor-not-allowed rounded-sm active:scale-[0.97] active:opacity-80 ${
                 totalComments > 0 
                   ? "bg-[var(--color-text-primary)] text-[var(--color-bg)] hover:bg-[var(--color-text-primary)]" 
                   : "bg-transparent text-[var(--color-text-muted)]"
@@ -180,7 +177,7 @@ export const BlueprintSheet = memo(function BlueprintSheet({
           <div className="space-y-4">
             {/* Hanya render feedback cards jika drawer terbuka (lazy rendering untuk hemat render cycle) */}
             {isFeedbackDrawerOpen && sections.map((section, index) => {
-              const sectionId = `sec_${index}`;
+              const sectionId = `sec_${section.heading.substring(0, 30).replace(/[^a-zA-Z0-9]/g, '_')}_${index}`;
               const currentComment = comments[sectionId] || "";
 
               return (
@@ -208,9 +205,10 @@ export const BlueprintSheet = memo(function BlueprintSheet({
             </div>
             <div className="flex items-center gap-2">
               <select 
-                className="bg-transparent text-[13px] text-[var(--color-text-secondary)] border border-[var(--color-border)] rounded-[6px] px-2 py-1 focus:outline-none focus:border-[var(--color-interactive)] focus-visible:ring-2 focus-visible:ring-[var(--color-interactive)]"
+                className="bg-transparent text-[13px] text-[var(--color-text-secondary)] border border-[var(--color-border)] rounded-sm px-3 py-2 min-h-[36px] focus:outline-none focus:border-[var(--color-interactive)] focus-visible:ring-2 focus-visible:ring-[var(--color-interactive)]"
                 value={activeVersionId || ""}
                 onChange={(e) => onSwitchVersion?.(e.target.value)}
+                aria-label={language === "en" ? "Select version" : "Pilih versi"}
               >
                 {versions.map((v, i) => (
                   <option key={v.id} value={v.id} className="bg-[var(--color-bg)] text-[var(--color-text-primary)]">Version {i + 1}</option>
@@ -230,7 +228,7 @@ export const BlueprintSheet = memo(function BlueprintSheet({
                 aria-valuemax={100}
                 aria-label={isGenerating ? (language === "en" ? "Generating PRD..." : "Membuat PRD...") : (language === "en" ? "PRD Complete" : "PRD Selesai")}
               >
-                <div className={`h-full bg-[var(--color-interactive)] transition-all duration-300 ${isGenerating ? 'animate-pulse' : ''}`} style={{width: `${progress}%`}} />
+                <div className={`h-full bg-[var(--color-interactive)] transition-[width] duration-300 ${isGenerating ? 'animate-pulse' : ''}`} style={{width: `${progress}%`}} />
               </div>
               <span className="text-[11px] font-mono text-[var(--color-text-muted)] whitespace-nowrap">
                 {isComplete ? (language === "en" ? "Complete" : "Selesai") : (language === "en" ? "Generating..." : "Menghasilkan...")}
@@ -299,7 +297,7 @@ const SheetSection = memo(function SheetSection({
   };
 
   return (
-    <div className="bg-[var(--color-surface)] border border-[var(--color-border)] rounded-[8px] overflow-hidden mb-4 print:bg-transparent print:border-none print:shadow-none print:p-0">
+    <div className="bg-[var(--color-surface)] border border-[var(--color-border)] rounded-md overflow-hidden mb-4 print:bg-transparent print:border-none print:shadow-none print:p-0">
       {/* Header — click to collapse */}
       <div 
         className={`flex items-center justify-between px-5 py-4 border-b border-[var(--color-border)] cursor-pointer select-none transition-colors no-print ${isCollapsed ? 'bg-[var(--color-surface)] hover:bg-[var(--color-surface-elevated)]' : 'bg-[var(--color-surface-elevated)] hover:bg-[var(--color-surface-elevated)]'}`}
@@ -312,7 +310,7 @@ const SheetSection = memo(function SheetSection({
       >
         <div className="flex items-center gap-3">
           <ChevronDown className={`w-4 h-4 text-[var(--color-text-muted)] transition-transform duration-200 ${isCollapsed ? '-rotate-90' : ''}`} strokeWidth={1.5} aria-hidden="true" />
-          <h2 className="text-[var(--color-text-primary)] text-[14px] font-semibold" id={sectionId}>{section.heading}</h2>
+          <h2 className="text-[var(--color-text-primary)] text-[14px] font-semibold" id={`${sectionId}-heading`}>{section.heading}</h2>
         </div>
         <div className="flex items-center gap-2">
           <span className="text-[11px] font-mono text-[var(--color-text-muted)]">{index + 1}/{total}</span>
@@ -320,17 +318,18 @@ const SheetSection = memo(function SheetSection({
       </div>
 
       {/* Content — collapsible */}
-      <div id={`section-content-${sectionId}`} className={`transition-all duration-300 overflow-hidden ${isCollapsed ? 'max-h-0' : 'max-h-[8000px]'} print:max-h-none`} role="region">
+      <div id={`section-content-${sectionId}`} className="grid transition-[grid-template-rows] duration-300 ease-[var(--ease-default)] print:max-h-none" style={{ gridTemplateRows: isCollapsed ? '0fr' : '1fr' }} role="region">
+          <div className="overflow-hidden">
         <div className="px-5 py-4">
           <div
-            id={sectionId}
+            id={`${sectionId}-content`}
             className="w-full prose prose-invert max-w-none 
               prose-headings:font-normal prose-headings:text-[var(--color-text-primary)]
               prose-h1:text-[36px] sm:prose-h1:text-[48px] prose-h1:mt-8 prose-h1:mb-4 prose-h1:leading-[1.15]
               prose-h2:hidden
               prose-h3:text-[18px] prose-h3:mt-8 prose-h3:font-semibold
               prose-p:text-[var(--color-text-secondary)] prose-p:text-[15px] prose-p:leading-[1.6] prose-p:mb-4
-              prose-a:text-[#6666ff] hover:prose-a:text-[#8888ff] prose-a:no-underline transition-colors
+              prose-a:text-[var(--color-interactive)] hover:prose-a:text-[var(--color-interactive-hover)] prose-a:no-underline transition-colors
               prose-li:text-[var(--color-text-secondary)] prose-li:text-[15px] prose-li:my-1
               prose-strong:text-[var(--color-text-primary)] prose-strong:font-medium
               prose-ul:pl-6 prose-ul:mb-6 prose-ol:pl-6 prose-ol:mb-6
@@ -342,7 +341,7 @@ const SheetSection = memo(function SheetSection({
             <ReactMarkdown
               remarkPlugins={[remarkGfm]}
               components={{
-                a: ({ href, children, ...props }: any) => (
+                a: ({ href, children, ...props }: React.AnchorHTMLAttributes<HTMLAnchorElement>) => (
                   <a href={href} target="_blank" rel="noreferrer noopener" {...props}>
                     {children}
                   </a>
@@ -354,7 +353,7 @@ const SheetSection = memo(function SheetSection({
                   </h3>
                 ),
                 table: ({ node, ...props }) => (
-                  <div className="w-full overflow-x-auto my-6 rounded-[8px] border border-[var(--color-border)] bg-[var(--color-surface)] print:border-gray-300 print:bg-transparent print:shadow-none">
+                  <div className="w-full overflow-x-auto my-6 rounded-md border border-[var(--color-border)] bg-[var(--color-surface)] print:border-gray-300 print:bg-transparent print:shadow-none">
                     <table className="w-full text-sm text-left border-collapse" {...props} />
                   </div>
                 ),
@@ -371,7 +370,7 @@ const SheetSection = memo(function SheetSection({
                   <td className="px-4 py-3 align-top leading-relaxed text-[var(--color-text-secondary)] print:text-black min-w-[120px] text-[13px]" {...props} />
                 ),
                 pre: ({ node, children, ...props }) => (
-                  <div className="relative my-6 rounded-[8px] border border-[var(--color-border)] bg-[var(--color-surface)] overflow-hidden print:bg-gray-50 print:border-gray-300">
+                  <div className="relative my-6 rounded-md border border-[var(--color-border)] bg-[var(--color-surface)] overflow-hidden print:bg-gray-50 print:border-gray-300">
                     <div className="px-4 py-2 border-b border-[var(--color-border)] bg-[var(--color-surface-elevated)] flex items-center justify-between">
                        <div className="flex gap-1.5">
                          <div className="w-3 h-3 rounded-full bg-[var(--color-border-subtle)]"></div>
@@ -384,7 +383,7 @@ const SheetSection = memo(function SheetSection({
                     </pre>
                   </div>
                 ),
-                code: ({ node, className, children, ...props }: any) => {
+                code: ({ node, className, children, ...props }: { node?: unknown; className?: string; children?: React.ReactNode }) => {
                   const match = /language-(\w+)/.exec(className || "");
                   const isInline = !match && !String(children).includes("\n");
                   if (isInline) {
@@ -410,14 +409,14 @@ const SheetSection = memo(function SheetSection({
         {/* Footer — actions */}
         <div className="flex items-center justify-end gap-3 px-5 py-3 border-t border-[var(--color-border)] no-print">
           <button 
-            className="text-[12px] text-[var(--color-text-muted)] hover:text-[var(--color-text-secondary)] transition-colors flex items-center gap-1.5 focus-visible:ring-2 focus-visible:ring-[var(--color-interactive)] focus-visible:outline-none" 
+            className="text-[12px] text-[var(--color-text-muted)] hover:text-[var(--color-text-secondary)] transition-colors flex items-center gap-1.5 focus-visible:ring-2 focus-visible:ring-[var(--color-interactive)] focus-visible:outline-none active:opacity-70" 
             onClick={copySection}
             aria-label={language === "en" ? "Copy section" : "Salin bagian"}
           >
             <ClipboardCopy size={14} strokeWidth={1.5} /> {language === "en" ? "Copy" : "Salin"}
           </button>
           <button 
-            className="text-[12px] text-[var(--color-text-muted)] hover:text-[var(--color-text-secondary)] transition-colors flex items-center gap-1.5 focus-visible:ring-2 focus-visible:ring-[var(--color-interactive)] focus-visible:outline-none"
+            className="text-[12px] text-[var(--color-text-muted)] hover:text-[var(--color-text-secondary)] transition-colors flex items-center gap-1.5 focus-visible:ring-2 focus-visible:ring-[var(--color-interactive)] focus-visible:outline-none active:opacity-70"
             onClick={onOpenFeedback}
             aria-label={language === "en" ? "Open feedback" : "Buka umpan balik"}
           >
@@ -425,6 +424,7 @@ const SheetSection = memo(function SheetSection({
           </button>
         </div>
       </div>
+    </div>
     </div>
   );
 });
@@ -448,7 +448,7 @@ function FeedbackCard({
   }, [comment]);
 
   return (
-    <div className="bg-[var(--color-surface)] border border-[var(--color-border)] rounded-[8px] p-4 text-left">
+    <div className="bg-[var(--color-surface)] border border-[var(--color-border)] rounded-md p-4 text-left">
       <div className="font-medium text-[13px] text-[var(--color-text-primary)] mb-2 truncate" title={section.heading}>
         {section.heading}
       </div>
@@ -459,7 +459,7 @@ function FeedbackCard({
             autoFocus
             value={tempComment}
             onChange={(e) => setTempComment(e.target.value)}
-            className="flex-grow w-full bg-[var(--color-bg)] border border-[var(--color-border)] text-[var(--color-text-primary)] text-[13px] p-3 rounded-[6px] focus:outline-none focus:border-[var(--color-interactive)] transition-all duration-200 ease min-h-[100px] resize-y"
+            className="flex-grow w-full bg-[var(--color-bg)] border border-[var(--color-border)] text-[var(--color-text-primary)] text-[13px] p-3 rounded-sm focus:outline-none focus:border-[var(--color-interactive)] focus-visible:ring-2 focus-visible:ring-[var(--color-interactive)] transition-[border-color] duration-200 ease min-h-[100px] resize-y"
             aria-label={language === "en" ? "Feedback for section" : "Umpan balik untuk bagian"}
             placeholder={
               language === "en"
@@ -473,7 +473,7 @@ function FeedbackCard({
                 setIsEditing(false);
                 setTempComment(comment);
               }}
-              className="px-3 py-1.5 text-[13px] text-[var(--color-text-secondary)] hover:text-[var(--color-text-primary)] hover:bg-[var(--color-surface-elevated)] transition-all duration-200 ease rounded-[6px] font-medium"
+              className="px-3 py-2 text-[13px] text-[var(--color-text-secondary)] hover:text-[var(--color-text-primary)] hover:bg-[var(--color-surface-elevated)] transition-[color] duration-200 ease rounded-sm font-medium active:opacity-70"
             >
               {language === "en" ? "Cancel" : "Batal"}
             </button>
@@ -482,7 +482,7 @@ function FeedbackCard({
                 setIsEditing(false);
                 onCommentChange(tempComment);
               }}
-              className="px-3 py-1.5 text-[13px] bg-[var(--color-text-primary)] text-[var(--color-bg)] font-medium rounded-[6px] hover:bg-[var(--color-text-primary)] transition-all duration-200 ease"
+              className="px-3 py-2 text-[13px] bg-[var(--color-text-primary)] text-[var(--color-bg)] font-medium rounded-sm hover:bg-[var(--color-text-primary)] transition-[color,transform,opacity] duration-200 ease active:scale-[0.97] active:opacity-80"
             >
               {language === "en" ? "Save" : "Simpan"}
             </button>
@@ -491,9 +491,9 @@ function FeedbackCard({
       ) : (
         <div
           onClick={() => setIsEditing(true)}
-          className={`text-[13px] rounded-[6px] transition-all duration-200 ease cursor-pointer border mt-2 ${
+          className={`text-[13px] rounded-sm transition-[color,border-color] duration-200 ease cursor-pointer border mt-2 ${
             comment 
-              ? "text-[#cccccc] p-3 bg-[var(--color-bg)] border-[var(--color-border)] hover:border-[var(--color-text-muted)]" 
+              ? "text-[var(--color-text-secondary)] p-3 bg-[var(--color-bg)] border-[var(--color-border)] hover:border-[var(--color-text-muted)]" 
               : "text-[var(--color-text-muted)] p-3 border-dashed border-[var(--color-border)] bg-transparent hover:border-[var(--color-text-muted)] hover:text-[var(--color-text-secondary)]"
           }`}
         >
@@ -513,8 +513,8 @@ function FeedbackCard({
 function LoadingSkeleton() {
   return (
     <div className="space-y-4 no-print w-full">
-      {[1, 2, 3].map((i) => (
-        <div key={i} className="bg-[var(--color-surface)] border border-[var(--color-border)] rounded-[8px] overflow-hidden mb-4 animate-pulse">
+      {[1, 2, 3, 4, 5, 6].map((i) => (
+        <div key={i} className="bg-[var(--color-surface)] border border-[var(--color-border)] rounded-md overflow-hidden mb-4 animate-pulse">
           <div className="h-[48px] bg-[var(--color-surface-elevated)] border-b border-[var(--color-border)] flex items-center px-5">
             <div className="w-4 h-4 rounded bg-[var(--color-border-subtle)] mr-3" />
             <div className="h-4 bg-[var(--color-border-subtle)] rounded w-1/3" />

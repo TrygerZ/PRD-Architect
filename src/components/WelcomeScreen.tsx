@@ -29,18 +29,19 @@ export function WelcomeScreen({ language, onQuickPrompt, prdMode, onChangeMode }
         </p>
         <div className="w-12 h-[2px] bg-[var(--color-border)] mx-auto my-6"></div>
 
-        <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 mb-8 text-left w-full px-4 sm:px-0 mx-auto">
+        <div role="radiogroup" aria-label={language === "en" ? "PRD Mode" : "Mode PRD"} className="grid grid-cols-1 sm:grid-cols-2 gap-4 mb-8 text-left w-full px-4 sm:px-0 mx-auto">
           <button 
             type="button"
+            role="radio"
+            aria-checked={prdMode === "business"}
             onClick={() => onChangeMode("business")}
-            aria-pressed={prdMode === "business"}
-            className={`p-4 rounded-xl border flex flex-col gap-1 transition-all duration-300 ${
+            className={`p-4 rounded-lg border flex flex-col gap-1 transition-[color,border-color,opacity,shadow,transform] duration-300 focus-visible:ring-2 focus-visible:ring-[var(--color-interactive)] focus-visible:outline-none active:scale-[0.97] ${
               prdMode === "business" 
-                ? "bg-[#112233]/40 border-[#4466ff] shadow-[0_0_15px_rgba(68,102,255,0.15)]" 
+                ? "bg-[var(--color-mode-business-bg)]/40 border-[var(--color-mode-business)] shadow-[0_0_15px_rgba(68,102,255,0.15)]" 
                 : "bg-[var(--color-surface)] border-[var(--color-border)] hover:bg-[var(--color-surface-elevated)] opacity-80"
             }`}
           >
-            <span className={`text-[15px] font-semibold flex items-center justify-center gap-2 ${prdMode === "business" ? "text-white" : "text-[var(--color-text-secondary)]"}`}>
+            <span className={`text-[15px] font-semibold flex items-center justify-center gap-2 ${prdMode === "business" ? "text-[var(--color-text-primary)]" : "text-[var(--color-text-secondary)]"}`}>
               <Briefcase className="w-4 h-4" />
               {language === "en" ? "Business & Investor Mode" : "Mode Bisnis & Investor"}
             </span>
@@ -51,15 +52,16 @@ export function WelcomeScreen({ language, onQuickPrompt, prdMode, onChangeMode }
 
           <button 
             type="button"
+            role="radio"
+            aria-checked={prdMode === "technical"}
             onClick={() => onChangeMode("technical")}
-            aria-pressed={prdMode === "technical"}
-            className={`p-4 rounded-xl border flex flex-col gap-1 transition-all duration-300 ${
+            className={`p-4 rounded-lg border flex flex-col gap-1 transition-[color,border-color,opacity,shadow,transform] duration-300 focus-visible:ring-2 focus-visible:ring-[var(--color-interactive)] focus-visible:outline-none active:scale-[0.97] ${
               prdMode === "technical" 
-                ? "bg-[#221133]/40 border-[#a855f7] shadow-[0_0_15px_rgba(168,85,247,0.15)]" 
+                ? "bg-[var(--color-mode-technical-bg)]/40 border-[var(--color-mode-technical)] shadow-[0_0_15px_rgba(168,85,247,0.15)]" 
                 : "bg-[var(--color-surface)] border-[var(--color-border)] hover:bg-[var(--color-surface-elevated)] opacity-80"
             }`}
           >
-            <span className={`text-[15px] font-semibold flex items-center justify-center gap-2 ${prdMode === "technical" ? "text-white" : "text-[var(--color-text-secondary)]"}`}>
+            <span className={`text-[15px] font-semibold flex items-center justify-center gap-2 ${prdMode === "technical" ? "text-[var(--color-text-primary)]" : "text-[var(--color-text-secondary)]"}`}>
               <Code className="w-4 h-4" />
               {language === "en" ? "AI Agent & Developer Mode" : "Mode AI Agent & Developer"}
             </span>
@@ -89,7 +91,7 @@ export function WelcomeScreen({ language, onQuickPrompt, prdMode, onChangeMode }
               }}
               type="button"
               onClick={() => onQuickPrompt(qp.text)}
-              className="group flex flex-col items-center justify-center text-center p-3 sm:p-4 border border-[var(--color-border)] rounded-[8px] bg-transparent text-[var(--color-text-secondary)] hover:bg-[var(--color-surface-elevated)] hover:border-[var(--color-text-muted)] hover:text-[var(--color-text-primary)] transition-all duration-200"
+              className="group flex flex-col items-center justify-center text-center p-3 sm:p-4 min-h-[44px] border border-[var(--color-border)] rounded-sm bg-transparent text-[var(--color-text-secondary)] hover:bg-[var(--color-surface-elevated)] hover:border-[var(--color-text-muted)] hover:text-[var(--color-text-primary)] transition-[color,border-color,transform] duration-200 focus-visible:ring-2 focus-visible:ring-[var(--color-interactive)] focus-visible:outline-none active:scale-[0.97]"
             >
               <Icon size={16} strokeWidth={1.5} className="mb-2 text-[var(--color-text-muted)] group-hover:text-[var(--color-text-secondary)]" />
               <span className="text-[13px] leading-[1.3]">{qp.label}</span>

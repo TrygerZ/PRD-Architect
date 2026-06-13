@@ -44,14 +44,14 @@ export const Sidebar = memo(function Sidebar({
         {/* Close button - mobile only */}
         <button
           onClick={onClose}
-          className="absolute top-3 right-3 lg:hidden p-1.5 rounded-md hover:bg-[var(--color-surface-elevated)] text-[var(--color-text-muted)] hover:text-[var(--color-text-primary)] focus-visible:ring-2 focus-visible:ring-[var(--color-interactive)] focus-visible:outline-none"
+          className="absolute top-3 right-3 lg:hidden p-2 min-w-[44px] min-h-[44px] flex items-center justify-center rounded-md hover:bg-[var(--color-surface-elevated)] text-[var(--color-text-muted)] hover:text-[var(--color-text-primary)] focus-visible:ring-2 focus-visible:ring-[var(--color-interactive)] focus-visible:outline-none active:scale-[0.97]"
           aria-label={language === "en" ? "Close sidebar" : "Tutup sidebar"}
         >
           <X size={18} strokeWidth={1.5} />
         </button>
         <button 
           onClick={onNewPRD}
-          className="w-full flex items-center gap-2 px-4 py-3 border-b border-[var(--color-border)] text-[var(--color-text-primary)] hover:bg-[var(--color-surface-elevated)] transition-all duration-200 text-[14px] font-medium focus-visible:ring-2 focus-visible:ring-[var(--color-interactive)] focus-visible:outline-none"
+          className="w-full flex items-center gap-2 px-4 py-3 min-h-[44px] border-b border-[var(--color-border)] text-[var(--color-text-primary)] hover:bg-[var(--color-surface-elevated)] transition-[color,transform] duration-200 text-[14px] font-medium focus-visible:ring-2 focus-visible:ring-[var(--color-interactive)] focus-visible:outline-none active:scale-[0.97]"
         >
           <FileText size={16} strokeWidth={1.5} />
           {language === "en" ? "+ New PRD" : "+ PRD Baru"}
@@ -73,7 +73,7 @@ export const Sidebar = memo(function Sidebar({
           {[...versions].reverse().map((v, i) => (
             <button
               key={v.id}
-              className="w-full text-left px-4 py-3 border-b border-[var(--color-border)] cursor-pointer hover:bg-[var(--color-surface-elevated)] transition-all duration-200 focus-visible:ring-2 focus-visible:ring-[var(--color-interactive)] focus-visible:outline-none"
+              className="w-full text-left px-4 py-3 min-h-[44px] border-b border-[var(--color-border)] cursor-pointer hover:bg-[var(--color-surface-elevated)] transition-[color,transform] duration-200 focus-visible:ring-2 focus-visible:ring-[var(--color-interactive)] focus-visible:outline-none active:scale-[0.97]"
               onClick={() => onSwitchVersion(v.id)}
               aria-current={v.id === activeVersionId ? "page" : undefined}
               style={{
@@ -88,7 +88,7 @@ export const Sidebar = memo(function Sidebar({
                 {formatDate(v.timestamp, language)}
               </time>
               <div className="text-[11px] text-[var(--color-text-muted)] mt-0.5 truncate">
-                {v.prompt ? (v.prompt.length > 60 ? v.prompt.slice(0, 60) + '...' : v.prompt) : (v.productType !== "Unknown" ? v.productType : (language === "en" ? "Draft" : "Draf"))}
+                {(v.userDisplayPrompt || v.prompt) ? ((v.userDisplayPrompt || v.prompt).length > 60 ? (v.userDisplayPrompt || v.prompt).slice(0, 60) + '...' : (v.userDisplayPrompt || v.prompt)) : (v.productType !== "Unknown" ? v.productType : (language === "en" ? "Draft" : "Draf"))}
               </div>
             </button>
           ))}

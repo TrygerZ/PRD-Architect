@@ -6,7 +6,8 @@ import { BlueprintSheet, getSections } from "./components/BlueprintSheet";
 import { ApiKeyModal } from "./components/ApiKeyModal";
 import { generatePRD } from "./services/geminiService";
 import { ProductType, PRDVersion, UploadedFile, AIProvider, PRDMode } from "./types";
-import { ArrowUp } from "lucide-react";
+import DOMPurify from "dompurify";
+import { ArrowUp, X } from "lucide-react";
 import { FileUploader } from "./components/FileUploader";
 import { safeGetLocalStorage, safeSetLocalStorage } from "./utils/storage";
 import { useSettings } from "./hooks/useSettings";
@@ -15,6 +16,7 @@ import { useScroll } from "./hooks/useScroll";
 import { useVersion } from "./hooks/useVersion";
 
 import { Sidebar } from "./components/Sidebar";
+import { ErrorBoundary } from "./components/ErrorBoundary";
 
 export default function App() {
   const [isSettingsOpen, setIsSettingsOpen] = useState(false);
@@ -47,6 +49,7 @@ export default function App() {
   const [sidebarOpen, setSidebarOpen] = useState(false);
   const [currentPrompt, setCurrentPrompt] = useState("");
   const abortControllerRef = useRef<AbortController | null>(null);
+  const isGeneratingRef = useRef(false);
   const [prdMode, setPrdMode] = useState<PRDMode>("business");
 
   const chatContainerRef = useRef<HTMLDivElement>(null);
@@ -69,12 +72,27 @@ export default function App() {
   };
 
   const handleNewPRD = useCallback(() => {
+    // Task 3.11 — Confirm dialog jika sudah ada versi
+    if (versions.length > 0) {
+      const confirmed = window.confirm(
+        language === 'en' ? 'Delete all PRD history?' : 'Hapus semua riwayat PRD?'
+      );
+      if (!confirmed) return;
+    }
     versionNewPRD(isGenerating, abortGeneration);
     setCurrentPrompt("");
     setUploadedFiles([]);
-  }, [versionNewPRD, isGenerating, abortGeneration]);
+  }, [versionNewPRD, isGenerating, abortGeneration, versions.length, language]);
 
   // showToast now provided by useToast hook
+
+  // Cleanup timers on unmount
+  useEffect(() => {
+    return () => {
+      clearTimeout(quickPromptTimerRef.current);
+      clearTimeout(printTimerRef.current);
+    };
+  }, []);
 
   // Load preferensi bahasa dari localStorage (default "id")
   useEffect(() => {
@@ -83,6 +101,11 @@ export default function App() {
       setLanguage(storedLang);
     }
   }, []);
+
+  // Sync html lang attribute with language state — penting untuk aksesibilitas screen reader
+  useEffect(() => {
+    document.documentElement.lang = language === "en" ? "en" : "id";
+  }, [language]);
 
   // P4 — beforeunload: cegah kehilangan data saat user menutup tab
   useEffect(() => {
@@ -145,7 +168,17 @@ export default function App() {
     prdMode: PRDMode,
     onSuccess?: () => void,
   ) => {
+    // Task 3.5 — Guard Ghost Version: jika sudah generating, batalkan dan skip buat versi baru
+    if (isGeneratingRef.current) {
+      abortControllerRef.current?.abort();
+      abortControllerRef.current = null;
+      setIsGenerating(false);
+      isGeneratingRef.current = false;
+      return;
+    }
+
     setIsGenerating(true);
+    isGeneratingRef.current = true;
     setError(null);
 
     // Batalkan controller sebelumnya jika masih aktif
@@ -207,6 +240,7 @@ export default function App() {
       console.error(err);
     } finally {
       setIsGenerating(false);
+      isGeneratingRef.current = false;
       abortControllerRef.current = null;
     }
   }, [customApiKey, provider, model, uploadedFiles]);
@@ -246,7 +280,13 @@ export default function App() {
     const currentActive = activeVersionRef.current;
     const currentComments = commentsRef.current;
     const lang = languageRef.current;
-    if (!currentActive || Object.keys(currentComments).length === 0) return;
+
+    // Task 3.9 — Filter whitespace-only comments sebelum cek
+    const hasRealComments = Object.values(currentComments).some(c => c.trim().length > 0);
+    if (!currentActive || !hasRealComments) return;
+
+    // Task 3.3 — Hoist getSections() ke luar forEach (parse PRD sekali saja)
+    const parsedSections = getSections(currentActive.content);
 
     // Bangun prompt revisi dari komentar per bagian
     let revisionPrompt =
@@ -256,9 +296,11 @@ export default function App() {
 
     Object.entries(currentComments).forEach(([sectionId, comment]) => {
       let sectionHeading = sectionId;
-      const secIdx = parseInt(sectionId.split("_")[1], 10);
+
+      // Task 3.2 — Parse index dari segmen terakhir (format: sec_<heading>_<index>)
+      const parts = sectionId.split("_");
+      const secIdx = parseInt(parts[parts.length - 1], 10);
       if (!isNaN(secIdx)) {
-        const parsedSections = getSections(currentActive.content);
         if (parsedSections[secIdx] && parsedSections[secIdx].heading) {
           sectionHeading = parsedSections[secIdx].heading
             .substring(0, 60)
@@ -289,7 +331,9 @@ export default function App() {
     const a = document.createElement("a");
     a.href = url;
     a.download = `PRD_${productType.replace(/ /g, "_")}_${new Date().getTime()}.md`;
+    document.body.appendChild(a);
     a.click();
+    document.body.removeChild(a);
     URL.revokeObjectURL(url);
   };
 
@@ -372,7 +416,7 @@ export default function App() {
               </style>
             </head>
             <body>
-              ${element.innerHTML}
+              ${DOMPurify.sanitize(element.innerHTML)}
             </body>
           </html>
         `;
@@ -381,7 +425,8 @@ export default function App() {
         printWindow.focus();
 
         // Wait for styles to apply before printing
-        setTimeout(() => {
+        clearTimeout(printTimerRef.current);
+        printTimerRef.current = setTimeout(() => {
           printWindow.print();
           // Optional: close after print, but some browsers block the thread so closing right away might cancel print
           // printWindow.close();
@@ -421,16 +466,30 @@ export default function App() {
   const handleBlueprintSwitchVersion = useCallback((vid: string) => {
     versionSwitchVersion(vid);
   }, [versionSwitchVersion]);
+  const quickPromptTimerRef = useRef<ReturnType<typeof setTimeout>>(undefined);
+  const printTimerRef = useRef<ReturnType<typeof setTimeout>>(undefined);
+
   const handleQuickPrompt = useCallback((text: string) => {
     setCurrentPrompt(text);
-    setTimeout(() => setCurrentPrompt(''), 100);
+    clearTimeout(quickPromptTimerRef.current);
+    quickPromptTimerRef.current = setTimeout(() => setCurrentPrompt(''), 100);
   }, []);
   const handleAttachClick = useCallback(() => setShowUploader(prev => !prev), []);
   const handleScrollTop = useCallback(() => {
     if (chatContainerRef.current) chatContainerRef.current.scrollTo({ top: 0, behavior: 'smooth' });
   }, []);
 
+  // Task 3.8 — Extract onSend ke useCallback untuk hindari stale closure
+  const handleSend = useCallback((text: string) => {
+    if (activeVersionRef.current) {
+      handleAppend(text);
+    } else {
+      handleGenerate(text, "Unknown");
+    }
+  }, [handleAppend, handleGenerate]);
+
   return (
+    <ErrorBoundary language={language}>
     <div className="min-h-screen bg-[var(--color-bg)] flex flex-col font-geist">
       <Header
         onOpenSettings={handleOpenSettings}
@@ -460,7 +519,7 @@ export default function App() {
         <div className="flex-1 flex flex-col relative overflow-hidden">
           <div 
             ref={chatContainerRef}
-            className="flex-1 overflow-y-auto px-4 sm:px-6 pb-[240px]" 
+            className="flex-1 overflow-y-auto px-4 sm:px-6 pb-[280px]" 
             id="chat-messages-container"
             aria-busy={isGenerating}
             aria-live="polite"
@@ -485,13 +544,20 @@ export default function App() {
             ) : (
               <div className="max-w-[800px] mx-auto space-y-6 pt-8 pb-8">
                 {error && (
-                  <div role="alert" className="w-full bg-[var(--color-surface)] p-4 mb-4 border border-[#8a3a3a] rounded-[8px] text-[#8a3a3a] text-[15px] font-medium no-print">
-                    {error}
+                  <div role="alert" className="w-full bg-[var(--color-surface)] p-4 mb-4 border border-[var(--color-error)] rounded-md text-[var(--color-error)] text-[15px] font-medium no-print flex items-start justify-between gap-3">
+                    <span>{error}</span>
+                    <button
+                      onClick={() => setError(null)}
+                      className="shrink-0 p-1 rounded-sm hover:bg-[var(--color-error-bg)] transition-colors focus-visible:ring-2 focus-visible:ring-[var(--color-interactive)] focus-visible:outline-none"
+                      aria-label={language === "en" ? "Dismiss error" : "Tutup pemberitahuan"}
+                    >
+                      <X size={16} strokeWidth={1.5} />
+                    </button>
                   </div>
                 )}
                 
                 {/* User Message */}
-                <div className="bg-[var(--color-surface-elevated)] rounded-[8px] p-3 sm:p-4 max-w-[95%] sm:max-w-[85%] ml-auto shadow-sm border border-[var(--color-border)]">
+                <div className="bg-[var(--color-surface-elevated)] rounded-md p-3 sm:p-4 max-w-[95%] sm:max-w-[85%] ml-auto shadow-sm border border-[var(--color-border)]">
                   <p className="text-[14px] text-[var(--color-text-primary)] whitespace-pre-wrap">
                     {activeVersion?.userDisplayPrompt || userPrompt}
                   </p>
@@ -499,7 +565,6 @@ export default function App() {
 
                 {/* AI Response — BlueprintSheet */}
                 <BlueprintSheet
-                  scrollContainerRef={chatContainerRef}
                   content={prdContent}
                   comments={comments}
                   onCommentChange={handleCommentChange}
@@ -516,13 +581,7 @@ export default function App() {
 
           {/* Input — fixed bottom */}
           <ChatInput
-            onSend={(text) => {
-              if (activeVersion) {
-                handleAppend(text);
-              } else {
-                handleGenerate(text, "Unknown");
-              }
-            }}
+            onSend={handleSend}
             isGenerating={isGenerating}
             onCancel={handleCancel}
             language={language}
@@ -547,7 +606,7 @@ export default function App() {
       {showScrollTop && (
         <button
           onClick={handleScrollTop}
-          className={`fixed bottom-[60px] right-[40px] z-[45] w-[36px] h-[36px] rounded-full bg-[var(--color-surface-elevated)] border border-[var(--color-border)] text-[var(--color-text-secondary)] hover:bg-[var(--color-border-subtle)] hover:text-[var(--color-text-primary)] flex items-center justify-center transition-all duration-200 no-print will-change-transform focus-visible:ring-2 focus-visible:ring-[var(--color-interactive)] focus-visible:outline-none`}
+          className={`fixed bottom-[60px] right-[40px] z-[45] w-[36px] h-[36px] rounded-full bg-[var(--color-surface-elevated)] border border-[var(--color-border)] text-[var(--color-text-secondary)] hover:bg-[var(--color-border-subtle)] hover:text-[var(--color-text-primary)] flex items-center justify-center transition-colors duration-200 no-print will-change-transform focus-visible:ring-2 focus-visible:ring-[var(--color-interactive)] focus-visible:outline-none`}
           aria-label={language === "en" ? "Scroll to top" : "Kembali ke atas"}
           title={language === "en" ? "Scroll to top" : "Kembali ke atas"}
         >
@@ -560,7 +619,7 @@ export default function App() {
         role="status"
         aria-live="polite"
         aria-atomic="true"
-        className={`fixed top-16 left-1/2 -translate-x-1/2 z-[100] transition-all duration-300 pointer-events-none no-print
+        className={`fixed top-16 left-1/2 -translate-x-1/2 z-[100] transition-[opacity,transform] duration-300 pointer-events-none no-print
           ${toastMessage ? "translate-y-0 opacity-100" : "-translate-y-4 opacity-0"}`
         }
       >
@@ -569,5 +628,6 @@ export default function App() {
         </div>
       </div>
     </div>
+    </ErrorBoundary>
   );
 }

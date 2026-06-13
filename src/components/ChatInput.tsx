@@ -65,7 +65,7 @@ export function ChatInput({
               type="button"
               onClick={onAttachClick}
               aria-label={language === "en" ? "Attach files" : "Lampirkan file"}
-              className={`absolute left-[10px] top-1/2 -translate-y-1/2 flex items-center justify-center w-[32px] h-[32px] rounded-[8px] transition-all duration-200 bg-transparent focus-visible:ring-2 focus-visible:ring-[var(--color-interactive)] focus-visible:outline-none ${
+              className={`absolute left-[10px] top-1/2 -translate-y-1/2 flex items-center justify-center min-w-[44px] min-h-[44px] rounded-md transition-opacity duration-200 bg-transparent focus-visible:ring-2 focus-visible:ring-[var(--color-interactive)] focus-visible:outline-none active:opacity-80 ${
                 hasFiles ? "text-[var(--color-text-primary)] bg-[var(--color-surface-elevated)]" : "text-[var(--color-text-muted)] hover:text-[var(--color-text-secondary)] hover:bg-[var(--color-surface-elevated)]"
               }`}
             >
@@ -84,7 +84,7 @@ export function ChatInput({
                 ? "Describe the product you want to build..."
                 : "Jelaskan produk yang ingin kamu bangun..."
             }
-            className="w-full bg-[var(--color-surface)] text-[var(--color-text-primary)] placeholder:text-[var(--color-text-muted)] outline-none resize-none min-h-[48px] max-h-[200px] font-mono text-[14px] border border-[#333333] focus:border-[var(--color-interactive)] rounded-[8px] p-3 pl-12 pr-[88px] transition-all duration-200"
+            className="w-full bg-[var(--color-surface)] text-[var(--color-text-primary)] placeholder:text-[var(--color-text-muted)] outline-none resize-none min-h-[48px] max-h-[200px] font-mono text-[14px] border border-[var(--color-border-subtle)] focus:border-[var(--color-interactive)] rounded-md p-3 pl-12 pr-[88px] transition-[border-color] duration-200"
             disabled={isGenerating}
             rows={1}
           />
@@ -94,7 +94,7 @@ export function ChatInput({
               <button
                 type="button"
                 onClick={onCancel}
-                className="flex items-center justify-center w-[36px] h-[36px] rounded-[8px] border border-[#8a3a3a] text-[#8a3a3a] hover:bg-[#8a3a3a] hover:text-white transition-all duration-200 focus-visible:ring-2 focus-visible:ring-[var(--color-interactive)] focus-visible:outline-none"
+                className="flex items-center justify-center w-[36px] h-[36px] rounded-md border border-[var(--color-error)] text-[var(--color-error)] hover:bg-[var(--color-error)] hover:text-white transition-[color,transform,opacity] duration-200 focus-visible:ring-2 focus-visible:ring-[var(--color-interactive)] focus-visible:outline-none active:scale-[0.97] active:opacity-80"
                 aria-label={language === "en" ? "Cancel" : "Batal"}
                 title={language === "en" ? "Cancel" : "Batal"}
               >
@@ -104,7 +104,7 @@ export function ChatInput({
             <button
               type="submit"
               disabled={!prompt.trim() || isGenerating}
-              className="flex items-center justify-center w-[36px] h-[36px] rounded-[8px] bg-[var(--color-text-primary)] text-[#111111] hover:bg-[#e5e5e5] disabled:opacity-30 disabled:cursor-not-allowed transition-all duration-200 focus-visible:ring-2 focus-visible:ring-[var(--color-interactive)] focus-visible:outline-none"
+              className="flex items-center justify-center w-[36px] h-[36px] rounded-md bg-[var(--color-text-primary)] text-[var(--color-bg)] hover:opacity-90 disabled:opacity-30 disabled:cursor-not-allowed transition-[opacity,transform] duration-200 focus-visible:ring-2 focus-visible:ring-[var(--color-interactive)] focus-visible:outline-none active:scale-[0.97] active:opacity-80"
               aria-label={language === "en" ? (isGenerating ? "Generating" : "Send") : (isGenerating ? "Menghasilkan" : "Kirim")}
               title={language === "en" ? "Generate" : "Buat PRD"}
             >
@@ -126,7 +126,7 @@ export function ChatInput({
                   key={qp.id}
                   type="button"
                   onClick={() => setPrompt(qp.text)}
-                  className="flex items-center justify-center gap-1.5 text-[11px] sm:text-[12px] px-2 py-1.5 border border-[var(--color-border)] rounded-[6px] bg-transparent text-[var(--color-text-secondary)] hover:bg-[var(--color-surface-elevated)] hover:border-[var(--color-text-muted)] hover:text-[var(--color-text-primary)] transition-all duration-200 whitespace-nowrap"
+                  className="flex items-center justify-center gap-1.5 text-[11px] sm:text-[12px] px-3 py-2 min-h-[36px] border border-[var(--color-border)] rounded-sm bg-transparent text-[var(--color-text-secondary)] hover:bg-[var(--color-surface-elevated)] hover:border-[var(--color-text-muted)] hover:text-[var(--color-text-primary)] transition-[color,border-color,transform] duration-200 whitespace-nowrap focus-visible:ring-2 focus-visible:ring-[var(--color-interactive)] focus-visible:outline-none active:scale-[0.97]"
                 >
                   <Icon size={14} strokeWidth={1.5} />
                   <span>{qp.label}</span>

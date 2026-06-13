@@ -36,12 +36,12 @@ export function Header({
           <button 
             onClick={onToggleSidebar}
             aria-label={language === "en" ? "Toggle sidebar" : "Buka/Tutup sidebar"}
-            className="text-[var(--color-text-secondary)] hover:text-[var(--color-text-primary)] transition-all duration-200 ease p-1.5 rounded-[6px] hover:bg-[var(--color-surface-elevated)] mr-2 focus-visible:ring-2 focus-visible:ring-[var(--color-interactive)] focus-visible:outline-none"
+            className="text-[var(--color-text-secondary)] hover:text-[var(--color-text-primary)] transition-[color,transform] duration-200 ease p-2 rounded-sm hover:bg-[var(--color-surface-elevated)] mr-2 focus-visible:ring-2 focus-visible:ring-[var(--color-interactive)] focus-visible:outline-none active:scale-[0.97]"
           >
             <PanelLeft size={18} strokeWidth={1.5} />
           </button>
         )}
-        <h1 className="text-[18px] sm:text-[18px] font-[600] tracking-[-0.02em] text-[var(--color-text-primary)]">
+        <h1 className="text-[18px] font-[600] tracking-[-0.02em] text-[var(--color-text-primary)]">
           PRD <span className="hidden sm:inline">Architect</span>
         </h1>
       </div>
@@ -52,8 +52,8 @@ export function Header({
             {/* Export buttons */}
             <button
                onClick={onCopy}
-               className="text-[var(--color-text-secondary)] hover:text-[var(--color-text-primary)] transition-all duration-200 ease py-1.5 px-2 flex items-center gap-1.5 text-[13px] font-medium rounded-[6px] hover:bg-[var(--color-surface-elevated)] focus-visible:ring-2 focus-visible:ring-[var(--color-interactive)] focus-visible:outline-none"
-               aria-label={language === "en" ? "Copy as Text" : "Salin Text"}
+               className="text-[var(--color-text-secondary)] hover:text-[var(--color-text-primary)] transition-[color,transform] duration-200 ease py-2 px-3 flex items-center gap-1.5 text-[13px] font-medium rounded-[6px] hover:bg-[var(--color-surface-elevated)] focus-visible:ring-2 focus-visible:ring-[var(--color-interactive)] focus-visible:outline-none active:scale-[0.97]"
+               aria-label={language === "en" ? "Copy" : "Salin"}
                title={language === "en" ? "Copy as Text" : "Salin Text"}
             >
               <Copy size={16} strokeWidth={1.5} />
@@ -63,7 +63,7 @@ export function Header({
             </button>
             <button
                onClick={onExportMd}
-               className="text-[var(--color-text-secondary)] hover:text-[var(--color-text-primary)] transition-all duration-200 ease py-1.5 px-2 flex items-center gap-1.5 text-[13px] font-medium rounded-[6px] hover:bg-[var(--color-surface-elevated)] focus-visible:ring-2 focus-visible:ring-[var(--color-interactive)] focus-visible:outline-none"
+               className="text-[var(--color-text-secondary)] hover:text-[var(--color-text-primary)] transition-[color,transform] duration-200 ease py-2 px-3 flex items-center gap-1.5 text-[13px] font-medium rounded-sm hover:bg-[var(--color-surface-elevated)] focus-visible:ring-2 focus-visible:ring-[var(--color-interactive)] focus-visible:outline-none active:scale-[0.97]"
                aria-label={language === "en" ? "Download Markdown" : "Unduh Markdown"}
                title={language === "en" ? "Download Markdown" : "Unduh Markdown"}
             >
@@ -72,7 +72,7 @@ export function Header({
             </button>
             <button
                onClick={onPrint}
-               className="text-[var(--color-text-secondary)] hover:text-[var(--color-text-primary)] transition-all duration-200 ease py-1.5 px-2 flex items-center gap-1.5 text-[13px] font-medium rounded-[6px] hover:bg-[var(--color-surface-elevated)] focus-visible:ring-2 focus-visible:ring-[var(--color-interactive)] focus-visible:outline-none"
+               className="text-[var(--color-text-secondary)] hover:text-[var(--color-text-primary)] transition-[color,transform] duration-200 ease py-2 px-3 flex items-center gap-1.5 text-[13px] font-medium rounded-sm hover:bg-[var(--color-surface-elevated)] focus-visible:ring-2 focus-visible:ring-[var(--color-interactive)] focus-visible:outline-none active:scale-[0.97]"
                aria-label={language === "en" ? "Print to PDF" : "Cetak PDF"}
                title={language === "en" ? "Print to PDF" : "Cetak PDF"}
             >
@@ -83,7 +83,7 @@ export function Header({
         )}
         <button
           onClick={onToggleLanguage}
-          className="text-[var(--color-text-secondary)] hover:text-[var(--color-text-primary)] transition-all duration-200 ease text-[13px] font-mono px-2 py-1.5 rounded-[6px] hover:bg-[var(--color-surface-elevated)] focus-visible:ring-2 focus-visible:ring-[var(--color-interactive)] focus-visible:outline-none"
+               className="text-[var(--color-text-secondary)] hover:text-[var(--color-text-primary)] transition-[color,transform] duration-200 ease text-[13px] font-mono px-3 py-2 min-h-[36px] rounded-sm hover:bg-[var(--color-surface-elevated)] focus-visible:ring-2 focus-visible:ring-[var(--color-interactive)] focus-visible:outline-none active:scale-[0.97]"
           aria-label={language === "en" ? "Toggle Language" : "Ganti Bahasa"}
           title={
             language === "en"
@@ -95,7 +95,7 @@ export function Header({
         </button>
         <button
           onClick={onOpenSettings}
-          className="text-[var(--color-text-secondary)] hover:text-[var(--color-text-primary)] transition-all duration-200 ease p-1.5 rounded-[6px] hover:bg-[var(--color-surface-elevated)] focus-visible:ring-2 focus-visible:ring-[var(--color-interactive)] focus-visible:outline-none"
+          className="text-[var(--color-text-secondary)] hover:text-[var(--color-text-primary)] transition-[color,transform] duration-200 ease p-2 rounded-sm hover:bg-[var(--color-surface-elevated)] focus-visible:ring-2 focus-visible:ring-[var(--color-interactive)] focus-visible:outline-none active:scale-[0.97]"
           aria-label={language === "en" ? "Settings" : "Pengaturan"}
           title={language === "en" ? "Settings" : "Pengaturan"}
         >

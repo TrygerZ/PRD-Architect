@@ -26,6 +26,7 @@ export const generatePRD = async (
     },
     body: JSON.stringify({
       prompt,
+      customApiKey,
       provider,
       model,
       language,

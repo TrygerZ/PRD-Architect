@@ -89,7 +89,7 @@ GEMINI_API_KEY=your_gemini_key
 ```
 
 **Method B: In-App UI**
-Click the **Settings (gear icon)** inside the app to paste your Custom API Key. This overrides environment variables and stores the key securely in your browser's local storage to be passed with your requests.
+Click the **Settings (gear icon)** inside the app to paste your Custom API Key. This stores the key in a secure httpOnly cookie via the backend, which will be used for subsequent API requests.
 
 ### 🏃‍♂️ Running the App
 

@@ -8,11 +8,28 @@
   --color-border: #2a2a2a;
   --color-text-primary: #f5f5f5;
   --color-text-secondary: #999999;
-  --color-text-muted: #767676;  /* sebelumnya #555555 — sekarang contrast 5.5:1 */
-  --color-interactive: #6666ff;
+  --color-text-muted: #888888;
+  --color-interactive: #7777ff;
   --color-interactive-hover: #8888ff;
   --color-interactive-subtle: rgba(102, 102, 255, 0.1);
   --color-border-subtle: #333333;
+
+  --color-error: #8a3a3a;
+  --color-error-hover: #a33a3a;
+  --color-error-bg: rgba(138, 58, 58, 0.1);
+  --color-warning: #8a7a2a;
+  --color-mode-business: #4466ff;
+  --color-mode-business-bg: #112233;
+  --color-mode-technical: #a855f7;
+  --color-mode-technical-bg: #221133;
+  --color-success: #22c55e;
+
+  --radius-sm: 6px;
+  --radius-md: 8px;
+  --radius-lg: 12px;
+
+  --ease-default: cubic-bezier(0.4, 0, 0.2, 1);
+  --shadow-fab: 0 4px 16px rgba(0, 0, 0, 0.4);
 
   --font-geist: 'Geist Sans', system-ui, -apple-system, sans-serif;
   --font-mono: 'Geist Mono', 'JetBrains Mono', monospace;
@@ -31,17 +48,8 @@
   }
   
   h1, h2, h3, h4, h5, h6 {
-    font-family: var(--font-geist);
     font-weight: 600;
   }
-}
-
-.panel,
-.card,
-.glass-panel {
-  background: var(--color-surface);
-  border: 1px solid var(--color-border);
-  border-radius: 8px;
 }
 
 /* Custom Scrollbar */
@@ -74,33 +82,6 @@ html {
   }
 }
 
-/* Cursor blink */
-@keyframes blink {
-  0%, 100% { border-color: transparent; }
-  50% { border-color: var(--color-text-muted); }
-}
-.animate-blink {
-  animation: blink 1s step-end infinite;
-}
-
-/* Typography Details */
-.anchor-link {
-  position: absolute;
-  left: -24px;
-  color: var(--color-text-muted);
-  font-family: var(--font-mono);
-  font-size: 14px;
-  opacity: 0;
-  transition: opacity 200ms ease, color 200ms ease;
-  text-decoration: none;
-}
-.group\/section:hover .anchor-link {
-  opacity: 1;
-}
-.group\/section:hover .anchor-link:hover {
-  color: var(--color-interactive);
-}
-
 /* Print Styles for PDF Export */
 @media print {
   body {
@@ -117,8 +98,5 @@ html {
   }
   .no-print {
     display: none !important;
-  }
-  .print-page-break {
-    page-break-after: always;
   }
 }

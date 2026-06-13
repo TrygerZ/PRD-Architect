@@ -119,22 +119,23 @@ export function ApiKeyModal({
   return (
     <AnimatePresence>
       {isOpen && (
-        <div className="fixed inset-0 z-[100] flex items-center justify-center bg-[var(--color-bg)]/80 p-4 print:hidden backdrop-blur-sm" onKeyDown={handleKeyDown}>
+        <div className="fixed inset-0 z-[100] flex items-center justify-center bg-[var(--color-bg)]/80 p-4 print:hidden backdrop-blur-sm" onKeyDown={handleKeyDown} onClick={onClose}>
           <motion.div
             initial={{ opacity: 0, scale: 0.95, y: 10 }}
             animate={{ opacity: 1, scale: 1, y: 0 }}
             exit={{ opacity: 0, scale: 0.95, y: 10 }}
             transition={{ duration: 0.2, ease: "easeOut" }}
-            className="w-full max-w-[480px] bg-[var(--color-surface)] p-8 border border-[var(--color-border)] rounded-[8px] shadow-2xl relative"
+            className="w-full max-w-[480px] bg-[var(--color-surface)] p-8 border border-[var(--color-border)] rounded-md shadow-2xl relative"
+            onClick={e => e.stopPropagation()}
           >
             <button
-              onClick={onClose}              aria-label={language === "en" ? "Close settings" : "Tutup pengaturan"}              className="absolute top-6 right-6 text-[var(--color-text-muted)] hover:text-[var(--color-text-primary)] transition-all duration-200 ease bg-transparent hover:bg-[var(--color-surface-elevated)] p-1.5 rounded-[6px]"
+              onClick={onClose}              aria-label={language === "en" ? "Close settings" : "Tutup pengaturan"}              className="absolute top-6 right-6 text-[var(--color-text-muted)] hover:text-[var(--color-text-primary)] transition-[color,transform] duration-200 ease bg-transparent hover:bg-[var(--color-surface-elevated)] p-2 rounded-sm active:scale-[0.97]"
             >
               <X size={20} strokeWidth={1.5} aria-hidden="true" />
             </button>
 
             <div className="flex items-center gap-3 mb-8 pb-4 border-b border-[var(--color-border)]">
-              <div className="w-[32px] h-[32px] rounded-[6px] bg-[var(--color-surface-elevated)] border border-[var(--color-border)] flex items-center justify-center">
+              <div className="w-[32px] h-[32px] rounded-sm bg-[var(--color-surface-elevated)] border border-[var(--color-border)] flex items-center justify-center">
                 <Key className="text-[var(--color-text-secondary)]" size={16} strokeWidth={1.5} />
               </div>
               <h2 className="text-[18px] font-semibold text-[var(--color-text-primary)]">
@@ -152,7 +153,7 @@ export function ApiKeyModal({
                     id="ai-provider"
                     value={provider}
                     onChange={(e) => handleProviderChange(e.target.value as AIProvider)}
-                    className="w-full bg-[var(--color-bg)] border border-[var(--color-border)] p-3 rounded-[6px] text-[var(--color-text-primary)] text-[13px] focus:border-[var(--color-interactive)] focus:outline-none transition-all duration-200 ease appearance-none pr-10"
+                    className="w-full bg-[var(--color-bg)] border border-[var(--color-border)] p-3 rounded-sm text-[var(--color-text-primary)] text-[13px] focus:border-[var(--color-interactive)] focus:outline-none transition-[border-color] duration-200 ease appearance-none pr-10"
                   >
                     <option value="gemini" className="bg-[var(--color-bg)]">Gemini</option>
                     <option value="deepseek" className="bg-[var(--color-bg)]">DeepSeek</option>
@@ -172,7 +173,7 @@ export function ApiKeyModal({
                     id="ai-model"
                     value={model}
                     onChange={(e) => setModel(e.target.value)}
-                    className="w-full bg-[var(--color-bg)] border border-[var(--color-border)] p-3 rounded-[6px] text-[var(--color-text-primary)] text-[13px] focus:border-[var(--color-interactive)] focus:outline-none transition-all duration-200 ease appearance-none pr-10"
+                    className="w-full bg-[var(--color-bg)] border border-[var(--color-border)] p-3 rounded-sm text-[var(--color-text-primary)] text-[13px] focus:border-[var(--color-interactive)] focus:outline-none transition-[border-color] duration-200 ease appearance-none pr-10"
                   >
                     {MODELS[provider].map((m) => (
                       <option key={m} value={m} className="bg-[var(--color-bg)]">
@@ -198,13 +199,13 @@ export function ApiKeyModal({
                   onChange={(e) => setApiKey(e.target.value)}
                   autoComplete="off"
                   placeholder={language === "en" ? "Optional. Leave blank to use app default..." : "Opsional. Kosongkan untuk bawaan sistem..."}
-                  className="w-full bg-[var(--color-bg)] border border-[var(--color-border)] p-3 rounded-[6px] text-[var(--color-text-primary)] font-mono text-[13px] focus:border-[var(--color-interactive)] focus:outline-none transition-all duration-200 ease placeholder:text-[var(--color-text-muted)]"
+                  className="w-full bg-[var(--color-bg)] border border-[var(--color-border)] p-3 rounded-sm text-[var(--color-text-primary)] font-mono text-[13px] focus:border-[var(--color-interactive)] focus:outline-none transition-[border-color] duration-200 ease placeholder:text-[var(--color-text-muted)]"
                 />
-                <div className="mt-3 bg-[var(--color-surface-elevated)] border border-[var(--color-border)] rounded-[6px] p-3 flex gap-2.5 items-start">
+                <div className="mt-3 bg-[var(--color-surface-elevated)] border border-[var(--color-border)] rounded-sm p-3 flex gap-2.5 items-start">
                   <AlertTriangle
                     size={14}
                     strokeWidth={1.5}
-                    className="shrink-0 mt-0.5 text-[#8a7a2a]"
+                    className="shrink-0 mt-0.5 text-[var(--color-warning)]"
                   />
                   <p className="text-[12px] text-[var(--color-text-secondary)] leading-relaxed">
                     {language === "en"
@@ -218,7 +219,7 @@ export function ApiKeyModal({
             <div className="flex justify-between items-center mt-8 pt-4 border-t border-[var(--color-border)]">
               <button
                 onClick={handleClear}
-                className="text-[13px] font-medium text-[var(--color-text-muted)] hover:text-[var(--color-text-primary)] bg-transparent hover:bg-[var(--color-surface-elevated)] transition-all duration-200 ease px-3 py-1.5 rounded-[6px]"
+                className="text-[13px] font-medium text-[var(--color-text-muted)] hover:text-[var(--color-text-primary)] bg-transparent hover:bg-[var(--color-surface-elevated)] transition-[color] duration-200 ease px-3 py-2 rounded-sm active:opacity-70"
                 title={language === "en" ? "Clear Key" : "Hapus Key"}
               >
                 {language === "en" ? "Clear Key" : "Hapus Key"}
@@ -228,7 +229,7 @@ export function ApiKeyModal({
                 ref={lastFocusableRef}
                 onClick={handleSave}
                 disabled={saved}
-                className="flex items-center gap-2 text-[13px] font-medium px-4 py-2 rounded-[6px] transition-all duration-200 ease bg-[var(--color-text-primary)] text-[var(--color-bg)] hover:bg-[var(--color-text-primary)] disabled:opacity-50 disabled:cursor-not-allowed"
+                className="flex items-center gap-2 text-[13px] font-medium px-4 py-2 min-h-[36px] rounded-sm transition-[color,transform,opacity] duration-200 ease bg-[var(--color-text-primary)] text-[var(--color-bg)] hover:bg-[var(--color-text-primary)] disabled:opacity-50 disabled:cursor-not-allowed active:scale-[0.97] active:opacity-80"
               >
                 {saved ? (
                   <>

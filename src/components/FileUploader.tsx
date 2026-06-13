@@ -13,7 +13,7 @@ import { UploadedFile } from "../types";
 
 interface FileUploaderProps {
   files: UploadedFile[];
-  onFilesChange: (files: UploadedFile[]) => void;
+  onFilesChange: React.Dispatch<React.SetStateAction<UploadedFile[]>>;
   language: "id" | "en";
 }
 
@@ -83,18 +83,33 @@ export function FileUploader({
     setIsUploading(true);
 
     try {
-      // Baca file: PDF via server-side parsing, non-PDF via FileReader client-side
+      // Baca file: binary formats (PDF, DOCX, XLSX, CSV) via server-side parsing,
+      // text files (MD, TXT) via FileReader client-side
+      const SERVER_SIDE_TYPES = [
+        'application/pdf',
+        'application/vnd.openxmlformats-officedocument.wordprocessingml.document', // DOCX
+        'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',       // XLSX
+        'application/vnd.ms-excel',                                                // XLS
+        'text/csv',
+      ];
+
       const localResults: UploadedFile[] = [];
       for (const file of validFiles) {
         let content: string;
 
-        if (file.type === 'application/pdf') {
-          // Upload PDF ke server untuk parsing teks dengan pdf-parse
+        const fileNameLower = file.name.toLowerCase();
+        const needsServer = SERVER_SIDE_TYPES.includes(file.type)
+          || fileNameLower.endsWith('.docx')
+          || fileNameLower.endsWith('.xlsx')
+          || fileNameLower.endsWith('.xls')
+          || fileNameLower.endsWith('.csv');
+
+        if (needsServer) {
+          // Upload binary file ke server untuk parsing teks
           const formData = new FormData();
           formData.append('files', file);
-          formData.append('language', language); // Kirim preferensi bahasa untuk error messages (BUG L5)
+          formData.append('language', language);
           try {
-            // P8 — AbortController untuk PDF upload fetch
             uploadAbortControllerRef.current?.abort();
             const uploadController = new AbortController();
             uploadAbortControllerRef.current = uploadController;
@@ -110,20 +125,24 @@ export function FileUploader({
             const results = await response.json();
             content = results[0]?.content || `[Error: Tidak ada konten dari ${file.name}]`;
           } catch (uploadErr: any) {
-            console.error(`Gagal parsing PDF ${file.name}:`, uploadErr);
-            content = `[Error parsing PDF ${file.name}: ${uploadErr.message}]`;
+            console.error(`Gagal parsing ${file.name}:`, uploadErr);
+            content = `[Error parsing ${file.name}: ${uploadErr.message}]`;
           }
-        } else {
-          // File non-PDF: baca secara client-side dengan FileReader
+        } else if (file.type.startsWith('image/')) {
+          // Image: baca sebagai data URL untuk ditampilkan
           content = await new Promise<string>((resolve) => {
             const reader = new FileReader();
             reader.onload = () => resolve(reader.result as string);
             reader.onerror = () => resolve(`[Error reading ${file.name}]`);
-            if (file.type.startsWith('image/')) {
-              reader.readAsDataURL(file);
-            } else {
-              reader.readAsText(file);
-            }
+            reader.readAsDataURL(file);
+          });
+        } else {
+          // Text files (.txt, .md): baca secara client-side dengan FileReader
+          content = await new Promise<string>((resolve) => {
+            const reader = new FileReader();
+            reader.onload = () => resolve(reader.result as string);
+            reader.onerror = () => resolve(`[Error reading ${file.name}]`);
+            reader.readAsText(file);
           });
         }
 
@@ -136,7 +155,7 @@ export function FileUploader({
           charCount: content.length,
         });
       }
-      onFilesChange([...files, ...localResults]);
+      onFilesChange(prev => [...prev, ...localResults]);
     } catch (err: any) {
       console.error("File Read Error:", err);
       setError(err.message || "An error occurred while reading files");
@@ -167,7 +186,7 @@ export function FileUploader({
   );
 
   const removeFile = (idToRemove: string) => {
-    onFilesChange(files.filter((f) => f.id !== idToRemove));
+    onFilesChange(prev => prev.filter((f) => f.id !== idToRemove));
   };
 
   const getFileIcon = (type: string) => {
@@ -185,9 +204,12 @@ export function FileUploader({
   return (
     <div className="w-full flex flex-col gap-4">
       <div
-        className={`w-full border border-dashed rounded-[8px] py-8 px-6 flex flex-col items-center justify-center transition-colors cursor-pointer
+        className={`w-full border border-dashed rounded-md py-8 px-6 flex flex-col items-center justify-center transition-colors cursor-pointer
           ${isDragging ? "border-[var(--color-text-primary)] bg-[var(--color-surface-elevated)]" : "border-[var(--color-border)] hover:border-[var(--color-text-secondary)] bg-transparent"}
           ${isUploading ? "opacity-50 pointer-events-none" : ""}`}
+        role="button"
+        tabIndex={0}
+        onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); fileInputRef.current?.click(); } }}
         onDragOver={onDragOver}
         onDragLeave={onDragLeave}
         onDrop={onDrop}
@@ -247,7 +269,7 @@ export function FileUploader({
                 animate={{ opacity: 1 }}
                 exit={{ opacity: 0 }}
                 transition={{ duration: 0.2 }}
-                className="flex items-center justify-between p-3 rounded-[6px] bg-[var(--color-surface)] border border-[var(--color-border)] group hover:border-[var(--color-border)] transition-colors"
+                className="flex items-center justify-between p-3 rounded-sm bg-[var(--color-surface)] border border-[var(--color-border)] group hover:border-[var(--color-border)] transition-colors"
               >
                 <div className="flex items-center gap-3 overflow-hidden">
                   {getFileIcon(file.type)}
@@ -270,7 +292,7 @@ export function FileUploader({
                     removeFile(file.id);
                   }}
                   aria-label={language === "en" ? "Remove file" : "Hapus file"}
-                  className="p-1.5 rounded-md hover:bg-[var(--color-surface-elevated)] text-[var(--color-text-muted)] hover:text-[#ef4444] transition-colors"
+                  className="p-1.5 rounded-md hover:bg-[var(--color-surface-elevated)] text-[var(--color-text-muted)] hover:text-[var(--color-error)] transition-colors active:scale-[0.97]"
                 >
                   <X className="w-4 h-4" strokeWidth={1.5} />
                 </button>
