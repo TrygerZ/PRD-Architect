@@ -1,6 +1,7 @@
 import { memo } from "react";
 import { FileText, MessageSquareText, X } from "lucide-react";
 import { PRDVersion } from "../types";
+import { formatDate } from "../utils/format";
 
 interface SidebarProps {
   versions: PRDVersion[];
@@ -21,15 +22,6 @@ export const Sidebar = memo(function Sidebar({
   isOpen,
   onClose,
 }: SidebarProps) {
-  const formatDate = (ts: number) => {
-    return new Date(ts).toLocaleString(language === "en" ? "en-US" : "id-ID", {
-      month: "short",
-      day: "numeric",
-      hour: "2-digit",
-      minute: "2-digit"
-    });
-  };
-
   return (
     <>
       {/* Mobile overlay */}
@@ -93,10 +85,10 @@ export const Sidebar = memo(function Sidebar({
                 {language === "en" ? `Version ${versions.length - i}` : `Versi ${versions.length - i}`}
               </div>
               <time dateTime={new Date(v.timestamp).toISOString()} className="text-[11px] text-[var(--color-text-muted)] font-mono mt-1">
-                {formatDate(v.timestamp)}
+                {formatDate(v.timestamp, language)}
               </time>
               <div className="text-[11px] text-[var(--color-text-muted)] mt-0.5 truncate">
-                {v.prompt ? (v.prompt.length > 60 ? v.prompt.slice(0, 60) + '...' : v.prompt) : (v.productType !== "Unknown" ? v.productType : "Draft")}
+                {v.prompt ? (v.prompt.length > 60 ? v.prompt.slice(0, 60) + '...' : v.prompt) : (v.productType !== "Unknown" ? v.productType : (language === "en" ? "Draft" : "Draf"))}
               </div>
             </button>
           ))}

@@ -1,4 +1,4 @@
-import { useState, useEffect, useRef } from "react";
+import { useState, useEffect, useRef, useCallback } from "react";
 import { Header } from "./components/Header";
 import { WelcomeScreen } from "./components/WelcomeScreen";
 import { ChatInput } from "./components/ChatInput";
@@ -8,83 +8,127 @@ import { generatePRD } from "./services/geminiService";
 import { ProductType, PRDVersion, UploadedFile, AIProvider, PRDMode } from "./types";
 import { ArrowUp } from "lucide-react";
 import { FileUploader } from "./components/FileUploader";
+import { safeGetLocalStorage, safeSetLocalStorage } from "./utils/storage";
+import { useSettings } from "./hooks/useSettings";
+import { useToast } from "./hooks/useToast";
+import { useScroll } from "./hooks/useScroll";
+import { useVersion } from "./hooks/useVersion";
 
 import { Sidebar } from "./components/Sidebar";
 
 export default function App() {
   const [isSettingsOpen, setIsSettingsOpen] = useState(false);
   const [customApiKey, setCustomApiKey] = useState("");
-  const [provider, setProvider] = useState<AIProvider>("deepseek");
-  const [model, setModel] = useState<string>("deepseek-v4-flash");
+  const { provider, model, persistSettings } = useSettings();
   const [isGenerating, setIsGenerating] = useState(false);
   const [productType, setProductType] = useState<ProductType>("Unknown");
   const [language, setLanguage] = useState<"id" | "en">("id");
-  const [showScrollTop, setShowScrollTop] = useState(false);
-  const [toastMessage, setToastMessage] = useState<string | null>(null);
+  const { showScrollTop, handleScroll: onContainerScroll } = useScroll();
+  const { toastMessage, showToast } = useToast();
 
   const [uploadedFiles, setUploadedFiles] = useState<UploadedFile[]>([]);
   const [showUploader, setShowUploader] = useState(false);
 
-  const [versions, setVersions] = useState<PRDVersion[]>([]);
-  const [activeVersionId, setActiveVersionId] = useState<string | null>(null);
-  const [comments, setComments] = useState<Record<string, string>>({});
+  const {
+    versions,
+    setVersions,
+    activeVersionId,
+    setActiveVersionId,
+    activeVersion,
+    comments,
+    setComments,
+    handleNewPRD: versionNewPRD,
+    handleSwitchVersion: versionSwitchVersion,
+    handleCommentChange: versionCommentChange,
+  } = useVersion();
 
   const [error, setError] = useState<string | null>(null);
 
   const [sidebarOpen, setSidebarOpen] = useState(false);
   const [currentPrompt, setCurrentPrompt] = useState("");
-  const [abortController, setAbortController] = useState<AbortController | null>(null);
+  const abortControllerRef = useRef<AbortController | null>(null);
   const [prdMode, setPrdMode] = useState<PRDMode>("business");
 
   const chatContainerRef = useRef<HTMLDivElement>(null);
+  const commentsRef = useRef(comments);
+  const languageRef = useRef(language);
+  const prdModeRef = useRef(prdMode);
 
   // Ref untuk menghindari stale closure — selalu merefleksikan activeVersion terbaru
   // saat handleAppend / handleRevise dipanggil setelah pergantian versi cepat
   const activeVersionRef = useRef(versions.find((v) => v.id === activeVersionId));
 
-  const handleCancel = () => {
-    abortController?.abort();
-    setAbortController(null);
+  const abortGeneration = useCallback(() => {
+    abortControllerRef.current?.abort();
+    abortControllerRef.current = null;
     setIsGenerating(false);
+  }, []);
+
+  const handleCancel = () => {
+    abortGeneration();
   };
 
-  const handleNewPRD = () => {
-    setActiveVersionId(null);
-    setComments({});
+  const handleNewPRD = useCallback(() => {
+    versionNewPRD(isGenerating, abortGeneration);
     setCurrentPrompt("");
     setUploadedFiles([]);
-    setVersions([]);
-  };
+  }, [versionNewPRD, isGenerating, abortGeneration]);
 
-  const showToast = (msg: string) => {
-    setToastMessage(msg);
-    setTimeout(() => setToastMessage(null), 3000);
-  };
+  // showToast now provided by useToast hook
 
+  // Load preferensi bahasa dari localStorage (default "id")
   useEffect(() => {
-    // Load API key dari local storage saat init
-    const stored = localStorage.getItem("PRD_CUSTOM_API_KEY");
-    if (stored) {
-      setCustomApiKey(stored);
-    }
-    const storedProv = localStorage.getItem("PRD_AI_PROVIDER") as AIProvider;
-    if (storedProv) {
-      setProvider(storedProv);
-    }
-    const storedModel = localStorage.getItem("PRD_AI_MODEL");
-    if (storedModel) {
-      setModel(storedModel);
-    }
-    // Load preferensi bahasa dari localStorage (default "id")
-    const storedLang = localStorage.getItem("PRD_LANGUAGE") as "id" | "en";
+    const storedLang = safeGetLocalStorage("PRD_LANGUAGE") as "id" | "en";
     if (storedLang === "id" || storedLang === "en") {
       setLanguage(storedLang);
     }
   }, []);
 
-  const activeVersion = versions.find((v) => v.id === activeVersionId);
+  // P4 — beforeunload: cegah kehilangan data saat user menutup tab
+  useEffect(() => {
+    const handler = (e: BeforeUnloadEvent) => {
+      if (isGenerating || versions.length > 0) {
+        e.preventDefault();
+        e.returnValue = ''; // Chrome requires this
+      }
+    };
+    window.addEventListener('beforeunload', handler);
+    return () => window.removeEventListener('beforeunload', handler);
+  }, [isGenerating, versions.length]);
+
+  // P6 — popstate guard: cegah back button meninggalkan app tanpa konfirmasi
+  useEffect(() => {
+    // Push initial state untuk mencegah back button meninggalkan app
+    if (window.history.length <= 1) {
+      window.history.pushState({ app: 'prd-architect' }, '', window.location.href);
+    }
+    
+    const handlePopState = (e: PopStateEvent) => {
+      // Jika user mencoba back dan ada data yang belum disimpan
+      if (isGenerating || versions.length > 0) {
+        const confirmLeave = window.confirm(
+          language === 'en' 
+            ? 'You have unsaved PRD content. Leave anyway?' 
+            : 'Anda memiliki konten PRD yang belum disimpan. Tetap tinggalkan?'
+        );
+        if (!confirmLeave) {
+          window.history.pushState({ app: 'prd-architect' }, '', window.location.href);
+        }
+      }
+    };
+    
+    window.addEventListener('popstate', handlePopState);
+    return () => window.removeEventListener('popstate', handlePopState);
+  }, [isGenerating, versions.length, language]);
+
+  // P6 — popstate guard continued
+  // ...
+
   // Selalu sinkronkan ref dengan activeVersion terbaru (untuk handleAppend/handleRevise)
   activeVersionRef.current = activeVersion;
+  commentsRef.current = comments;
+  languageRef.current = language;
+  prdModeRef.current = prdMode;
   const prdContent = activeVersion?.content || "";
   const hasMessage = !!activeVersionId || versions.length > 0;
   const userPrompt = activeVersion?.prompt || "";
@@ -93,7 +137,7 @@ export default function App() {
   // Helper executeGeneration — menghindari duplikasi kode ~70% di
   // handleGenerate, handleAppend, dan handleRevise (BUG L1)
   // ============================================================
-  const executeGeneration = async (
+  const executeGeneration = useCallback(async (
     finalPrompt: string,
     displayPrompt: string,
     mode: "initial" | "append" | "revision",
@@ -105,9 +149,9 @@ export default function App() {
     setError(null);
 
     // Batalkan controller sebelumnya jika masih aktif
-    abortController?.abort();
+    abortControllerRef.current?.abort();
     const controller = new AbortController();
-    setAbortController(controller);
+    abortControllerRef.current = controller;
 
     const newVersionId = Date.now().toString();
     const newVersion: PRDVersion = {
@@ -124,13 +168,15 @@ export default function App() {
     setVersions((prev) => [...prev, newVersion]);
     setActiveVersionId(newVersionId);
 
+    const lang = languageRef.current;
+
     try {
       await generatePRD(
         finalPrompt,
         customApiKey,
         provider,
         model,
-        language,
+        lang,
         productType,
         uploadedFiles,
         mode,
@@ -146,40 +192,43 @@ export default function App() {
       );
       // Jalankan callback setelah sukses (contoh: hapus komentar setelah revisi)
       onSuccess?.();
-    } catch (err: any) {
-      if (err.name === 'AbortError' || err.message === 'This operation was aborted') {
+    } catch (err: unknown) {
+      if (err instanceof Error && (err.name === 'AbortError' || err.message === 'This operation was aborted')) {
         // Biarkan output yang sudah ter-generate sebagian — jangan hapus
         return;
       }
+      const message = err instanceof Error ? err.message : undefined;
       setError(
-        err.message ||
-          (language === "en"
+        message ||
+          (lang === "en"
             ? "An unexpected error occurred during PRD generation."
             : "Terjadi kesalahan tidak terduga saat membuat PRD."),
       );
       console.error(err);
     } finally {
-      if (!controller.signal.aborted) {
-        setIsGenerating(false);
-      }
+      setIsGenerating(false);
+      abortControllerRef.current = null;
     }
-  };
+  }, [customApiKey, provider, model, uploadedFiles]);
 
-  const handleGenerate = async (prompt: string, type: ProductType = "Unknown") => {
+  const handleGenerate = useCallback(async (prompt: string, type: ProductType = "Unknown") => {
     setProductType(type);
     setComments({}); // reset komentar saat generate baru
-    await executeGeneration(prompt, prompt, "initial", type, prdMode);
-  };
+    await executeGeneration(prompt, prompt, "initial", type, prdModeRef.current);
+  }, [executeGeneration]);
 
-  const handleAppend = async (newPrompt: string) => {
+  const handleAppend = useCallback(async (newPrompt: string) => {
     // Gunakan ref untuk mendapatkan activeVersion terbaru (hindari stale closure)
     const currentActive = activeVersionRef.current;
+    const lang = languageRef.current;
     if (!currentActive) {
-      handleGenerate(newPrompt, "Unknown");
+      setProductType("Unknown");
+      setComments({});
+      await executeGeneration(newPrompt, newPrompt, "initial", "Unknown", prdModeRef.current);
       return;
     }
 
-    const appendPrompt = language === "en"
+    const appendPrompt = lang === "en"
       ? `I have an existing PRD. Please ADD the following to it:\n\n### EXISTING PRD:\n${currentActive.content}\n\n### ADDITIONAL REQUEST:\n${newPrompt}`
       : `Saya punya PRD yang sudah ada. Tolong TAMBAHKAN berikut:\n\n### PRD SAAT INI:\n${currentActive.content}\n\n### PERMINTAAN TAMBAHAN:\n${newPrompt}`;
 
@@ -190,20 +239,22 @@ export default function App() {
       currentActive.productType,
       currentActive.prdMode || "business",
     );
-  };
+  }, [executeGeneration]);
 
-  const handleRevise = async () => {
+  const handleRevise = useCallback(async () => {
     // Gunakan ref untuk mendapatkan activeVersion terbaru (hindari stale closure)
     const currentActive = activeVersionRef.current;
-    if (!currentActive || Object.keys(comments).length === 0) return;
+    const currentComments = commentsRef.current;
+    const lang = languageRef.current;
+    if (!currentActive || Object.keys(currentComments).length === 0) return;
 
     // Bangun prompt revisi dari komentar per bagian
     let revisionPrompt =
-      language === "en"
+      lang === "en"
         ? `I want to revise the current PRD based on specific feedback for certain sections.\n\n### Current PRD:\n${currentActive.content}\n\n### Revisions requested per section:\n`
         : `Saya ingin merevisi PRD saat ini berdasarkan feedback spesifik untuk beberapa bagian.\n\n### PRD Saat Ini:\n${currentActive.content}\n\n### Permintaan revisi per bagian:\n`;
 
-    Object.entries(comments).forEach(([sectionId, comment]) => {
+    Object.entries(currentComments).forEach(([sectionId, comment]) => {
       let sectionHeading = sectionId;
       const secIdx = parseInt(sectionId.split("_")[1], 10);
       if (!isNaN(secIdx)) {
@@ -214,22 +265,22 @@ export default function App() {
             .trim();
         }
       }
-      revisionPrompt += `- **${language === "en" ? "Section" : "Bagian"} "${sectionHeading}"**: ${comment}\n`;
+      revisionPrompt += `- **${lang === "en" ? "Section" : "Bagian"} "${sectionHeading}"**: ${comment}\n`;
     });
     revisionPrompt +=
-      language === "en"
+      lang === "en"
         ? `\nApply ONLY the revisions listed above. Keep ALL other sections exactly as they are — do not rewrite them.`
         : `\nTerapkan HANYA revisi yang disebutkan di atas. Biarkan SEMUA bagian lainnya persis seperti aslinya — jangan menulis ulang.`;
 
     await executeGeneration(
       revisionPrompt,
-      language === "en" ? "Revising PRD based on comments..." : "Merevisi PRD berdasarkan komentar...",
+      lang === "en" ? "Revising PRD based on comments..." : "Merevisi PRD berdasarkan komentar...",
       "revision",
       currentActive.productType,
       currentActive.prdMode || "business",
       () => setComments({}), // hapus komentar setelah revisi berhasil
     );
-  };
+  }, [executeGeneration]);
 
   const handleExportMd = () => {
     if (!prdContent) return;
@@ -242,14 +293,22 @@ export default function App() {
     URL.revokeObjectURL(url);
   };
 
-  const handleCopy = () => {
+  const handleCopy = async () => {
     if (!prdContent) return;
-    navigator.clipboard.writeText(prdContent);
-    showToast(
-      language === "en"
-        ? "PRD copied to clipboard!"
-        : "PRD disalin ke clipboard!"
-    );
+    try {
+      await navigator.clipboard.writeText(prdContent);
+      showToast(
+        language === "en"
+          ? "Copied to clipboard!"
+          : "Disalin ke clipboard!"
+      );
+    } catch {
+      showToast(
+        language === "en"
+          ? "Failed to copy. Please try again."
+          : "Gagal menyalin. Coba lagi."
+      );
+    }
   };
 
   const handlePrint = () => {
@@ -262,6 +321,14 @@ export default function App() {
             <head>
               <title>${productType} - PRD</title>
               <style>
+                :root {
+                  --color-bg: #ffffff;
+                  --color-surface: #fafafa;
+                  --color-text-primary: #111111;
+                  --color-text-secondary: #555555;
+                  --color-text-muted: #767676;
+                  --color-border: #dddddd;
+                }
                 body { 
                   font-family: 'Geist Sans', -apple-system, sans-serif; 
                   line-height: 1.6; 
@@ -329,24 +396,52 @@ export default function App() {
     }
   };
 
+  // === Stable Callback References (P1 — useCallback) ===
+  const handleOpenSettings = useCallback(() => setIsSettingsOpen(true), []);
+  const handleSettingsClose = useCallback(() => setIsSettingsOpen(false), []);
+  const handleSettingsSave = useCallback((key: string, p: AIProvider, m: string) => {
+    setCustomApiKey(key);
+    persistSettings(p, m);
+  }, [persistSettings]);
+  const handleToggleLanguage = useCallback(() => {
+    setLanguage((lang) => {
+      const newLang = lang === "id" ? "en" : "id";
+      safeSetLocalStorage("PRD_LANGUAGE", newLang);
+      return newLang;
+    });
+  }, []);
+  const handleToggleSidebar = useCallback(() => setSidebarOpen(prev => !prev), []);
+  const handleSidebarClose = useCallback(() => setSidebarOpen(false), []);
+  const handleSidebarSwitchVersion = useCallback((vid: string) => {
+    versionSwitchVersion(vid);
+  }, [versionSwitchVersion]);
+  const handleCommentChange = useCallback((secId: string, comment: string) => {
+    versionCommentChange(secId, comment);
+  }, [versionCommentChange]);
+  const handleBlueprintSwitchVersion = useCallback((vid: string) => {
+    versionSwitchVersion(vid);
+  }, [versionSwitchVersion]);
+  const handleQuickPrompt = useCallback((text: string) => {
+    setCurrentPrompt(text);
+    setTimeout(() => setCurrentPrompt(''), 100);
+  }, []);
+  const handleAttachClick = useCallback(() => setShowUploader(prev => !prev), []);
+  const handleScrollTop = useCallback(() => {
+    if (chatContainerRef.current) chatContainerRef.current.scrollTo({ top: 0, behavior: 'smooth' });
+  }, []);
+
   return (
     <div className="min-h-screen bg-[var(--color-bg)] flex flex-col font-geist">
       <Header
-        onOpenSettings={() => setIsSettingsOpen(true)}
+        onOpenSettings={handleOpenSettings}
         onExportMd={handleExportMd}
         onCopy={handleCopy}
         onPrint={handlePrint}
         hasData={prdContent.length > 0}
         language={language}
-        onToggleLanguage={() =>
-          setLanguage((lang) => {
-            const newLang = lang === "id" ? "en" : "id";
-            localStorage.setItem("PRD_LANGUAGE", newLang); // Persist ke localStorage
-            return newLang;
-          })
-        }
+        onToggleLanguage={handleToggleLanguage}
         minimal={!hasMessage}
-        onToggleSidebar={() => setSidebarOpen(!sidebarOpen)}
+        onToggleSidebar={handleToggleSidebar}
       />
 
       <div className="flex flex-1 pt-12 min-h-0 max-h-screen">
@@ -354,14 +449,11 @@ export default function App() {
         <Sidebar
           versions={versions}
           activeVersionId={activeVersionId}
-          onSwitchVersion={(vid) => {
-            setActiveVersionId(vid);
-            setComments({});
-          }}
+          onSwitchVersion={handleSidebarSwitchVersion}
           onNewPRD={handleNewPRD}
           language={language}
           isOpen={sidebarOpen}
-          onClose={() => setSidebarOpen(false)}
+          onClose={handleSidebarClose}
         />
 
         {/* Chat Area */}
@@ -370,7 +462,9 @@ export default function App() {
             ref={chatContainerRef}
             className="flex-1 overflow-y-auto px-4 sm:px-6 pb-[240px]" 
             id="chat-messages-container"
-            onScroll={(e) => setShowScrollTop(e.currentTarget.scrollTop > 500)}
+            aria-busy={isGenerating}
+            aria-live="polite"
+            onScroll={(e) => onContainerScroll(e.currentTarget.scrollTop)}
           >
             {showUploader && (
               <div className="max-w-[640px] mx-auto w-full mb-4 mt-4">
@@ -384,10 +478,7 @@ export default function App() {
             {!hasMessage ? (
               <WelcomeScreen 
                 language={language} 
-                onQuickPrompt={(text) => {
-                  setCurrentPrompt(text);
-                  setTimeout(() => setCurrentPrompt(''), 100);
-                }} 
+                onQuickPrompt={handleQuickPrompt} 
                 prdMode={prdMode}
                 onChangeMode={setPrdMode}
               />
@@ -411,19 +502,10 @@ export default function App() {
                   scrollContainerRef={chatContainerRef}
                   content={prdContent}
                   comments={comments}
-                  onCommentChange={(secId, comment) => {
-                    setComments((prev) => {
-                      const newCom = { ...prev, [secId]: comment };
-                      if (!comment) delete newCom[secId];
-                      return newCom;
-                    });
-                  }}
+                  onCommentChange={handleCommentChange}
                   versions={versions}
                   activeVersionId={activeVersionId}
-                  onSwitchVersion={(vid) => {
-                    setActiveVersionId(vid);
-                    setComments({});
-                  }}
+                  onSwitchVersion={handleBlueprintSwitchVersion}
                   onRevise={handleRevise}
                   isGenerating={isGenerating}
                   language={language}
@@ -444,7 +526,7 @@ export default function App() {
             isGenerating={isGenerating}
             onCancel={handleCancel}
             language={language}
-            onAttachClick={() => setShowUploader(!showUploader)}
+            onAttachClick={handleAttachClick}
             hasFiles={uploadedFiles.length > 0}
             initialPrompt={currentPrompt}
             showQuickPrompts={false}
@@ -454,12 +536,8 @@ export default function App() {
 
       <ApiKeyModal
         isOpen={isSettingsOpen}
-        onClose={() => setIsSettingsOpen(false)}
-        onSave={(key, p, m) => {
-          setCustomApiKey(key);
-          setProvider(p);
-          setModel(m);
-        }}
+        onClose={handleSettingsClose}
+        onSave={handleSettingsSave}
         language={language}
         initialProvider={provider}
         initialModel={model}
@@ -468,9 +546,7 @@ export default function App() {
       {/* Scroll to Top Button */}
       {showScrollTop && (
         <button
-          onClick={() => {
-            if (chatContainerRef.current) chatContainerRef.current.scrollTo({ top: 0, behavior: 'smooth' });
-          }}
+          onClick={handleScrollTop}
           className={`fixed bottom-[60px] right-[40px] z-[45] w-[36px] h-[36px] rounded-full bg-[var(--color-surface-elevated)] border border-[var(--color-border)] text-[var(--color-text-secondary)] hover:bg-[var(--color-border-subtle)] hover:text-[var(--color-text-primary)] flex items-center justify-center transition-all duration-200 no-print will-change-transform focus-visible:ring-2 focus-visible:ring-[var(--color-interactive)] focus-visible:outline-none`}
           aria-label={language === "en" ? "Scroll to top" : "Kembali ke atas"}
           title={language === "en" ? "Scroll to top" : "Kembali ke atas"}
@@ -481,6 +557,9 @@ export default function App() {
 
       {/* Toast Notification */}
       <div 
+        role="status"
+        aria-live="polite"
+        aria-atomic="true"
         className={`fixed top-16 left-1/2 -translate-x-1/2 z-[100] transition-all duration-300 pointer-events-none no-print
           ${toastMessage ? "translate-y-0 opacity-100" : "-translate-y-4 opacity-0"}`
         }

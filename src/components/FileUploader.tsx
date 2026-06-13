@@ -1,4 +1,4 @@
-import React, { useState, useRef, useCallback } from "react";
+import React, { useState, useRef, useEffect, useCallback } from "react";
 import {
   Upload,
   X,
@@ -29,6 +29,14 @@ export function FileUploader({
   const [isUploading, setIsUploading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
+  const uploadAbortControllerRef = useRef<AbortController | null>(null);
+
+  // P8 — cleanup AbortController on unmount
+  useEffect(() => {
+    return () => {
+      uploadAbortControllerRef.current?.abort();
+    };
+  }, []);
 
   const t = {
     dropHere:
@@ -86,9 +94,14 @@ export function FileUploader({
           formData.append('files', file);
           formData.append('language', language); // Kirim preferensi bahasa untuk error messages (BUG L5)
           try {
+            // P8 — AbortController untuk PDF upload fetch
+            uploadAbortControllerRef.current?.abort();
+            const uploadController = new AbortController();
+            uploadAbortControllerRef.current = uploadController;
             const response = await fetch('/api/upload-files', {
               method: 'POST',
               body: formData,
+              signal: uploadController.signal,
             });
             if (!response.ok) {
               const errData = await response.json().catch(() => ({}));

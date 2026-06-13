@@ -33,6 +33,7 @@ export function WelcomeScreen({ language, onQuickPrompt, prdMode, onChangeMode }
           <button 
             type="button"
             onClick={() => onChangeMode("business")}
+            aria-pressed={prdMode === "business"}
             className={`p-4 rounded-xl border flex flex-col gap-1 transition-all duration-300 ${
               prdMode === "business" 
                 ? "bg-[#112233]/40 border-[#4466ff] shadow-[0_0_15px_rgba(68,102,255,0.15)]" 
@@ -41,7 +42,7 @@ export function WelcomeScreen({ language, onQuickPrompt, prdMode, onChangeMode }
           >
             <span className={`text-[15px] font-semibold flex items-center justify-center gap-2 ${prdMode === "business" ? "text-white" : "text-[var(--color-text-secondary)]"}`}>
               <Briefcase className="w-4 h-4" />
-              Business & Investor Mode
+              {language === "en" ? "Business & Investor Mode" : "Mode Bisnis & Investor"}
             </span>
             <span className="text-[13px] text-[var(--color-text-secondary)]">
               {language === "en" ? "Focus on business metrics, ROI, and GTM roadmap" : "Fokus pada metrik bisnis, ROI, dan GTM roadmap"}
@@ -51,6 +52,7 @@ export function WelcomeScreen({ language, onQuickPrompt, prdMode, onChangeMode }
           <button 
             type="button"
             onClick={() => onChangeMode("technical")}
+            aria-pressed={prdMode === "technical"}
             className={`p-4 rounded-xl border flex flex-col gap-1 transition-all duration-300 ${
               prdMode === "technical" 
                 ? "bg-[#221133]/40 border-[#a855f7] shadow-[0_0_15px_rgba(168,85,247,0.15)]" 
@@ -59,7 +61,7 @@ export function WelcomeScreen({ language, onQuickPrompt, prdMode, onChangeMode }
           >
             <span className={`text-[15px] font-semibold flex items-center justify-center gap-2 ${prdMode === "technical" ? "text-white" : "text-[var(--color-text-secondary)]"}`}>
               <Code className="w-4 h-4" />
-              AI Agent & Developer Mode
+              {language === "en" ? "AI Agent & Developer Mode" : "Mode AI Agent & Developer"}
             </span>
             <span className="text-[13px] text-[var(--color-text-secondary)]">
               {language === "en" ? "Focus on database schemas, API payloads, and architecture" : "Fokus pada skema database, payload API, dan arsitektur"}

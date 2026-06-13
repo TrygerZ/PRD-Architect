@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 import { Key, X, Check, AlertTriangle } from "lucide-react";
 import { motion, AnimatePresence } from "motion/react";
 
@@ -26,6 +26,31 @@ export function ApiKeyModal({
   const [model, setModel] = useState<string>(initialModel);
   const [saved, setSaved] = useState(false);
 
+  const firstFocusableRef = useRef<HTMLInputElement>(null);
+  const lastFocusableRef = useRef<HTMLButtonElement>(null);
+
+  useEffect(() => {
+    if (isOpen) {
+      firstFocusableRef.current?.focus();
+    }
+  }, [isOpen]);
+
+  const handleKeyDown = (e: React.KeyboardEvent) => {
+    if (e.key === 'Escape') {
+      onClose();
+      return;
+    }
+    if (e.key === 'Tab') {
+      if (e.shiftKey && document.activeElement === firstFocusableRef.current) {
+        e.preventDefault();
+        lastFocusableRef.current?.focus();
+      } else if (!e.shiftKey && document.activeElement === lastFocusableRef.current) {
+        e.preventDefault();
+        firstFocusableRef.current?.focus();
+      }
+    }
+  };
+
   const MODELS: Record<AIProvider, string[]> = {
     deepseek: ["deepseek-v4-flash", "deepseek-v4-pro"],
     gemini: ["gemini-2.5-flash", "gemini-2.5-pro"]
@@ -33,10 +58,10 @@ export function ApiKeyModal({
 
   useEffect(() => {
     if (isOpen) {
-      const storedKey = localStorage.getItem("PRD_CUSTOM_API_KEY");
+      // API key disimpan di httpOnly cookie (tidak bisa dibaca JS) — tidak dibaca dari localStorage
       const storedProv = localStorage.getItem("PRD_AI_PROVIDER") as AIProvider;
       const storedModel = localStorage.getItem("PRD_AI_MODEL");
-      if (storedKey) setApiKey(storedKey);
+      setApiKey(""); // always start empty — key is in httpOnly cookie
       if (storedProv) setProvider(storedProv);
       else setProvider(initialProvider);
       if (storedModel) setModel(storedModel);
@@ -51,20 +76,42 @@ export function ApiKeyModal({
     setModel(MODELS[newProvider][0]);
   };
 
-  const handleSave = () => {
-    localStorage.setItem("PRD_CUSTOM_API_KEY", apiKey.trim());
-    localStorage.setItem("PRD_AI_PROVIDER", provider);
-    localStorage.setItem("PRD_AI_MODEL", model);
-    onSave(apiKey.trim(), provider, model);
-    setSaved(true);
-    setTimeout(() => {
-      onClose();
-    }, 1000);
+  const handleSave = async () => {
+    if (!apiKey.trim()) {
+      // If empty, just clear the key
+      await handleClear();
+      onSave("", provider, model);
+      return;
+    }
+    try {
+      await fetch("/api/auth/set-key", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ apiKey: apiKey.trim(), language }),
+      });
+      // Provider & model tetap di localStorage (bukan secret)
+      localStorage.setItem("PRD_AI_PROVIDER", provider);
+      localStorage.setItem("PRD_AI_MODEL", model);
+      onSave(apiKey.trim(), provider, model);
+      setSaved(true);
+      setTimeout(() => {
+        onClose();
+      }, 1000);
+    } catch (err) {
+      console.error("Failed to save API key:", err);
+      // Fallback: jika fetch gagal (misal offline), jangan close modal
+      alert(language === "en" 
+        ? "Failed to save API key. Please check your connection." 
+        : "Gagal menyimpan API key. Periksa koneksi Anda.");
+    }
   };
 
-  const handleClear = () => {
-    localStorage.removeItem("PRD_CUSTOM_API_KEY");
-    // We don't remove provider or model, just reset key
+  const handleClear = async () => {
+    try {
+      await fetch("/api/auth/clear-key", { method: "POST" });
+    } catch (err) {
+      console.error("Failed to clear API key:", err);
+    }
     setApiKey("");
     onSave("", provider, model);
   };
@@ -72,7 +119,7 @@ export function ApiKeyModal({
   return (
     <AnimatePresence>
       {isOpen && (
-        <div className="fixed inset-0 z-[100] flex items-center justify-center bg-[var(--color-bg)]/80 p-4 print:hidden backdrop-blur-sm">
+        <div className="fixed inset-0 z-[100] flex items-center justify-center bg-[var(--color-bg)]/80 p-4 print:hidden backdrop-blur-sm" onKeyDown={handleKeyDown}>
           <motion.div
             initial={{ opacity: 0, scale: 0.95, y: 10 }}
             animate={{ opacity: 1, scale: 1, y: 0 }}
@@ -81,10 +128,9 @@ export function ApiKeyModal({
             className="w-full max-w-[480px] bg-[var(--color-surface)] p-8 border border-[var(--color-border)] rounded-[8px] shadow-2xl relative"
           >
             <button
-              onClick={onClose}
-              className="absolute top-6 right-6 text-[var(--color-text-muted)] hover:text-[var(--color-text-primary)] transition-all duration-200 ease bg-transparent hover:bg-[var(--color-surface-elevated)] p-1.5 rounded-[6px]"
+              onClick={onClose}              aria-label={language === "en" ? "Close settings" : "Tutup pengaturan"}              className="absolute top-6 right-6 text-[var(--color-text-muted)] hover:text-[var(--color-text-primary)] transition-all duration-200 ease bg-transparent hover:bg-[var(--color-surface-elevated)] p-1.5 rounded-[6px]"
             >
-              <X size={20} strokeWidth={1.5} />
+              <X size={20} strokeWidth={1.5} aria-hidden="true" />
             </button>
 
             <div className="flex items-center gap-3 mb-8 pb-4 border-b border-[var(--color-border)]">
@@ -142,9 +188,10 @@ export function ApiKeyModal({
 
               <div className="mb-8">
                 <label htmlFor="custom-api-key" className="block text-[13px] font-medium text-[var(--color-text-secondary)] mb-2">
-                  {language === "en" ? "Custom API Key" : "Custom API Key"}
+                  {language === "en" ? "Custom API Key" : "API Key Kustom"}
                 </label>
                 <input
+                  ref={firstFocusableRef}
                   id="custom-api-key"
                   type="password"
                   value={apiKey}
@@ -161,8 +208,8 @@ export function ApiKeyModal({
                   />
                   <p className="text-[12px] text-[var(--color-text-secondary)] leading-relaxed">
                     {language === "en"
-                      ? "Overrides the system default key. Your key is stored securely in your browser's local storage."
-                      : "Berlaku untuk provider di atas dan menggantikan key sistem. Tersimpan secara lokal di browser kamu."}
+                      ? "Overrides the system default key. Your key is stored in a secure httpOnly cookie (inaccessible to JavaScript)."
+                      : "Berlaku untuk provider di atas dan menggantikan key sistem. Key Anda disimpan di cookie httpOnly yang aman (tidak bisa diakses JavaScript)."}
                   </p>
                 </div>
               </div>
@@ -178,6 +225,7 @@ export function ApiKeyModal({
               </button>
 
               <button
+                ref={lastFocusableRef}
                 onClick={handleSave}
                 disabled={saved}
                 className="flex items-center gap-2 text-[13px] font-medium px-4 py-2 rounded-[6px] transition-all duration-200 ease bg-[var(--color-text-primary)] text-[var(--color-bg)] hover:bg-[var(--color-text-primary)] disabled:opacity-50 disabled:cursor-not-allowed"

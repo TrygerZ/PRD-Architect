@@ -35,7 +35,7 @@ export function Header({
         {onToggleSidebar && (
           <button 
             onClick={onToggleSidebar}
-            aria-label="Toggle Sidebar"
+            aria-label={language === "en" ? "Toggle sidebar" : "Buka/Tutup sidebar"}
             className="text-[var(--color-text-secondary)] hover:text-[var(--color-text-primary)] transition-all duration-200 ease p-1.5 rounded-[6px] hover:bg-[var(--color-surface-elevated)] mr-2 focus-visible:ring-2 focus-visible:ring-[var(--color-interactive)] focus-visible:outline-none"
           >
             <PanelLeft size={18} strokeWidth={1.5} />

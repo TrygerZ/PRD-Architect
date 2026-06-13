@@ -41,12 +41,13 @@ export class ErrorBoundary extends Component<ErrorBoundaryProps, ErrorBoundarySt
 
   render(): ReactNode {
     if (this.state.hasError) {
-      const isEn = this.props.language === "en";
+      const storedLang = (typeof window !== 'undefined' && localStorage.getItem("PRD_LANGUAGE")) as "id" | "en";
+      const isEn = this.props.language === "en" || (!this.props.language && storedLang !== "id");
       return (
         <div className="min-h-screen bg-[var(--color-bg)] flex items-center justify-center p-6">
           <div className="max-w-md w-full bg-[var(--color-surface)] border border-[var(--color-border)] rounded-[8px] p-8 text-center">
             <div className="w-12 h-12 rounded-full bg-[#8a3a3a] flex items-center justify-center mx-auto mb-4">
-              <span className="text-white text-xl font-bold">!</span>
+              <span className="text-white text-xl font-bold" aria-hidden="true">!</span>
             </div>
             <h2 className="text-xl font-semibold text-[var(--color-text-primary)] mb-2">
               {isEn ? "Something went wrong" : "Terjadi Kesalahan"}

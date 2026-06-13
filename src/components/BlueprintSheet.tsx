@@ -1,4 +1,4 @@
-import { useState, useEffect, memo } from "react";
+import { useState, useEffect, memo, useCallback, useMemo } from "react";
 import ReactMarkdown from "react-markdown";
 import remarkGfm from "remark-gfm";
 import {
@@ -10,6 +10,7 @@ import {
   ClipboardCopy
 } from "lucide-react";
 import { PRDVersion } from "../types";
+import { formatDate } from "../utils/format";
 
 interface BlueprintSheetProps {
   content: string; // active version content
@@ -82,7 +83,7 @@ export const BlueprintSheet = memo(function BlueprintSheet({
   language,
   scrollContainerRef,
 }: BlueprintSheetProps) {
-  const sections = getSections(content);
+  const sections = useMemo(() => getSections(content), [content]);
   const totalComments = Object.values(comments).filter(
     (c) => c.trim().length > 0,
   ).length;
@@ -106,27 +107,22 @@ export const BlueprintSheet = memo(function BlueprintSheet({
   const activeVersion = versions.find(v => v.id === activeVersionId) || versions[versions.length - 1];
   const activeVersionIndex = activeVersion ? versions.findIndex(v => v.id === activeVersion.id) : 0;
   
-  const formatDate = (ts: number) => {
-    return new Date(ts).toLocaleString(language === "en" ? "en-US" : "id-ID", {
-      month: "short",
-      day: "numeric",
-      hour: "2-digit",
-      minute: "2-digit"
-    });
-  };
-
   const totalSections = sections.length;
   // Show content completeness: 100% when done, indeterminate while generating
   const isComplete = content.length > 0 && !isGenerating;
   const showProgress = content.length > 0;
   const progress = isComplete ? 100 : (isGenerating && content.length > 0 ? 75 : 0);
 
-  const toggleSection = (sectionId: string) => {
+  const handleToggleCollapse = useCallback((sectionId: string) => {
     setCollapsedStates(prev => ({
       ...prev,
       [sectionId]: !prev[sectionId]
     }));
-  };
+  }, []);
+
+  const handleOpenFeedback = useCallback(() => {
+    setIsFeedbackDrawerOpen(true);
+  }, []);
 
   return (
     <div className="w-full mx-auto relative z-10 print:block print:w-full print:max-w-full print:bg-white print:text-black">
@@ -208,7 +204,7 @@ export const BlueprintSheet = memo(function BlueprintSheet({
             <div className="flex items-center gap-2">
               <GitBranch size={14} strokeWidth={1.5} className="text-[var(--color-text-muted)]" />
               <span className="text-[13px] text-[var(--color-text-secondary)]">Version {activeVersionIndex + 1}</span>
-              <time dateTime={new Date(activeVersion.timestamp).toISOString()} className="text-[11px] font-mono text-[var(--color-text-muted)]">{formatDate(activeVersion.timestamp)}</time>
+              <time dateTime={new Date(activeVersion.timestamp).toISOString()} className="text-[11px] font-mono text-[var(--color-text-muted)]">{formatDate(activeVersion.timestamp, language)}</time>
             </div>
             <div className="flex items-center gap-2">
               <select 
@@ -226,7 +222,14 @@ export const BlueprintSheet = memo(function BlueprintSheet({
           {/* Progress Bar Header */}
           {showProgress && totalSections > 0 && (
             <div className="flex items-center gap-4 px-1 mb-6">
-              <div className="flex-1 h-[2px] bg-[var(--color-border)] rounded overflow-hidden">
+              <div
+                className="flex-1 h-[2px] bg-[var(--color-border)] rounded overflow-hidden"
+                role="progressbar"
+                aria-valuenow={progress}
+                aria-valuemin={0}
+                aria-valuemax={100}
+                aria-label={isGenerating ? (language === "en" ? "Generating PRD..." : "Membuat PRD...") : (language === "en" ? "PRD Complete" : "PRD Selesai")}
+              >
                 <div className={`h-full bg-[var(--color-interactive)] transition-all duration-300 ${isGenerating ? 'animate-pulse' : ''}`} style={{width: `${progress}%`}} />
               </div>
               <span className="text-[11px] font-mono text-[var(--color-text-muted)] whitespace-nowrap">
@@ -243,7 +246,7 @@ export const BlueprintSheet = memo(function BlueprintSheet({
       ) : (
         <div className="space-y-0" data-prd-content="true">
           {sections.map((section, index) => {
-            const sectionId = `sec_${index}`;
+            const sectionId = `sec_${section.heading.substring(0, 30).replace(/[^a-zA-Z0-9]/g, '_')}_${index}`;
             return (
               <SheetSection
                 key={sectionId}
@@ -252,10 +255,10 @@ export const BlueprintSheet = memo(function BlueprintSheet({
                 index={index}
                 total={sections.length}
                 isCollapsed={collapsedStates[sectionId] || false}
-                onToggleCollapse={() => toggleSection(sectionId)}
+                onToggleCollapse={handleToggleCollapse}
                 isGenerating={isGenerating}
                 language={language}
-                onOpenFeedback={() => setIsFeedbackDrawerOpen(true)}
+                onOpenFeedback={handleOpenFeedback}
               />
             );
           })}
@@ -281,14 +284,18 @@ const SheetSection = memo(function SheetSection({
   index: number;
   total: number;
   isCollapsed: boolean;
-  onToggleCollapse: () => void;
+  onToggleCollapse: (sectionId: string) => void;
   isGenerating?: boolean;
   language: "id" | "en";
   onOpenFeedback: () => void;
 }) {
   
-  const copySection = () => {
-    navigator.clipboard.writeText(section.heading + "\n\n" + section.content);
+  const copySection = async () => {
+    try {
+      await navigator.clipboard.writeText(section.heading + "\n\n" + section.content);
+    } catch {
+      // Clipboard write failed — silently ignore in section context
+    }
   };
 
   return (
@@ -296,10 +303,10 @@ const SheetSection = memo(function SheetSection({
       {/* Header — click to collapse */}
       <div 
         className={`flex items-center justify-between px-5 py-4 border-b border-[var(--color-border)] cursor-pointer select-none transition-colors no-print ${isCollapsed ? 'bg-[var(--color-surface)] hover:bg-[var(--color-surface-elevated)]' : 'bg-[var(--color-surface-elevated)] hover:bg-[var(--color-surface-elevated)]'}`}
-        onClick={onToggleCollapse}
+        onClick={() => onToggleCollapse(sectionId)}
         role="button"
         tabIndex={0}
-        onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); onToggleCollapse(); } }}
+        onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); onToggleCollapse(sectionId); } }}
         aria-expanded={!isCollapsed}
         aria-controls={`section-content-${sectionId}`}
       >
@@ -335,6 +342,11 @@ const SheetSection = memo(function SheetSection({
             <ReactMarkdown
               remarkPlugins={[remarkGfm]}
               components={{
+                a: ({ href, children, ...props }: any) => (
+                  <a href={href} target="_blank" rel="noreferrer noopener" {...props}>
+                    {children}
+                  </a>
+                ),
                 h2: () => null, // h2 is already displayed in the card header
                 h3: ({node, children, ...props}) => (
                   <h3 className="relative group/h3" {...props}>
@@ -407,9 +419,9 @@ const SheetSection = memo(function SheetSection({
           <button 
             className="text-[12px] text-[var(--color-text-muted)] hover:text-[var(--color-text-secondary)] transition-colors flex items-center gap-1.5 focus-visible:ring-2 focus-visible:ring-[var(--color-interactive)] focus-visible:outline-none"
             onClick={onOpenFeedback}
-            aria-label="Feedback"
+            aria-label={language === "en" ? "Open feedback" : "Buka umpan balik"}
           >
-            <MessageSquareText size={14} strokeWidth={1.5} /> Feedback
+            <MessageSquareText size={14} strokeWidth={1.5} /> {language === "en" ? "Feedback" : "Umpan Balik"}
           </button>
         </div>
       </div>
