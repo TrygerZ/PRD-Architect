@@ -11,6 +11,7 @@ import {
 } from "lucide-react";
 import { PRDVersion } from "../types";
 import { formatDate } from "../utils/format";
+import { MermaidRenderer } from "./MermaidRenderer";
 
 interface BlueprintSheetProps {
   content: string; // active version content
@@ -385,6 +386,11 @@ const SheetSection = memo(function SheetSection({
                 ),
                 code: ({ node, className, children, ...props }: { node?: unknown; className?: string; children?: React.ReactNode }) => {
                   const match = /language-(\w+)/.exec(className || "");
+                  // Mermaid diagram rendering
+                  if (match?.[1] === "mermaid") {
+                    const chartStr = String(children).replace(/\n$/, "");
+                    return <MermaidRenderer chart={chartStr} />;
+                  }
                   const isInline = !match && !String(children).includes("\n");
                   if (isInline) {
                     return (

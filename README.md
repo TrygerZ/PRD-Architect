@@ -27,14 +27,17 @@
 
 **PRD Architect** is a modern, full-stack application designed to dramatically accelerate the product planning phase. By taking a simple product idea as input, it automatically generates a highly structured, enterprise-grade Product Requirements Document (PRD) or Technical Specification Document.
 
-It features a **Dual-Mode** generation engine:
-- **💼 Business & Investor Mode (12 Chapters)**: Focuses on TAM/SAM/SOM, MoSCoW scoping, financial KPIs, competitor analysis, Risk mitigation, and 12-week roadmap.
-- **💻 Technical & AI Agent Mode (9 Chapters)**: Focuses strictly on Data Models (ORM), API Contracts (JSON payloads), Frontend Component Architecture, Error Handling, Edge Cases, and AI Agent Implementation Guidelines.
+It features a **Dual-Mode** generation engine, each with comprehensively enhanced chapters:
+- **💼 Business & Investor Mode (12 Chapters)**: Covers Stakeholder Analysis, Problem Statement, Assumptions & Constraints, Non-Goals, TAM/SAM/SOM, MoSCoW scoping, Enhanced User Stories (Given/When/Then format + Epic hierarchy), Classified NFRs (Performance/Scalability/Security/Usability/Availability), Baseline-backed KPIs, GTM Strategy, Risk Register with scoring, 12-week roadmap, and Regulatory Compliance.
+- **💻 Technical & AI Agent Mode (9 Chapters)**: Covers System Context Diagram, Alternatives Considered, Non-Goals, Data Models with ERD, API Contracts with full Error Responses (400/401/403/404/409/500), Frontend Architecture with Data Flow Diagrams, Testing Pyramid Strategy, Classified NFRs, Retry Strategy with exponential backoff, and AI Agent Implementation Guidelines with structured templates.
 
 ## ✨ Features
 
 - 🌓 **Dual-Mode Generation**: Clean toggle between high-level Business/Investor strategies and deep Technical specifications.
-- 🧠 **Bring Your Own Model (BYOM)**: Seamlessly switch between AI providers (DeepSeek, Gemini, including DeepSeek Reasoner) and select specific models via the in-app Settings UI.
+- 🧠 **Bring Your Own Model (BYOM)**: Seamlessly switch between AI providers (DeepSeek, Gemini, **OpenCode Zen**) and select specific models via the in-app Settings UI.
+- 🆓 **Free AI Models**: OpenCode Zen provides 5 free models (deepseek-v4-flash-free, nemotron-3-ultra-free, mimo-v2.5-free, north-mini-code-free, big-pickle) — no credit card required.
+- 📊 **Live Mermaid Diagrams**: Generated PRDs include rich, interactive diagrams rendered in real-time — System Context (graph), Entity Relationships (ERD), User Journeys (journey), Gantt Roadmaps (gantt), and Data Flows (sequenceDiagram).
+- 🛡️ **Auto-Sanitized Mermaid Syntax**: AI-generated diagram syntax is automatically fixed (parentheses in labels, commas, edge labels) ensuring diagrams always render without errors.
 - ⚡ **Highly Stable Real-time Streaming**: Built with robust connection handling that supports infinite generation times—perfect for deep reasoning models (R1) without arbitrary timeouts.
 - 📏 **Precision Markdown Parsing**: Accurately segregates and renders complex Markdown documents in the UI purely based on primary chapter headings.
 - 💬 **Interactive Revisions**: Leave feedback on the generated document to incrementally refine and polish the PRD, complete with a version control system to switch between generation attempts.
@@ -45,10 +48,10 @@ It features a **Dual-Mode** generation engine:
 
 ## 🛠️ Tech Stack
 
-- **Frontend**: React 19, Vite, Tailwind CSS v4, Lucide React (Icons), React Markdown
+- **Frontend**: React 19, Vite, Tailwind CSS v4, Lucide React (Icons), React Markdown, **Mermaid.js** (diagram rendering)
 - **Backend**: Node.js, Express.js
 - **Tooling**: TypeScript, esbuild
-- **Integration**: Native fetch API for OpenAI-compatible streaming (DeepSeek) and Gemini API.
+- **Integration**: Native fetch API for OpenAI-compatible streaming — supports **DeepSeek**, **Gemini**, and **OpenCode Zen** (including 5 free models).
 
 ## 🚀 Getting Started
 
@@ -74,7 +77,7 @@ It features a **Dual-Mode** generation engine:
 
 ### ⚙️ Configuration
 
-You can fully customize the AI provider and model directly from the application's **Settings (gear icon)** within the UI. You can choose from **DeepSeek and Gemini** and specify exact models (e.g., `deepseek-v4-flash`, `gemini-2.5-pro`).
+You can fully customize the AI provider and model directly from the application's **Settings (gear icon)** within the UI. You can choose from **DeepSeek**, **Gemini**, or **OpenCode Zen** (5 free models) and specify exact models (e.g., `deepseek-v4-flash`, `gemini-2.5-pro`, `deepseek-v4-flash-free`).
 
 #### API Key Setup
 
@@ -86,6 +89,7 @@ Create a `.env` file in the root of the project to set default values for the ba
 ```env
 DEEPSEEK_API_KEY=your_deepseek_key
 GEMINI_API_KEY=your_gemini_key
+OPENCODE_API_KEY=your_opencode_key
 ```
 
 **Method B: In-App UI**

@@ -86,6 +86,7 @@ app.use(helmet({
         "'self'",
         "https://api.deepseek.com",
         "https://generativelanguage.googleapis.com",
+        "https://opencode.ai",
       ],
       fontSrc: ["'self'"],
       objectSrc: ["'none'"],
@@ -364,14 +365,23 @@ ${isEn ?
 "## 1. Executive Summary & Value Proposition\n## 2. Problem Definition & Market Analysis (TAM/SAM/SOM, Competitors)\n## 3. Solution Overview & Scope (MoSCoW)\n## 4. User Stories & Acceptance Criteria\n## 5. UX Design, User Journey & Wireframe Flow\n## 6. High-Level Technical Architecture\n## 7. Non-Functional Requirements\n## 8. Success Metrics, Business KPIs (MRR, Churn)\n## 9. Go-to-Market (GTM) Strategy & Monetization\n## 10. Risk Register & Mitigation\n## 11. Project Timeline & 12-Week Roadmap\n## 12. Regulatory & Compliance" : 
 "## 1. Executive Summary & Value Proposition (Ringkasan Eksekutif & Proposisi Nilai)\n## 2. Problem Definition & Market Analysis (TAM/SAM/SOM, Kompetitor)\n## 3. Solution Overview & Scope (MoSCoW)\n## 4. User Stories & Acceptance Criteria\n## 5. UX Design, User Journey & Wireframe Flow (Desain UX & Alur)\n## 6. High-Level Technical Architecture (Arsitektur Teknis Level Atas)\n## 7. Non-Functional Requirements (Kebutuhan Non-Fungsional)\n## 8. Success Metrics, Business KPIs (Metrik Keberhasilan & KPI Bisnis)\n## 9. Go-to-Market (GTM) Strategy & Monetization (Strategi GTM & Monetisasi)\n## 10. Risk Register & Mitigation (Daftar Risiko & Mitigasi)\n## 11. Project Timeline & 12-Week Roadmap (Linimasa Proyek & Peta Jalan 12 Minggu)\n## 12. Regulatory & Compliance (Kepatuhan & Regulasi)"}
 CHAPTER CONSTRAINTS:
-- Ch 2: Provide exactly 5 specific problems, a concrete Competitor analysis (min 3 real/hypothetical competitors), and an estimated TAM/SAM/SOM breakdown.
-- Ch 3: Group features clearly by Must-have, Should-have, Could-have, Won't-have (MoSCoW).
-- Ch 4: Use a bulleted list format. Create EXACTLY 3 personas, each with 2 stories (6 total). Add a markdown separator (---) between stories.
+- Ch 1: Include a Stakeholder Analysis table mapping key stakeholders, their roles, interests, influence level (High/Medium/Low), and engagement strategy.
+- Ch 2: Provide exactly 5 specific problems, a concrete Competitor analysis (min 3 real/hypothetical competitors), and an estimated TAM/SAM/SOM breakdown. Start with a formal Problem Statement (one sentence: "[Target user] needs [need] because [insight]."). Also include an Assumptions & Constraints table with columns: Assumption, Impact if Wrong, Validation Plan — covering technology assumptions, business assumptions, and user behavior assumptions.
+- Ch 3: Group features clearly by Must-have, Should-have, Could-have, Won't-have (MoSCoW). After MoSCoW, add a "Non-Goals / Out of Scope" subsection explicitly listing what is intentionally NOT being built in this phase, with a brief rationale for each.
+- Ch 4: Use a structured table format with columns: ID, Persona, User Story, Priority (Must/Should/Could), Acceptance Criteria (in Given/When/Then format), Effort Estimate. Create EXACTLY 3 personas, each with 2 stories (6 total). Add a markdown separator (---) between stories. Include an Epic hierarchy overview before the stories.
+- Ch 5: Include a User Journey diagram using Mermaid journey syntax (\`\`\`mermaid journey) mapping the user's complete flow from discovery to retention, highlighting pain points and opportunities.
 - Ch 6: Include an API Design Table (Endpoint, Method, Description, Request, Response). Minimum 5 endpoints.
-- Ch 7: Provide exact numbers (e.g. "99.99% Uptime", "< 200ms Latency").
-- Ch 8 & Ch 9 & Ch 10: MUST use Markdown Tables to structure the financial KPIs, GTM ROI estimates, and Risk Mitigation.
+- Ch 7: Provide exact numbers (e.g. "99.99% Uptime", "< 200ms Latency"). Classify NFRs into clear sub-categories: Performance, Scalability, Security, Usability, Availability. For each, include the Measurement Method and Target Value in a table.
+- Ch 8 & Ch 9 & Ch 10: MUST use Markdown Tables to structure the financial KPIs (include Baseline and Target columns), GTM ROI estimates, and Risk Mitigation (include Probability, Impact, Risk Score columns).
+- Ch 11: Include a Gantt chart using Mermaid gantt syntax (\`\`\`mermaid gantt) showing the full 12-week roadmap with weekly sprints, milestones, dependencies, and key deliverables.
 LANGUAGE REQUIREMENT:
 Generate the entire document strictly in ${isEn ? 'English' : 'Indonesian'}.
+MERMAID DIAGRAM RULES (CRITICAL - READ ALL):
+- NEVER use parentheses () in EDGE LABELS (text between pipes |...|). Parentheses inside |...| will crash the parser. Example: WRONG → |Mengirim Data (REST/GraphQL)|. Instead write: |Mengirim Data REST- GraphQL| (remove parens or use dashes/brackets).
+- For NODE LABELS in graph/flowchart: ALWAYS wrap labels containing parentheses, commas, or special characters in double quotes. Example: A["User (Logged In)"] instead of A[User (Logged In)].
+- For journey: use "Title: Task" format as required by Mermaid journey syntax.
+- For gantt: ensure date formats use YYYY-MM-DD and section titles are plain text.
+- Always test mentally: if a label contains any character other than letters, numbers, spaces, and dashes, wrap it in double quotes.
 ${extraPrompt ? '\nAdditional Context from User:\n' + extraPrompt : ''}`;
   } else {
     // TECHNICAL MODE
@@ -387,15 +397,23 @@ ${isEn ?
 "## 1. Project Technical Overview & Core Objective\n## 2. Feature Scope & MVP Definition (Strict MoSCoW)\n## 3. Data Models & Database Schema\n## 4. API Contracts & Interfaces\n## 5. Frontend Component Architecture & State Management\n## 6. Edge Case & Integration Testing Criteria\n## 7. Security, Auth & Non-Functional Requirements\n## 8. Error Handling, Fallbacks & Retry Strategies\n## 9. AI Agent Implementation Guidelines" : 
 "## 1. Project Technical Overview & Core Objective (Ringkasan Teknis & Obyektif Inti)\n## 2. Feature Scope & MVP Definition (Cakupan Fitur & Definisi MVP - Strict MoSCoW)\n## 3. Data Models & Database Schema (Model Data & Skema Database)\n## 4. API Contracts & Interfaces (Kontrak API & Antarmuka)\n## 5. Frontend Component Architecture & State Management (Arsitektur Komponen & Manajemen State)\n## 6. Edge Case & Integration Testing Criteria (Kriteria Pengujian Edge Case)\n## 7. Security, Auth & Non-Functional Requirements (Keamanan, Auth & Kebutuhan Non-Fungsional)\n## 8. Error Handling, Fallbacks & Retry Strategies (Penanganan Error & Strategi Retry)\n## 9. AI Agent Implementation Guidelines (Instruksi Khusus untuk AI Coder)"}
 CHAPTER CONSTRAINTS:
-- Ch 3 (Data Models): MUST include detailed tables indicating Column Name, Data Type (ORM specific), Relations (1:N, M:N), Constraints (Nullable, Unique), and Indexes.
-- Ch 4 (API Contracts): MUST include literal JSON block examples for Payload Requests and Responses for at least 5 core endpoints.
-- Ch 5 (Frontend): MUST define UI component hierarchies, URL Routing paths, and State Management logic (e.g. Redux, Zustand contexts).
-- Ch 6 (Testing): List at least 6 critical edge cases focusing on race conditions, concurrent requests, and API failures. Add a markdown separator (---) between cases.
-- Ch 7 (Security): Detail Auth flows (e.g., JWT, OAuth2), RBAC policies, Rate Limiting logic, and exact performance thresholds.
-- Ch 8 (Errors): Define HTTP Status Code mappings, global error boundary strategies, and offline/fallback states.
-- Ch 9 (AI Guidelines): Provide exact step-by-step CLI commands or structural instructions for an AI coder (Cursor/Copilot) to initialize and build the project from this spec.
+- Ch 1: Include a System Context Diagram using Mermaid graph syntax (\`\`\`mermaid graph TD) showing how the system fits into the broader landscape: users, external services, and integrations. Also include a high-level overview of Alternatives Considered for key architectural decisions.
+- Ch 2: Include a "Non-Goals / Out of Scope" subsection explicitly listing what is intentionally excluded from this technical phase, with rationale.
+- Ch 3 (Data Models): MUST include detailed tables indicating Column Name, Data Type (ORM specific), Relations (1:N, M:N), Constraints (Nullable, Unique), and Indexes. Also include an Entity Relationship Diagram (ERD) using Mermaid erDiagram syntax (\`\`\`mermaid erDiagram) showing relationships between all tables.
+- Ch 4 (API Contracts): MUST include literal JSON block examples for Payload Requests and Responses for at least 5 core endpoints. For EACH endpoint, also include error responses: 400 (Validation Error), 401/403 (Auth Error), 404 (Not Found), 409 (Conflict), 500 (Server Error) with example JSON payloads. Document authentication requirements per endpoint.
+- Ch 5 (Frontend): MUST define UI component hierarchies, URL Routing paths, State Management logic (e.g. Redux, Zustand contexts), and a data flow diagram using Mermaid sequenceDiagram syntax (\`\`\`mermaid sequenceDiagram) between components. Include lazy loading strategy for route-based code splitting.
+- Ch 6 (Testing): List at least 6 critical edge cases focusing on race conditions, concurrent requests, and API failures. Add a markdown separator (---) between cases. Include a brief testing pyramid strategy (Unit vs Integration vs E2E) and test data setup approach.
+- Ch 7 (Security): Detail Auth flows (e.g., JWT, OAuth2), RBAC policies, Rate Limiting logic, and exact performance thresholds. Classify NFRs into sub-categories: Performance, Scalability, Security, Usability, Availability — each with Measurement Method and Target Value in a table.
+- Ch 8 (Errors): Define HTTP Status Code mappings, global error boundary strategies, and offline/fallback states. Include retry strategy details (exponential backoff policy, max retries, circuit breaker thresholds) and a graceful degradation plan.
+- Ch 9 (AI Guidelines): Provide exact step-by-step CLI commands or structural instructions for an AI coder (Cursor/Copilot) to initialize and build the project from this spec. Use a structured template: Prerequisites (Node version, package manager), Step-by-step Setup Commands, File Creation Order, Environment Variables (with .env template), Build & Run Commands, Test Commands.
 LANGUAGE REQUIREMENT:
-Generate the entire document strictly in ${isEn ? 'English' : 'Indonesian'}. 
+Generate the entire document strictly in ${isEn ? 'English' : 'Indonesian'}.
+MERMAID DIAGRAM RULES (CRITICAL - READ ALL):
+- NEVER use parentheses () in EDGE LABELS (text between pipes |...|). Parentheses inside |...| will crash the parser. Example: WRONG → |Mengirim Data (REST/GraphQL)|. Instead write: |Mengirim Data REST- GraphQL| (remove parens or use dashes/brackets).
+- For NODE LABELS in graph/flowchart: ALWAYS wrap labels containing parentheses, commas, or special characters in double quotes. Example: A["User (Logged In)"] instead of A[User (Logged In)].
+- For sequenceDiagram: use participant names as simple identifiers, and wrap message text with "quotes" if it contains special characters.
+- For erDiagram: use "Entity" ||--|| "Entity" for relationships, keep entity names as simple identifiers without special characters.
+- Always test mentally: if a label contains any character other than letters, numbers, spaces, and dashes, wrap it in double quotes.
 ${extraPrompt ? '\nAdditional Context from User:\n' + extraPrompt : ''}`;
   }
 }
@@ -501,7 +519,7 @@ app.post("/api/generate-prd", async (req, res) => {
     const { prompt, customApiKey, provider = 'deepseek', model = 'deepseek-v4-flash', productType, uploadedFiles, mode = 'initial', prdMode = 'business' } = req.body;
 
     // Validate provider
-    const VALID_PROVIDERS = ["deepseek", "gemini"];
+    const VALID_PROVIDERS = ["deepseek", "gemini", "opencode"];
     if (!VALID_PROVIDERS.includes(provider)) {
       if (!res.writableEnded) {
         res.write(`data: ${JSON.stringify({ error: language === 'en' ? `Invalid provider "${provider}". Must be one of: ${VALID_PROVIDERS.join(", ")}` : `Provider "${provider}" tidak valid. Harus salah satu dari: ${VALID_PROVIDERS.join(", ")}` })}\n\n`);
@@ -569,6 +587,10 @@ app.post("/api/generate-prd", async (req, res) => {
       // OpenAI-compatible endpoint (stable as of 2025 — Google Generative Language API)
       endpoint = "https://generativelanguage.googleapis.com/v1beta/openai/chat/completions";
       if (!modelName) modelName = "gemini-2.5-flash";
+    } else if (provider === "opencode") {
+      apiKeyEnvName = "OPENCODE_API_KEY";
+      endpoint = "https://opencode.ai/zen/v1/chat/completions";
+      if (!modelName) modelName = "deepseek-v4-flash-free";
     } else {
       apiKeyEnvName = "DEEPSEEK_API_KEY";
       endpoint = "https://api.deepseek.com/chat/completions";

@@ -53,7 +53,14 @@ export function ApiKeyModal({
 
   const MODELS: Record<AIProvider, string[]> = {
     deepseek: ["deepseek-v4-flash", "deepseek-v4-pro"],
-    gemini: ["gemini-2.5-flash", "gemini-2.5-pro"]
+    gemini: ["gemini-2.5-flash", "gemini-2.5-pro"],
+    opencode: [
+      "deepseek-v4-flash-free",
+      "nemotron-3-ultra-free",
+      "mimo-v2.5-free",
+      "north-mini-code-free",
+      "big-pickle"
+    ]
   };
 
   useEffect(() => {
@@ -157,6 +164,7 @@ export function ApiKeyModal({
                   >
                     <option value="gemini" className="bg-[var(--color-bg)]">Gemini</option>
                     <option value="deepseek" className="bg-[var(--color-bg)]">DeepSeek</option>
+                    <option value="opencode" className="bg-[var(--color-bg)]">OpenCode Zen</option>
                   </select>
                   <div className="absolute right-3 top-1/2 -translate-y-1/2 pointer-events-none text-[var(--color-text-muted)]">
                     <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"><path d="m6 9 6 6 6-6"/></svg>
