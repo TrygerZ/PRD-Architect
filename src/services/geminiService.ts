@@ -15,7 +15,7 @@ export const generatePRD = async (
   productType: string,
   uploadedFiles: UploadedFile[],
   mode: string = "initial",
-  prdMode: "business" | "technical" = "business",
+  prdMode: "business" | "technical" | "simple" = "business",
   signal: AbortSignal | undefined,
   onChunk: (chunk: string) => void,
 ) => {

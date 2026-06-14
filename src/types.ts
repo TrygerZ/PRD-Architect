@@ -1,5 +1,5 @@
 export type AIProvider = "deepseek" | "gemini" | "opencode";
-export type PRDMode = "business" | "technical";
+export type PRDMode = "business" | "technical" | "simple";
 
 export type ProductType =
   | "e-commerce"

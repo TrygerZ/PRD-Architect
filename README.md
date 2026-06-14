@@ -25,15 +25,16 @@
 
 ## ⚡ Overview
 
-**PRD Architect** is a modern, full-stack application designed to dramatically accelerate the product planning phase. By taking a simple product idea as input, it automatically generates a highly structured, enterprise-grade Product Requirements Document (PRD) or Technical Specification Document.
+**PRD Architect** is a modern, full-stack application designed to dramatically accelerate the product planning phase. By taking a simple product idea as input, it automatically generates a highly structured, enterprise-grade Product Requirements Document (PRD), Technical Specification Document, or a streamlined Simple PRD for early-stage projects.
 
-It features a **Dual-Mode** generation engine, each with comprehensively enhanced chapters:
+It features a **Tri-Mode** generation engine, each with comprehensively enhanced chapters:
+- **⚡ Simple PRD Mode (6 Chapters)**: Designed for early-stage MVPs and solo developers. Covers Problem Statement, Feature Scope (MoSCoW), Out of Scope Rules & Boundaries, User Stories & Core Workflows, detailed Feature Specifications (input fields, business logic, error states, integrations), and Open Questions with Success Metrics & Timeline. No market analysis, no technical architecture — pure MVP focus.
 - **💼 Business & Investor Mode (12 Chapters)**: Covers Stakeholder Analysis, Problem Statement, Assumptions & Constraints, Non-Goals, TAM/SAM/SOM, MoSCoW scoping, Enhanced User Stories (Given/When/Then format + Epic hierarchy), Classified NFRs (Performance/Scalability/Security/Usability/Availability), Baseline-backed KPIs, GTM Strategy, Risk Register with scoring, 12-week roadmap, and Regulatory Compliance.
 - **💻 Technical & AI Agent Mode (9 Chapters)**: Covers System Context Diagram, Alternatives Considered, Non-Goals, Data Models with ERD, API Contracts with full Error Responses (400/401/403/404/409/500), Frontend Architecture with Data Flow Diagrams, Testing Pyramid Strategy, Classified NFRs, Retry Strategy with exponential backoff, and AI Agent Implementation Guidelines with structured templates.
 
 ## ✨ Features
 
-- 🌓 **Dual-Mode Generation**: Clean toggle between high-level Business/Investor strategies and deep Technical specifications.
+- 🌓 **Tri-Mode Generation**: Clean toggle between ⚡ Simple PRD (early-stage MVP), 💼 Business/Investor strategies, and 💻 deep Technical specifications.
 - 🧠 **Bring Your Own Model (BYOM)**: Seamlessly switch between AI providers (DeepSeek, Gemini, **OpenCode Zen**) and select specific models via the in-app Settings UI.
 - 🆓 **Free AI Models**: OpenCode Zen provides 5 free models (deepseek-v4-flash-free, nemotron-3-ultra-free, mimo-v2.5-free, north-mini-code-free, big-pickle) — no credit card required.
 - 📊 **Live Mermaid Diagrams**: Generated PRDs include rich, interactive diagrams rendered in real-time — System Context (graph), Entity Relationships (ERD), User Journeys (journey), Gantt Roadmaps (gantt), and Data Flows (sequenceDiagram).

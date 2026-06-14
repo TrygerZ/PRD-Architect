@@ -1,7 +1,7 @@
 import { motion } from "motion/react";
 import { getQuickPrompts } from "../utils/quickPrompts";
 import { PRDMode } from "../types";
-import { Briefcase, Code } from "lucide-react";
+import { Briefcase, Code, Zap } from "lucide-react";
 
 interface WelcomeScreenProps {
   language: "en" | "id";
@@ -29,7 +29,7 @@ export function WelcomeScreen({ language, onQuickPrompt, prdMode, onChangeMode }
         </p>
         <div className="w-12 h-[2px] bg-[var(--color-border)] mx-auto my-6"></div>
 
-        <div role="radiogroup" aria-label={language === "en" ? "PRD Mode" : "Mode PRD"} className="grid grid-cols-1 sm:grid-cols-2 gap-4 mb-8 text-left w-full px-4 sm:px-0 mx-auto">
+        <div role="radiogroup" aria-label={language === "en" ? "PRD Mode" : "Mode PRD"} className="grid grid-cols-1 sm:grid-cols-3 gap-4 mb-8 text-left w-full px-4 sm:px-0 mx-auto">
           <button 
             type="button"
             role="radio"
@@ -47,6 +47,26 @@ export function WelcomeScreen({ language, onQuickPrompt, prdMode, onChangeMode }
             </span>
             <span className="text-[13px] text-[var(--color-text-secondary)]">
               {language === "en" ? "Focus on business metrics, ROI, and GTM roadmap" : "Fokus pada metrik bisnis, ROI, dan GTM roadmap"}
+            </span>
+          </button>
+
+          <button 
+            type="button"
+            role="radio"
+            aria-checked={prdMode === "simple"}
+            onClick={() => onChangeMode("simple")}
+            className={`p-4 rounded-lg border flex flex-col gap-1 transition-[color,border-color,opacity,shadow,transform] duration-300 focus-visible:ring-2 focus-visible:ring-[var(--color-interactive)] focus-visible:outline-none active:scale-[0.97] ${
+              prdMode === "simple" 
+                ? "bg-[var(--color-mode-simple-bg)]/40 border-[var(--color-mode-simple)] shadow-[0_0_15px_rgba(16,185,129,0.15)]" 
+                : "bg-[var(--color-surface)] border-[var(--color-border)] hover:bg-[var(--color-surface-elevated)] opacity-80"
+            }`}
+          >
+            <span className={`text-[15px] font-semibold flex items-center justify-center gap-2 ${prdMode === "simple" ? "text-[var(--color-text-primary)]" : "text-[var(--color-text-secondary)]"}`}>
+              <Zap className="w-4 h-4" />
+              {language === "en" ? "Simple PRD" : "PRD Sederhana"}
+            </span>
+            <span className="text-[13px] text-[var(--color-text-secondary)]">
+              {language === "en" ? "Focus on problem, MVP features, and action plan" : "Fokus pada masalah, fitur MVP, dan rencana aksi"}
             </span>
           </button>
 
@@ -80,7 +100,7 @@ export function WelcomeScreen({ language, onQuickPrompt, prdMode, onChangeMode }
         }}
         className="grid grid-cols-2 sm:grid-cols-4 gap-3 w-full max-w-[640px] px-4 sm:px-0 mt-2"
       >
-        {getQuickPrompts(language).map((qp) => {
+        {getQuickPrompts(language, prdMode).map((qp) => {
           const Icon = qp.icon;
           return (
             <motion.button

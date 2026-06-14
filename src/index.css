@@ -22,6 +22,8 @@
   --color-mode-business-bg: #112233;
   --color-mode-technical: #a855f7;
   --color-mode-technical-bg: #221133;
+  --color-mode-simple: #10B981;
+  --color-mode-simple-bg: rgba(16, 185, 129, 0.1);
   --color-success: #22c55e;
 
   --radius-sm: 6px;

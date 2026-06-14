@@ -383,6 +383,45 @@ MERMAID DIAGRAM RULES (CRITICAL - READ ALL):
 - For gantt: ensure date formats use YYYY-MM-DD and section titles are plain text.
 - Always test mentally: if a label contains any character other than letters, numbers, spaces, and dashes, wrap it in double quotes.
 ${extraPrompt ? '\nAdditional Context from User:\n' + extraPrompt : ''}`;
+  } else if (prdMode === 'simple') {
+    // SIMPLE PRD MODE — 6 chapters for early-stage MVP
+    return `You are a Senior Product Manager helping an early-stage team define their MVP.
+Generate a concise, actionable Simple PRD with exactly 6 chapters using Markdown format.
+
+CRITICAL INSTRUCTIONS (FAILURE IS NOT AN OPTION):
+1. NO INTRODUCTIONS OR OUTROS. Start immediately with "## 1."
+2. EVERY chapter MUST start with a Markdown Heading 2 (##). Example: "## 1. Problem Statement & Value Proposition"
+3. DO NOT output a main title like "# PRD" or "Here is your Simple PRD".
+4. NO PLACEHOLDERS like "[Insert Here]". Generate specific, concrete content based on the product idea.
+5. Keep it CONCISE — each chapter should be focused and practical, not bloated.
+6. NO Mermaid diagrams unless explicitly specified below.
+7. NO OUTLINES OR PLANS. You must generate the ENTIRE document right now in one go.
+
+The 6 Chapters MUST be exactly:
+${isEn ? 
+"## 1. Problem Statement & Value Proposition\n## 2. Feature Scope & MVP Definition\n## 3. Out of Scope Rules & Boundaries\n## 4. User Stories & Core Workflows\n## 5. Feature Specification & Logic\n## 6. Open Questions, Success Metrics & Timeline" : 
+"## 1. Problem Statement & Value Proposition (Pernyataan Masalah & Proposisi Nilai)\n## 2. Feature Scope & MVP Definition (Cakupan Fitur & Definisi MVP)\n## 3. Out of Scope Rules & Boundaries (Aturan Lingkup & Batasan)\n## 4. User Stories & Core Workflows (Cerita Pengguna & Alur Kerja Inti)\n## 5. Feature Specification & Logic (Spesifikasi Fitur & Logika)\n## 6. Open Questions, Success Metrics & Timeline (Pertanyaan Terbuka, Metrik & Linimasa)"}
+
+CHAPTER CONSTRAINTS:
+- Ch 1: Start with a one-sentence problem statement: "[Target user] needs [need] because [insight]." Then describe the value proposition in 1 paragraph. Finally, identify the target user clearly. NO market analysis, NO TAM/SAM/SOM, NO competitor analysis.
+- Ch 2: Describe the solution approach in 1-2 paragraphs. Then use a MoSCoW table with exactly 2 priority levels: Must-have (MVP-critical, must be in v1) and Should-have (post-MVP, can wait). Do NOT use Could-have or Won't-have categories. After the table, describe the solution. Do NOT include Non-Goals here — they belong in Ch 3.
+- Ch 3: Create a table with columns: Item, Alasan Dikeluarkan, Boundary Rule, Kondisi Revisit. Include minimum 4 items that are intentionally NOT being built in this phase. Each item MUST have: (1) a clear boundary rule specifying the condition under which it would be reconsidered, (2) a brief rationale for why it is excluded now, (3) a revisit condition (e.g., "after 1000 active users" or "after Phase 2 funding"). This is a standalone chapter — give it the attention it deserves.
+- Ch 4: Use a simple table format with columns: Persona, User Story, Priority. Create EXACTLY 2-3 personas, each with 1-2 stories (total 3-6 stories). After the table, include a "Core Workflow" section describing the main user flow in 3-5 narrative steps. NO Given/When/Then format — use simple narrative. NO effort estimates.
+- Ch 5 (IMPORTANT — most detailed chapter): For EACH Must-have feature from Ch 2, provide a thorough feature specification with these sub-sections:
+  * Feature ID (FEAT-01, FEAT-02, etc.)
+  * Tujuan — why this feature exists (1-2 sentences)
+  * Kondisi Tampil — when this feature appears in the UI
+  * Input Fields — table with columns: Field, Tipe, Wajib?, Validasi, Logic Tambahan
+  * Flow / Alur — numbered steps from user action to completion (minimum 4 steps)
+  * Logika Bisnis — business rules, state machines, calculations, edge cases
+  * Error States — table with columns: Skenario, Pesan Error, Aksi Frontend (minimum 3 scenarios)
+  * Loading States — table with columns: Skenario, Tampilan/Feedback
+  * Integrasi — table with columns: Fitur Terkait, Bentuk Integrasi
+- Ch 6: Structure with sub-sections in this EXACT order: (6.1) Open Questions — table with columns: Pertanyaan, Dampak Jika Tidak Dijawab, Deadline Keputusan, Decision Maker. Minimum 4 questions. Each question must identify WHO decides and WHEN. (6.2) Success Metrics — 3-5 key metrics in a table (Metric, Target, How to Measure). (6.3) Timeline & Milestones — 3-4 milestones in a table (Milestone, Timeline, Key Deliverables). Timeline in phases (Bulan 1, Bulan 2, Bulan 3), NOT weekly sprints. (6.4) Key Risks — minimum 3 risks with brief mitigation strategy.
+
+LANGUAGE REQUIREMENT:
+Generate the entire document strictly in ${isEn ? 'English' : 'Indonesian'}.
+${extraPrompt ? '\nAdditional Context from User:\n' + extraPrompt : ''}`;
   } else {
     // TECHNICAL MODE
     return `You are a highly skilled Senior Software Architect. Your job is to generate a comprehensive, purely technical architecture and engineering specification document mapped EXACTLY into 9 structured chapters using strictly Markdown format.
@@ -418,7 +457,13 @@ ${extraPrompt ? '\nAdditional Context from User:\n' + extraPrompt : ''}`;
   }
 }
 
-function getRevisionPrompt(language: string) {
+function getRevisionPrompt(language: string, prdMode: string = 'business') {
+  const simpleGuard = prdMode === 'simple'
+    ? (language === 'id'
+      ? '\n10. INI ADALAH SIMPLE PRD (6 chapter). JANGAN mengubah struktur 6 chapter. JANGAN menambahkan analisis pasar, TAM/SAM/SOM, diagram Mermaid, GTM strategy, technical architecture detail, atau compliance — ini BUKAN Business/Technical PRD.'
+      : '\n10. THIS IS A SIMPLE PRD (6 chapters). Do NOT change the 6-chapter structure. Do NOT add market analysis, TAM/SAM/SOM, Mermaid diagrams, GTM strategy, technical architecture details, or compliance — this is NOT a Business/Technical PRD.')
+    : '';
+
   if (language === 'id') {
     return `Anda adalah editor yang merevisi Product Requirements Document yang sudah ada.
 
@@ -431,7 +476,7 @@ INSTRUKSI KRITIS:
 6. Output murni Markdown — tanpa pembukaan, tanpa catatan, tanpa penjelasan
 7. JANGAN menambahkan bagian baru kecuali diminta secara eksplisit
 8. JANGAN menghapus konten yang ada kecuali feedback secara spesifik meminta
-9. Output Anda akan MENGGANTIKAN seluruh dokumen yang ada, jadi Anda HARUS menyertakan SEMUANYA`;
+9. Output Anda akan MENGGANTIKAN seluruh dokumen yang ada, jadi Anda HARUS menyertakan SEMUANYA${simpleGuard}`;
   }
   return `You are an editor revising an existing Product Requirements Document.
 
@@ -444,10 +489,16 @@ CRITICAL INSTRUCTIONS:
 6. Output pure Markdown — no preamble, no notes, no explanations
 7. Do NOT add new sections unless explicitly requested
 8. Do NOT remove existing content unless feedback specifically says to
-9. Your output will REPLACE the entire existing document, so you MUST include EVERYTHING`;
+9. Your output will REPLACE the entire existing document, so you MUST include EVERYTHING${simpleGuard}`;
 }
 
-function getAppendPrompt(language: string) {
+function getAppendPrompt(language: string, prdMode: string = 'business') {
+  const simpleGuard = prdMode === 'simple'
+    ? (language === 'id'
+      ? '\n8. INI ADALAH SIMPLE PRD (6 chapter). JANGAN mengubah struktur 6 chapter. Konten baru harus disisipkan ke dalam 6 chapter yang ada — jangan membuat chapter ke-7.'
+      : '\n8. THIS IS A SIMPLE PRD (6 chapters). Do NOT change the 6-chapter structure. New content must be inserted into the existing 6 chapters — do NOT create a 7th chapter.')
+    : '';
+
   if (language === 'id') {
     return `Anda sedang melengkapi Product Requirements Document yang sudah ada.
 
@@ -458,7 +509,7 @@ INSTRUKSI KRITIS:
 4. Pertahankan gaya penulisan, nada, dan format yang SAMA — jangan memformat ulang apa pun
 5. Output murni Markdown — tanpa pembukaan, tanpa catatan, tanpa penjelasan
 6. PERTAHANKAN SEMUA konten yang ada persis seperti aslinya — reproduksi dengan setia
-7. Output Anda akan MENGGANTIKAN seluruh dokumen yang ada, jadi Anda HARUS menyertakan SEMUANYA`;
+7. Output Anda akan MENGGANTIKAN seluruh dokumen yang ada, jadi Anda HARUS menyertakan SEMUANYA${simpleGuard}`;
   }
   return `You are enhancing an existing Product Requirements Document.
 
@@ -469,7 +520,7 @@ CRITICAL INSTRUCTIONS:
 4. Maintain the SAME writing style, tone, and format — do not reformat anything
 5. Output pure Markdown — no preamble, no notes, no explanations
 6. PRESERVE ALL existing content exactly as-is — reproduce it faithfully
-7. Your output will REPLACE the entire existing document, so you MUST include EVERYTHING`;
+7. Your output will REPLACE the entire existing document, so you MUST include EVERYTHING${simpleGuard}`;
 }
 
 app.post("/api/auth/set-key", (req, res) => {
@@ -571,7 +622,9 @@ app.post("/api/generate-prd", async (req, res) => {
     if (mode === 'initial') {
       const firstHeading = prdMode === 'business' 
         ? "## 1. Executive Summary" 
-        : "## 1. Project Technical Overview";
+        : prdMode === 'simple'
+          ? "## 1. Problem Statement"
+          : "## 1. Project Technical Overview";
       const forcedDirectiveEn = `\n\nCRITICAL REMINDER: Do NOT give me an outline, plan, or introduction. You MUST generate the ENTIRE comprehensive document right now. Start your response immediately with "${firstHeading}" and NOTHING ELSE. Output the full raw Markdown.`;
       const forcedDirectiveId = `\n\nPENGINGAT KRITIS: JANGAN berikan saya outline, rencana, atau kata pengantar. Anda HARUS menghasilkan KESELURUHAN dokumen secara utuh sekarang juga. Mulai respons Anda langsung dengan "${firstHeading}" dan TANPA BASA-BASI APA PUN. Output harus berupa Markdown murni.`;
       
@@ -612,9 +665,9 @@ app.post("/api/generate-prd", async (req, res) => {
 
     let modeInstructions = '';
     if (mode === 'revision') {
-      modeInstructions = getRevisionPrompt(language);
+      modeInstructions = getRevisionPrompt(language, prdMode);
     } else if (mode === 'append') {
-      modeInstructions = getAppendPrompt(language);
+      modeInstructions = getAppendPrompt(language, prdMode);
     }
 
     // Dapatkan prompt spesifik industri (E-Commerce, SaaS, Fintech, dll.)
