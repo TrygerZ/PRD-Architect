@@ -65,11 +65,13 @@ export function ChatInput({
               type="button"
               onClick={onAttachClick}
               aria-label={language === "en" ? "Attach files" : "Lampirkan file"}
-              className={`absolute left-[10px] top-1/2 -translate-y-1/2 flex items-center justify-center min-w-[44px] min-h-[44px] rounded-md transition-opacity duration-200 bg-transparent focus-visible:ring-2 focus-visible:ring-[var(--color-interactive)] focus-visible:outline-none active:opacity-80 ${
-                hasFiles ? "text-[var(--color-text-primary)] bg-[var(--color-surface-elevated)]" : "text-[var(--color-text-muted)] hover:text-[var(--color-text-secondary)] hover:bg-[var(--color-surface-elevated)]"
+              className={`absolute left-[8px] top-1/2 -translate-y-[55%] flex items-center justify-center w-8 h-8 rounded-md transition-opacity duration-200 focus-visible:ring-2 focus-visible:ring-[var(--color-interactive)] focus-visible:outline-none active:opacity-80 ${
+                hasFiles
+                  ? "text-[var(--color-text-primary)] bg-[var(--color-surface-elevated)]"
+                  : "text-[var(--color-text-muted)] hover:text-[var(--color-text-secondary)] hover:bg-[var(--color-surface-elevated)]"
               }`}
             >
-              <Paperclip size={18} strokeWidth={1.5} />
+              <Paperclip size={16} strokeWidth={1.5} />
             </button>
           )}
 
@@ -84,34 +86,34 @@ export function ChatInput({
                 ? "Describe the product you want to build..."
                 : "Jelaskan produk yang ingin kamu bangun..."
             }
-            className="w-full bg-[var(--color-surface)] text-[var(--color-text-primary)] placeholder:text-[var(--color-text-muted)] outline-none resize-none min-h-[48px] max-h-[200px] font-mono text-[14px] border border-[var(--color-border-subtle)] focus:border-[var(--color-interactive)] rounded-md p-3 pl-12 pr-[88px] transition-[border-color] duration-200"
+            className="w-full bg-[var(--color-surface)] text-[var(--color-text-primary)] placeholder:text-[var(--color-text-muted)] outline-none resize-none min-h-[48px] max-h-[200px] font-mono text-[14px] border border-[var(--color-border-subtle)] focus:border-[var(--color-interactive)] rounded-md p-3 pl-[50px] pr-[88px] transition-[border-color] duration-200"
             disabled={isGenerating}
             rows={1}
           />
 
-          <div className="absolute right-[10px] top-1/2 -translate-y-1/2 flex items-center gap-1.5">
+          <div className="absolute right-[8px] top-1/2 -translate-y-[55%] flex items-center gap-1">
             {isGenerating && onCancel && (
               <button
                 type="button"
                 onClick={onCancel}
-                className="flex items-center justify-center min-w-[44px] min-h-[44px] rounded-md border border-[var(--color-error)] text-[var(--color-error)] hover:bg-[var(--color-error)] hover:text-white transition-[color,transform,opacity] duration-200 focus-visible:ring-2 focus-visible:ring-[var(--color-interactive)] focus-visible:outline-none active:scale-[0.97] active:opacity-80"
+                className="flex items-center justify-center w-8 h-8 rounded-md border border-[var(--color-error)] text-[var(--color-error)] hover:bg-[var(--color-error)] hover:text-white transition-[color,transform,opacity] duration-200 focus-visible:ring-2 focus-visible:ring-[var(--color-interactive)] focus-visible:outline-none active:scale-[0.97] active:opacity-80"
                 aria-label={language === "en" ? "Cancel" : "Batal"}
                 title={language === "en" ? "Cancel" : "Batal"}
               >
-                <Pause size={16} strokeWidth={1.5} />
+                <Pause size={14} strokeWidth={1.5} />
               </button>
             )}
             <button
               type="submit"
               disabled={!prompt.trim() || isGenerating}
-              className="flex items-center justify-center min-w-[44px] min-h-[44px] rounded-md bg-[var(--color-text-primary)] text-[var(--color-bg)] hover:opacity-90 disabled:opacity-30 disabled:cursor-not-allowed transition-[opacity,transform] duration-200 focus-visible:ring-2 focus-visible:ring-[var(--color-interactive)] focus-visible:outline-none active:scale-[0.97] active:opacity-80"
+              className="flex items-center justify-center w-8 h-8 rounded-md bg-[var(--color-text-primary)] text-[var(--color-bg)] hover:opacity-90 disabled:opacity-30 disabled:cursor-not-allowed transition-[opacity,transform] duration-200 focus-visible:ring-2 focus-visible:ring-[var(--color-interactive)] focus-visible:outline-none active:scale-[0.97] active:opacity-80"
               aria-label={language === "en" ? (isGenerating ? "Generating" : "Send") : (isGenerating ? "Menghasilkan" : "Kirim")}
               title={language === "en" ? "Generate" : "Buat PRD"}
             >
               {isGenerating ? (
-                <Loader2 size={16} strokeWidth={1.5} className="animate-spin" />
+                <Loader2 size={14} strokeWidth={1.5} className="animate-spin" />
               ) : (
-                <Send size={16} strokeWidth={1.5} className="relative -ml-[1px]" />
+                <Send size={14} strokeWidth={1.5} className="relative -ml-[1px]" />
               )}
             </button>
           </div>

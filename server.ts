@@ -750,7 +750,7 @@ app.post("/api/generate-prd", async (req, res) => {
     }
 
     // Wave 3 — Task 3.2: Prompt length validation
-    const MAX_PROMPT_LENGTH = 10000;
+    const MAX_PROMPT_LENGTH = 25000;
     if (!prompt || typeof prompt !== 'string') {
       if (!res.writableEnded) {
         res.write(`data: ${JSON.stringify({ error: t('Prompt is required.', 'Prompt wajib diisi.', language) })}\n\n`);

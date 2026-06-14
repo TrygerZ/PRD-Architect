@@ -7,7 +7,7 @@ interface SSEChunk {
 }
 
 const MAX_RETRIES = 2;
-const RETRY_DELAY_MS = 2000;
+const RETRY_DELAY_MS = 1000;
 const MAX_BUFFER_SIZE = 1024 * 1024; // 1MB buffer limit
 
 export const generatePRD = async (

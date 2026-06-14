@@ -1,4 +1,4 @@
-import { useState, useEffect, useRef, useMemo } from "react";
+import { useState, useEffect, useRef, useMemo, memo } from "react";
 import DOMPurify from "dompurify";
 
 /**
@@ -36,16 +36,58 @@ function sanitizeMermaid(chart: string): string {
     return content.replace(/"/g, '\\"');
   }
 
-  // 1. Edge labels |...| containing () → replace () with []
-  //    MRD-06: Skip if no parens present
+  // ── MRD-17: ERD sanitization — AI often outputs SQL keywords invalid in Mermaid ──
+  // Only run this pass on erDiagram charts.
+  if (/^\s*erDiagram\b/m.test(sanitized)) {
+    sanitized = sanitized.split("\n").map(line => {
+      // Skip non-attribute lines (entity declarations, relationships, comments)
+      if (!/^\s+(int|integer|bigint|smallint|tinyint|float|double|decimal|numeric|real|varchar|char|text|string|boolean|bool|date|datetime|timestamp|time|uuid|json|jsonb|blob|enum|bit|binary|varbinary)\s/i.test(line)) {
+        return line;
+      }
+
+      // --- Clean up SQL-specific keywords on attribute lines ---
+
+      // Replace multi-word SQL with Mermaid equivalents
+      let cleaned = line
+        .replace(/\bPRIMARY\s+KEY\b/gi, "PK")
+        .replace(/\bFOREIGN\s+KEY\b/gi, "FK")
+        .replace(/\bNOT\s+NULL\b/gi, "")
+        .replace(/\bAUTO_?INCREMENT\b/gi, "")
+        .replace(/\bREFERENCES\s+\w+\s*\([^)]*\)/gi, "")
+        .replace(/\bDEFAULT\s+\S+/gi, "")
+        .replace(/\bUNIQUE\b(?!\s*\w)/gi, "UK")    // UNIQUE not followed by word → UK
+        .replace(/\bVARCHAR\b/gi, "varchar");       // normalize case
+
+      // --- Remove duplicate key constraints (keep first only) ---
+      // Mermaid allows max 1 key constraint (PK/FK/UK) per attribute line
+      const keyKeywords = ["PK", "FK", "UK"];
+      let foundKey = false;
+      cleaned = cleaned.split(/\s+/).filter(word => {
+        if (keyKeywords.includes(word.toUpperCase())) {
+          if (foundKey) return false; // skip duplicate
+          foundKey = true;
+        }
+        return true;
+      }).join(" ");
+
+      // --- Normalize whitespace ---
+      return cleaned.replace(/\s+/g, " ");
+    }).join("\n");
+  }
+
+  // ── 1. Edge labels |...| containing () → replace () with [] ──
   sanitized = sanitized.replace(/\|([^|]+)\|/g, (match, content) => {
     if (!content.includes("(") && !content.includes(")")) return match;
     return match.replace(/\(/g, "[").replace(/\)/g, "]");
   });
 
-  // 2. Node labels [...] containing parentheses → wrap in double quotes
-  //    MRD-05: Check BOTH start AND end quotes; MRD-01: escape inner quotes
+  // ── 2. Node labels [...] containing parentheses → wrap ["..."] ──
+  //     MRD-11: Skip shape-specific nodes: [(Cylinder)], [[Subroutine]],
+  //             [/Parallelogram/], [\Trapezoid\], [/Trapezoid\]
   sanitized = sanitized.replace(/\[([^\]]+)\]/g, (match, content) => {
+    // Skip shape-specific — content starts with (, [, {, /, or \
+    if (/^[\(\[\{\/\\]/.test(content)) return match;
+    // Skip already-quoted
     if (content.startsWith('"') && content.endsWith('"')) return match;
     if (content.includes("(") || content.includes(")")) {
       return `["${escapeInnerQuotes(content)}"]`;
@@ -53,9 +95,10 @@ function sanitizeMermaid(chart: string): string {
     return match;
   });
 
-  // 3. Node labels [...] containing commas → wrap in double quotes
-  //    MRD-05: Check BOTH start AND end quotes; MRD-01: escape inner quotes
+  // ── 3. Node labels [...] containing commas → wrap ["..."] ──
   sanitized = sanitized.replace(/\[([^\]]+)\]/g, (match, content) => {
+    // Skip shape-specific & already-quoted (same as above)
+    if (/^[\(\[\{\/\\]/.test(content)) return match;
     if (content.startsWith('"') && content.endsWith('"')) return match;
     if (content.includes(",")) {
       return `["${escapeInnerQuotes(content)}"]`;
@@ -63,9 +106,11 @@ function sanitizeMermaid(chart: string): string {
     return match;
   });
 
-  // 4. Decision nodes {...} containing parentheses → wrap in double quotes
-  //    MRD-05: Check BOTH start AND end quotes; MRD-01: escape inner quotes
+  // ── 4. Decision nodes {...} containing parentheses → wrap {"..."} ──
   sanitized = sanitized.replace(/\{([^}]+)\}/g, (match, content) => {
+    // MRD-11: Skip hexagon {{...}}
+    if (/^\{/.test(content)) return match;
+    // Skip already-quoted
     if (content.startsWith('"') && content.endsWith('"')) return match;
     if (content.includes("(") || content.includes(")")) {
       return `{"${escapeInnerQuotes(content)}"}`;
@@ -83,12 +128,21 @@ function sanitizeMermaid(chart: string): string {
 
 // MRD-08: Module-level flag to avoid re-initializing mermaid on every render
 let mermaidInitialized = false;
+let mermaidModule: any = null;
+
+async function getMermaidModule() {
+  if (!mermaidModule) {
+    mermaidModule = await import("mermaid");
+  }
+  return mermaidModule;
+}
 
 interface MermaidRendererProps {
   chart: string;
+  isGenerating?: boolean;
 }
 
-export function MermaidRenderer({ chart }: MermaidRendererProps) {
+export const MermaidRenderer = memo(function MermaidRenderer({ chart, isGenerating = false }: MermaidRendererProps) {
   const [status, setStatus] = useState<"loading" | "error" | "success">(
     "loading"
   );
@@ -99,17 +153,23 @@ export function MermaidRenderer({ chart }: MermaidRendererProps) {
   const containerId = useRef(
     `mermaid-${Math.random().toString(36).substring(2, 11)}`
   );
+  const svgRef = useRef<string | null>(null);
+  const lastRenderTimeRef = useRef(0);
+  const throttleRef = useRef<ReturnType<typeof setTimeout>>();
 
   useEffect(() => {
     let cancelled = false;
 
     async function renderDiagram() {
-      setStatus("loading");
-      setSvg(null);
+      // MRD-14: Stale-while-revalidate — keep showing previous
+      // SVG/diagram while re-rendering. Only show loading on first render.
+      if (!svgRef.current) {
+        setStatus("loading");
+      }
       setError(null);
 
       try {
-        const mermaid = await import("mermaid");
+        const mermaid = await getMermaidModule();
         if (cancelled) return;
 
         // MRD-08: Only initialize mermaid once
@@ -117,18 +177,34 @@ export function MermaidRenderer({ chart }: MermaidRendererProps) {
           mermaid.default.initialize({
             startOnLoad: false,
             theme: "dark",
+            fontFamily: "Geist Mono",
+            securityLevel: "loose",
             themeVariables: {
               primaryColor: "#1e1e2e",
               primaryTextColor: "#cdd6f4",
-              fontFamily: "Geist Mono",
             },
           });
           mermaidInitialized = true;
         }
 
+        // MRD-09: Pre-processing — normalize input before render
+        const normalized = sanitizedChart
+          .replace(/^\uFEFF/, "")
+          .replace(/\r\n/g, "\n")
+          .replace(/^\n+/, "")
+          .replace(/\n+$/, "\n");
+
+        // MRD-10: Pre-validate with mermaid.parse() for early error detection
+        try {
+          await mermaid.default.parse(normalized);
+        } catch (parseErr) {
+          const msg = parseErr instanceof Error ? parseErr.message : String(parseErr);
+          throw new Error(`Parse error: ${msg}`);
+        }
+
         const { svg: renderedSvg } = await mermaid.default.render(
           containerId.current,
-          sanitizedChart
+          normalized
         );
         if (cancelled) return;
 
@@ -136,26 +212,51 @@ export function MermaidRenderer({ chart }: MermaidRendererProps) {
           USE_PROFILES: { svg: true, svgFilters: true },
           ADD_TAGS: ["foreignObject"],
         });
+        svgRef.current = sanitizedSvg;
+        lastRenderTimeRef.current = Date.now();
         setSvg(sanitizedSvg);
         setStatus("success");
       } catch (err) {
         if (cancelled) return;
-        setError(
-          err instanceof Error ? err.message : "Failed to render diagram"
-        );
-        setStatus("error");
+        // MRD-14: Only show error if no previous successful render
+        if (!svgRef.current) {
+          setError(
+            err instanceof Error ? err.message : "Failed to render diagram"
+          );
+          setStatus("error");
+        }
       }
     }
 
-    renderDiagram();
+    // MRD-16: Throttle during streaming — max 1 render every 2s.
+    // This prevents the 800ms-debounce problem (timer never fires during
+    // active streaming), while still batching rapid content changes.
+    // After generation: render immediately (no throttle).
+    clearTimeout(throttleRef.current);
+    const now = Date.now();
+    const sinceLast = now - lastRenderTimeRef.current;
+
+    if (isGenerating && sinceLast < 2000) {
+      // Throttle: wait until 2s since last render
+      throttleRef.current = setTimeout(() => {
+        if (!cancelled) renderDiagram();
+      }, 2000 - sinceLast);
+    } else {
+      // Immediate with 100ms micro-delay for React batching during streaming
+      throttleRef.current = setTimeout(() => {
+        if (!cancelled) renderDiagram();
+      }, isGenerating ? 100 : 0);
+    }
+
     return () => {
       cancelled = true;
+      clearTimeout(throttleRef.current);
     };
-  }, [sanitizedChart]);
+  }, [sanitizedChart, isGenerating]);
 
   if (status === "loading") {
     return (
-      <div className="flex items-center gap-3 p-4 my-6 rounded-md border border-[var(--color-border)] bg-[var(--color-surface)]">
+      <div className="flex items-center gap-3 p-4 my-6 rounded-md border border-[var(--color-border)] bg-[var(--color-surface)] min-h-[80px] transition-all duration-300">
         <div className="w-4 h-4 border-2 border-[var(--color-text-muted)] border-t-[var(--color-interactive)] rounded-full animate-spin" />
         <span className="text-[13px] text-[var(--color-text-secondary)]">
           Rendering diagram...
@@ -166,7 +267,7 @@ export function MermaidRenderer({ chart }: MermaidRendererProps) {
 
   if (status === "error") {
     return (
-      <div className="my-6 rounded-md border border-[var(--color-error)] bg-[var(--color-error-bg)] overflow-hidden">
+      <div className="my-6 rounded-md border border-[var(--color-error)] bg-[var(--color-error-bg)] overflow-hidden transition-all duration-300">
         <div className="flex items-center gap-2 px-4 py-2 border-b border-[var(--color-error)] bg-[var(--color-error-bg)]">
           <span className="w-2 h-2 rounded-full bg-[var(--color-error)]" />
           <span className="text-[13px] font-medium text-[var(--color-error)]">
@@ -194,7 +295,7 @@ export function MermaidRenderer({ chart }: MermaidRendererProps) {
 
   // success — render SVG
   return (
-    <div className="my-6 rounded-md border border-[var(--color-border)] bg-[var(--color-surface)] overflow-hidden">
+    <div className="my-6 rounded-md border border-[var(--color-border)] bg-[var(--color-surface)] overflow-hidden transition-all duration-300">
       <div className="flex items-center gap-2 px-4 py-2 border-b border-[var(--color-border)] bg-[var(--color-surface-elevated)]">
         <span className="w-2 h-2 rounded-full bg-[var(--color-success)]" />
         <span className="text-[11px] font-mono text-[var(--color-text-muted)]">
@@ -207,4 +308,4 @@ export function MermaidRenderer({ chart }: MermaidRendererProps) {
       />
     </div>
   );
-}
+});

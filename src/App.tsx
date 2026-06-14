@@ -23,6 +23,7 @@ export default function App() {
   const [customApiKey, setCustomApiKey] = useState("");
   const { provider, model, persistSettings } = useSettings();
   const [isGenerating, setIsGenerating] = useState(false);
+  const [isConnecting, setIsConnecting] = useState(false);
   const [productType, setProductType] = useState<ProductType>("Unknown");
   const [language, setLanguage] = useState<"id" | "en">("id");
   const { showScrollTop, handleScroll: onContainerScroll } = useScroll();
@@ -50,6 +51,7 @@ export default function App() {
   const [currentPrompt, setCurrentPrompt] = useState("");
   const abortControllerRef = useRef<AbortController | null>(null);
   const isGeneratingRef = useRef(false);
+  const connectingRef = useRef(true);
   const [prdMode, setPrdMode] = useState<PRDMode>("business");
 
   const chatContainerRef = useRef<HTMLDivElement>(null);
@@ -65,6 +67,7 @@ export default function App() {
     abortControllerRef.current?.abort();
     abortControllerRef.current = null;
     setIsGenerating(false);
+    setIsConnecting(false);
   }, []);
 
   // BUG-04 fix — Wrap handleCancel with useCallback to prevent unnecessary re-renders
@@ -89,6 +92,7 @@ export default function App() {
     }
     isGeneratingRef.current = false;
     setIsGenerating(false);
+    setIsConnecting(false);
 
     // Pass false for isGenerating since we already aborted above
     versionNewPRD(false, abortGeneration);
@@ -192,6 +196,8 @@ export default function App() {
     // Set state FIRST, then create controller
     isGeneratingRef.current = true;
     setIsGenerating(true);
+    connectingRef.current = true;
+    setIsConnecting(true);
     setError(null);
 
     const controller = new AbortController();
@@ -232,6 +238,10 @@ export default function App() {
         prdMode,
         controller.signal,
         (chunk) => {
+          if (connectingRef.current) {
+            connectingRef.current = false;
+            setIsConnecting(false);
+          }
           setVersions((prev) =>
             prev.map((v) =>
               v.id === newVersionId ? { ...v, content: v.content + chunk } : v,
@@ -244,6 +254,7 @@ export default function App() {
     } catch (err: unknown) {
       if (err instanceof Error && (err.name === 'AbortError' || err.message === 'This operation was aborted')) {
         // Biarkan output yang sudah ter-generate sebagian — jangan hapus
+        setIsConnecting(false);
         return;
       }
       const message = err instanceof Error ? err.message : undefined;
@@ -261,6 +272,7 @@ export default function App() {
         abortControllerRef.current = null;
         isGeneratingRef.current = false;
         setIsGenerating(false);
+        setIsConnecting(false);
       }
     }
   }, [customApiKey, provider, model, uploadedFiles]);
@@ -576,6 +588,16 @@ export default function App() {
                     </button>
                   </div>
                 )}
+
+                {/* Connecting Indicator */}
+                {isConnecting && !prdContent && (
+                  <div className="flex items-center gap-3 p-4 mb-4 rounded-md border border-[var(--color-interactive-subtle)] bg-[var(--color-interactive-subtle)]">
+                    <div className="w-4 h-4 border-2 border-[var(--color-interactive)] border-t-transparent rounded-full animate-spin" />
+                    <span className="text-[13px] text-[var(--color-interactive)]">
+                      {language === "en" ? "Connecting to AI..." : "Menghubungkan ke AI..."}
+                    </span>
+                  </div>
+                )}
                 
                 {/* User Message */}
                 <div className="bg-[var(--color-surface-elevated)] rounded-md p-3 sm:p-4 max-w-[95%] sm:max-w-[85%] ml-auto shadow-sm border border-[var(--color-border)]">
@@ -627,7 +649,7 @@ export default function App() {
       {showScrollTop && (
         <button
           onClick={handleScrollTop}
-          className={`fixed bottom-[60px] right-[40px] z-[45] min-w-[44px] min-h-[44px] rounded-full bg-[var(--color-surface-elevated)] border border-[var(--color-border)] text-[var(--color-text-secondary)] hover:bg-[var(--color-border-subtle)] hover:text-[var(--color-text-primary)] flex items-center justify-center transition-colors duration-200 no-print will-change-transform focus-visible:ring-2 focus-visible:ring-[var(--color-interactive)] focus-visible:outline-none`}
+          className={`fixed bottom-[196px] sm:bottom-[156px] right-[16px] sm:right-[40px] z-[35] min-w-[44px] min-h-[44px] rounded-full bg-[var(--color-surface-elevated)] border border-[var(--color-border)] text-[var(--color-text-secondary)] hover:bg-[var(--color-border-subtle)] hover:text-[var(--color-text-primary)] flex items-center justify-center transition-colors duration-200 no-print will-change-transform focus-visible:ring-2 focus-visible:ring-[var(--color-interactive)] focus-visible:outline-none`}
           aria-label={language === "en" ? "Scroll to top" : "Kembali ke atas"}
           title={language === "en" ? "Scroll to top" : "Kembali ke atas"}
         >

@@ -168,7 +168,7 @@ export const BlueprintSheet = memo(function BlueprintSheet({
       {/* FAB button */}
       <button
         onClick={() => setIsFeedbackDrawerOpen(!isFeedbackDrawerOpen)}
-className={`fixed bottom-[100px] sm:bottom-[100px] right-[16px] sm:right-[40px] z-[50] w-[48px] h-[48px] rounded-full flex items-center justify-center transition-[color,transform,opacity] duration-200 ease no-print will-change-transform focus-visible:ring-2 focus-visible:ring-[var(--color-interactive)] focus-visible:outline-none active:scale-[0.97] active:opacity-80 ${
+className={`fixed bottom-[140px] sm:bottom-[100px] right-[16px] sm:right-[40px] z-[50] w-[48px] h-[48px] rounded-full flex items-center justify-center transition-[color,transform,opacity] duration-200 ease no-print will-change-transform focus-visible:ring-2 focus-visible:ring-[var(--color-interactive)] focus-visible:outline-none active:scale-[0.97] active:opacity-80 ${
           isFeedbackDrawerOpen 
             ? "bg-[var(--color-border)] text-[var(--color-text-primary)] shadow-none" 
             : "bg-[var(--color-text-primary)] hover:bg-[var(--color-text-primary)] text-[var(--color-bg)] shadow-fab"
@@ -187,11 +187,11 @@ className={`fixed bottom-[100px] sm:bottom-[100px] right-[16px] sm:right-[40px] 
         data-feedback-drawer
         role="dialog"
         aria-label={language === "en" ? "Feedback panel" : "Panel umpan balik"}
-        className={`fixed top-0 right-0 bottom-0 w-[400px] max-w-[100vw] bg-[var(--color-surface)] border-l border-[var(--color-border)] z-[40] transition-transform duration-200 ease overflow-y-auto no-print ${
+        className={`fixed top-12 right-0 bottom-0 w-full sm:w-[400px] sm:max-w-[100vw] bg-[var(--color-surface)] border-l border-[var(--color-border)] z-[45] transition-transform duration-200 ease overflow-y-auto overscroll-contain no-print ${
           isFeedbackDrawerOpen ? "translate-x-0" : "translate-x-full"
         }`}
       >
-        <div className="p-6">
+        <div className="p-6 pb-24">
           <div className="flex items-center justify-between mb-8 pb-4 border-b border-[var(--color-border)]">
             <h2 className="text-[18px] font-semibold text-[var(--color-text-primary)] flex items-center gap-2">
               <MessageSquareText size={16} strokeWidth={1.5} className="text-[var(--color-text-secondary)]" />
@@ -408,7 +408,14 @@ const SheetSection = memo(function SheetSection({
                 td: ({ node, ...props }) => (
                   <td className="px-4 py-3 align-top leading-relaxed text-[var(--color-text-secondary)] print:text-black min-w-[120px] text-[13px]" {...props} />
                 ),
-                pre: ({ node, children, ...props }) => (
+                pre: ({ node, children, ...props }: { node?: any; children?: React.ReactNode; [key: string]: any }) => {
+                  // MRD-13: Skip outer box for mermaid — MermaidRenderer has its own chrome.
+                  // Otherwise we get a double-box (pre box + MermaidRenderer box).
+                  const isMermaid = node?.children?.[0]?.properties?.className?.includes("language-mermaid");
+                  if (isMermaid) {
+                    return <>{children}</>;
+                  }
+                  return (
                   <div className="relative my-6 rounded-md border border-[var(--color-border)] bg-[var(--color-surface)] overflow-hidden print:bg-gray-50 print:border-gray-300">
                     <div className="px-4 py-2 border-b border-[var(--color-border)] bg-[var(--color-surface-elevated)] flex items-center justify-between">
                        <div className="flex gap-1.5">
@@ -421,13 +428,22 @@ const SheetSection = memo(function SheetSection({
                       {children}
                     </pre>
                   </div>
-                ),
+                  );
+                },
                 code: ({ node, className, children, ...props }: { node?: unknown; className?: string; children?: React.ReactNode }) => {
                   const match = /language-(\w+)/.exec(className || "");
                   // Mermaid diagram rendering
                   if (match?.[1] === "mermaid") {
-                    const chartStr = String(children).replace(/\n$/, "");
-                    return <MermaidRenderer chart={chartStr} />;
+                    // MRD-12: react-markdown v10 passes children either as string
+                    // or array-of-strings (per line). String() on array comma-joins.
+                    // Handle both cases + normalize line endings.
+                    const raw = Array.isArray(children)
+                      ? children.filter(c => typeof c === "string").join("")
+                      : typeof children === "string"
+                        ? children
+                        : String(children ?? "");
+                    const chartStr = raw.replace(/[\r\n]+$/, "");
+                    return <MermaidRenderer chart={chartStr} isGenerating={isGenerating} />;
                   }
                   const isInline = !match && !String(children).includes("\n");
                   if (isInline) {

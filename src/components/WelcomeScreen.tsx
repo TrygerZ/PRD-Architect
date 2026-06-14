@@ -35,14 +35,14 @@ export function WelcomeScreen({ language, onQuickPrompt, prdMode, onChangeMode }
             role="radio"
             aria-checked={prdMode === "business"}
             onClick={() => onChangeMode("business")}
-            className={`p-4 rounded-lg border flex flex-col gap-1 transition-[color,border-color,opacity,shadow,transform] duration-300 focus-visible:ring-2 focus-visible:ring-[var(--color-interactive)] focus-visible:outline-none active:scale-[0.97] ${
+            className={`p-5 rounded-lg border flex flex-col gap-2 min-h-[120px] justify-center transition-[color,border-color,opacity,shadow,transform] duration-300 focus-visible:ring-2 focus-visible:ring-[var(--color-interactive)] focus-visible:outline-none active:scale-[0.97] ${
               prdMode === "business" 
                 ? "bg-[var(--color-mode-business-bg)]/40 border-[var(--color-mode-business)] shadow-[0_0_15px_rgba(68,102,255,0.15)]" 
                 : "bg-[var(--color-surface)] border-[var(--color-border)] hover:bg-[var(--color-surface-elevated)] opacity-80"
             }`}
           >
             <span className={`text-[15px] font-semibold flex items-center justify-center gap-2 ${prdMode === "business" ? "text-[var(--color-text-primary)]" : "text-[var(--color-text-secondary)]"}`}>
-              <Briefcase className="w-4 h-4" />
+              <Briefcase className="w-5 h-5" />
               {language === "en" ? "Business & Investor Mode" : "Mode Bisnis & Investor"}
             </span>
             <span className="text-[13px] text-[var(--color-text-secondary)]">
@@ -55,14 +55,14 @@ export function WelcomeScreen({ language, onQuickPrompt, prdMode, onChangeMode }
             role="radio"
             aria-checked={prdMode === "simple"}
             onClick={() => onChangeMode("simple")}
-            className={`p-4 rounded-lg border flex flex-col gap-1 transition-[color,border-color,opacity,shadow,transform] duration-300 focus-visible:ring-2 focus-visible:ring-[var(--color-interactive)] focus-visible:outline-none active:scale-[0.97] ${
+            className={`p-5 rounded-lg border flex flex-col gap-2 min-h-[120px] justify-center transition-[color,border-color,opacity,shadow,transform] duration-300 focus-visible:ring-2 focus-visible:ring-[var(--color-interactive)] focus-visible:outline-none active:scale-[0.97] ${
               prdMode === "simple" 
                 ? "bg-[var(--color-mode-simple-bg)]/40 border-[var(--color-mode-simple)] shadow-[0_0_15px_rgba(16,185,129,0.15)]" 
                 : "bg-[var(--color-surface)] border-[var(--color-border)] hover:bg-[var(--color-surface-elevated)] opacity-80"
             }`}
           >
             <span className={`text-[15px] font-semibold flex items-center justify-center gap-2 ${prdMode === "simple" ? "text-[var(--color-text-primary)]" : "text-[var(--color-text-secondary)]"}`}>
-              <Zap className="w-4 h-4" />
+              <Zap className="w-5 h-5" />
               {language === "en" ? "Simple PRD" : "PRD Sederhana"}
             </span>
             <span className="text-[13px] text-[var(--color-text-secondary)]">
@@ -75,14 +75,14 @@ export function WelcomeScreen({ language, onQuickPrompt, prdMode, onChangeMode }
             role="radio"
             aria-checked={prdMode === "technical"}
             onClick={() => onChangeMode("technical")}
-            className={`p-4 rounded-lg border flex flex-col gap-1 transition-[color,border-color,opacity,shadow,transform] duration-300 focus-visible:ring-2 focus-visible:ring-[var(--color-interactive)] focus-visible:outline-none active:scale-[0.97] ${
+            className={`p-5 rounded-lg border flex flex-col gap-2 min-h-[120px] justify-center transition-[color,border-color,opacity,shadow,transform] duration-300 focus-visible:ring-2 focus-visible:ring-[var(--color-interactive)] focus-visible:outline-none active:scale-[0.97] ${
               prdMode === "technical" 
                 ? "bg-[var(--color-mode-technical-bg)]/40 border-[var(--color-mode-technical)] shadow-[0_0_15px_rgba(168,85,247,0.15)]" 
                 : "bg-[var(--color-surface)] border-[var(--color-border)] hover:bg-[var(--color-surface-elevated)] opacity-80"
             }`}
           >
             <span className={`text-[15px] font-semibold flex items-center justify-center gap-2 ${prdMode === "technical" ? "text-[var(--color-text-primary)]" : "text-[var(--color-text-secondary)]"}`}>
-              <Code className="w-4 h-4" />
+              <Code className="w-5 h-5" />
               {language === "en" ? "AI Agent & Developer Mode" : "Mode AI Agent & Developer"}
             </span>
             <span className="text-[13px] text-[var(--color-text-secondary)]">
