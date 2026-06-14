@@ -3,6 +3,7 @@ import { Key, X, Check, AlertTriangle } from "lucide-react";
 import { motion, AnimatePresence } from "motion/react";
 
 import { AIProvider } from "../types";
+import { safeGetLocalStorage, safeSetLocalStorage } from "../utils/storage";
 
 interface ApiKeyModalProps {
   isOpen: boolean;
@@ -66,8 +67,8 @@ export function ApiKeyModal({
   useEffect(() => {
     if (isOpen) {
       // API key disimpan di httpOnly cookie (tidak bisa dibaca JS) — tidak dibaca dari localStorage
-      const storedProv = localStorage.getItem("PRD_AI_PROVIDER") as AIProvider;
-      const storedModel = localStorage.getItem("PRD_AI_MODEL");
+      const storedProv = safeGetLocalStorage("PRD_AI_PROVIDER") as AIProvider;
+      const storedModel = safeGetLocalStorage("PRD_AI_MODEL");
       setApiKey(""); // always start empty — key is in httpOnly cookie
       if (storedProv) setProvider(storedProv);
       else setProvider(initialProvider);
@@ -97,8 +98,8 @@ export function ApiKeyModal({
         body: JSON.stringify({ apiKey: apiKey.trim(), language }),
       });
       // Provider & model tetap di localStorage (bukan secret)
-      localStorage.setItem("PRD_AI_PROVIDER", provider);
-      localStorage.setItem("PRD_AI_MODEL", model);
+      safeSetLocalStorage("PRD_AI_PROVIDER", provider);
+      safeSetLocalStorage("PRD_AI_MODEL", model);
       onSave(apiKey.trim(), provider, model);
       setSaved(true);
       setTimeout(() => {

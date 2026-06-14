@@ -94,7 +94,7 @@ export function ChatInput({
               <button
                 type="button"
                 onClick={onCancel}
-                className="flex items-center justify-center w-[36px] h-[36px] rounded-md border border-[var(--color-error)] text-[var(--color-error)] hover:bg-[var(--color-error)] hover:text-white transition-[color,transform,opacity] duration-200 focus-visible:ring-2 focus-visible:ring-[var(--color-interactive)] focus-visible:outline-none active:scale-[0.97] active:opacity-80"
+                className="flex items-center justify-center min-w-[44px] min-h-[44px] rounded-md border border-[var(--color-error)] text-[var(--color-error)] hover:bg-[var(--color-error)] hover:text-white transition-[color,transform,opacity] duration-200 focus-visible:ring-2 focus-visible:ring-[var(--color-interactive)] focus-visible:outline-none active:scale-[0.97] active:opacity-80"
                 aria-label={language === "en" ? "Cancel" : "Batal"}
                 title={language === "en" ? "Cancel" : "Batal"}
               >
@@ -104,7 +104,7 @@ export function ChatInput({
             <button
               type="submit"
               disabled={!prompt.trim() || isGenerating}
-              className="flex items-center justify-center w-[36px] h-[36px] rounded-md bg-[var(--color-text-primary)] text-[var(--color-bg)] hover:opacity-90 disabled:opacity-30 disabled:cursor-not-allowed transition-[opacity,transform] duration-200 focus-visible:ring-2 focus-visible:ring-[var(--color-interactive)] focus-visible:outline-none active:scale-[0.97] active:opacity-80"
+              className="flex items-center justify-center min-w-[44px] min-h-[44px] rounded-md bg-[var(--color-text-primary)] text-[var(--color-bg)] hover:opacity-90 disabled:opacity-30 disabled:cursor-not-allowed transition-[opacity,transform] duration-200 focus-visible:ring-2 focus-visible:ring-[var(--color-interactive)] focus-visible:outline-none active:scale-[0.97] active:opacity-80"
               aria-label={language === "en" ? (isGenerating ? "Generating" : "Send") : (isGenerating ? "Menghasilkan" : "Kirim")}
               title={language === "en" ? "Generate" : "Buat PRD"}
             >

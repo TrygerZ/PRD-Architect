@@ -101,6 +101,41 @@ export const BlueprintSheet = memo(function BlueprintSheet({
     return () => window.removeEventListener("keydown", handleKeyDown);
   }, [isFeedbackDrawerOpen]);
 
+  // Focus trap for feedback drawer (A11Y-03)
+  useEffect(() => {
+    if (!isFeedbackDrawerOpen) return;
+
+    const drawer = document.querySelector('[data-feedback-drawer]');
+    if (!drawer) return;
+
+    const focusableElements = drawer.querySelectorAll(
+      'button, [href], input, select, textarea, [tabindex]:not([tabindex="-1"])'
+    );
+    const firstFocusable = focusableElements[0] as HTMLElement;
+    const lastFocusable = focusableElements[focusableElements.length - 1] as HTMLElement;
+
+    const handleTabTrap = (e: KeyboardEvent) => {
+      if (e.key !== 'Tab') return;
+
+      if (e.shiftKey) {
+        if (document.activeElement === firstFocusable) {
+          e.preventDefault();
+          lastFocusable.focus();
+        }
+      } else {
+        if (document.activeElement === lastFocusable) {
+          e.preventDefault();
+          firstFocusable.focus();
+        }
+      }
+    };
+
+    document.addEventListener('keydown', handleTabTrap);
+    firstFocusable?.focus();
+
+    return () => document.removeEventListener('keydown', handleTabTrap);
+  }, [isFeedbackDrawerOpen]);
+
   // Progress UI tracking removed to enhance scrolling performance.
 
   const activeVersion = versions.find(v => v.id === activeVersionId) || versions[versions.length - 1];
@@ -149,6 +184,9 @@ className={`fixed bottom-[100px] sm:bottom-[100px] right-[16px] sm:right-[40px] 
 
       {/* Slide-in Feedback Drawer */}
       <div
+        data-feedback-drawer
+        role="dialog"
+        aria-label={language === "en" ? "Feedback panel" : "Panel umpan balik"}
         className={`fixed top-0 right-0 bottom-0 w-[400px] max-w-[100vw] bg-[var(--color-surface)] border-l border-[var(--color-border)] z-[40] transition-transform duration-200 ease overflow-y-auto no-print ${
           isFeedbackDrawerOpen ? "translate-x-0" : "translate-x-full"
         }`}
@@ -301,7 +339,7 @@ const SheetSection = memo(function SheetSection({
     <div className="bg-[var(--color-surface)] border border-[var(--color-border)] rounded-md overflow-hidden mb-4 print:bg-transparent print:border-none print:shadow-none print:p-0">
       {/* Header — click to collapse */}
       <div 
-        className={`flex items-center justify-between px-5 py-4 border-b border-[var(--color-border)] cursor-pointer select-none transition-colors no-print ${isCollapsed ? 'bg-[var(--color-surface)] hover:bg-[var(--color-surface-elevated)]' : 'bg-[var(--color-surface-elevated)] hover:bg-[var(--color-surface-elevated)]'}`}
+        className={`flex items-center justify-between px-5 py-4 border-b border-[var(--color-border)] cursor-pointer select-none transition-colors no-print focus-visible:ring-2 focus-visible:ring-[var(--color-interactive)] focus-visible:outline-none ${isCollapsed ? 'bg-[var(--color-surface)] hover:bg-[var(--color-surface-elevated)]' : 'bg-[var(--color-surface-elevated)] hover:bg-[var(--color-surface-elevated)]'}`}
         onClick={() => onToggleCollapse(sectionId)}
         role="button"
         tabIndex={0}
@@ -497,7 +535,19 @@ function FeedbackCard({
       ) : (
         <div
           onClick={() => setIsEditing(true)}
-          className={`text-[13px] rounded-sm transition-[color,border-color] duration-200 ease cursor-pointer border mt-2 ${
+          onKeyDown={(e) => {
+            if (e.key === 'Enter' || e.key === ' ') {
+              e.preventDefault();
+              setIsEditing(true);
+            }
+          }}
+          role="button"
+          tabIndex={0}
+          aria-label={comment
+            ? (language === "en" ? "Edit feedback for this section" : "Edit umpan balik untuk bagian ini")
+            : (language === "en" ? "Add feedback for this section" : "Tambah umpan balik untuk bagian ini")
+          }
+          className={`text-[13px] rounded-sm transition-[color,border-color] duration-200 ease cursor-pointer border mt-2 focus-visible:ring-2 focus-visible:ring-[var(--color-interactive)] focus-visible:outline-none ${
             comment 
               ? "text-[var(--color-text-secondary)] p-3 bg-[var(--color-bg)] border-[var(--color-border)] hover:border-[var(--color-text-muted)]" 
               : "text-[var(--color-text-muted)] p-3 border-dashed border-[var(--color-border)] bg-transparent hover:border-[var(--color-text-muted)] hover:text-[var(--color-text-secondary)]"

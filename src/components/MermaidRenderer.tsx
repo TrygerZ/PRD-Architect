@@ -1,4 +1,5 @@
 import { useState, useEffect, useRef, useMemo } from "react";
+import DOMPurify from "dompurify";
 
 /**
  * Auto-fix AI-generated Mermaid syntax yang sering error.
@@ -15,46 +16,73 @@ import { useState, useEffect, useRef, useMemo } from "react";
  * 4. Decision nodes `{...}` mengandung parentheses → wrap `{"..."}`
  */
 function sanitizeMermaid(chart: string): string {
+  // MRD-04: Defensive check for non-string input
+  if (typeof chart !== "string") {
+    console.warn("sanitizeMermaid: expected string, got", typeof chart);
+    return "";
+  }
+
   let sanitized = chart;
 
+  // MRD-03: Extract comments to protect them from sanitization
+  const comments: string[] = [];
+  sanitized = sanitized.replace(/%%.*$/gm, (match) => {
+    comments.push(match);
+    return `__COMMENT_${comments.length - 1}__`;
+  });
+
+  // MRD-01: Helper to escape inner double quotes before wrapping
+  function escapeInnerQuotes(content: string): string {
+    return content.replace(/"/g, '\\"');
+  }
+
   // 1. Edge labels |...| containing () → replace () with []
-  //    Example: A -->|text (parens)| B → A -->|text [parens]| B
-  sanitized = sanitized.replace(/\|[^|]+\|/g, (match) =>
-    match.replace(/\(/g, "[").replace(/\)/g, "]")
-  );
+  //    MRD-06: Skip if no parens present
+  sanitized = sanitized.replace(/\|([^|]+)\|/g, (match, content) => {
+    if (!content.includes("(") && !content.includes(")")) return match;
+    return match.replace(/\(/g, "[").replace(/\)/g, "]");
+  });
 
   // 2. Node labels [...] containing parentheses → wrap in double quotes
-  //    Example: B[Start (here)] → B["Start (here)"]
+  //    MRD-05: Check BOTH start AND end quotes; MRD-01: escape inner quotes
   sanitized = sanitized.replace(/\[([^\]]+)\]/g, (match, content) => {
-    if (content.startsWith('"')) return match; // already quoted
+    if (content.startsWith('"') && content.endsWith('"')) return match;
     if (content.includes("(") || content.includes(")")) {
-      return `["${content}"]`;
+      return `["${escapeInnerQuotes(content)}"]`;
     }
     return match;
   });
 
   // 3. Node labels [...] containing commas → wrap in double quotes
-  //    Example: C[Option A, Option B] → C["Option A, Option B"]
+  //    MRD-05: Check BOTH start AND end quotes; MRD-01: escape inner quotes
   sanitized = sanitized.replace(/\[([^\]]+)\]/g, (match, content) => {
-    if (content.startsWith('"')) return match; // already quoted
+    if (content.startsWith('"') && content.endsWith('"')) return match;
     if (content.includes(",")) {
-      return `["${content}"]`;
+      return `["${escapeInnerQuotes(content)}"]`;
     }
     return match;
   });
 
   // 4. Decision nodes {...} containing parentheses → wrap in double quotes
-  //    Example: D{Decision (yes/no)} → D{"Decision (yes/no)"}
+  //    MRD-05: Check BOTH start AND end quotes; MRD-01: escape inner quotes
   sanitized = sanitized.replace(/\{([^}]+)\}/g, (match, content) => {
-    if (content.startsWith('"')) return match; // already quoted
+    if (content.startsWith('"') && content.endsWith('"')) return match;
     if (content.includes("(") || content.includes(")")) {
-      return `{"${content}"}`;
+      return `{"${escapeInnerQuotes(content)}"}`;
     }
     return match;
   });
 
+  // MRD-03: Restore comments after sanitization
+  sanitized = sanitized.replace(/__COMMENT_(\d+)__/g, (_, index) =>
+    comments[parseInt(index)]
+  );
+
   return sanitized;
 }
+
+// MRD-08: Module-level flag to avoid re-initializing mermaid on every render
+let mermaidInitialized = false;
 
 interface MermaidRendererProps {
   chart: string;
@@ -84,15 +112,19 @@ export function MermaidRenderer({ chart }: MermaidRendererProps) {
         const mermaid = await import("mermaid");
         if (cancelled) return;
 
-        mermaid.default.initialize({
-          startOnLoad: false,
-          theme: "dark",
-          themeVariables: {
-            primaryColor: "#1e1e2e",
-            primaryTextColor: "#cdd6f4",
-            fontFamily: "Geist Mono",
-          },
-        });
+        // MRD-08: Only initialize mermaid once
+        if (!mermaidInitialized) {
+          mermaid.default.initialize({
+            startOnLoad: false,
+            theme: "dark",
+            themeVariables: {
+              primaryColor: "#1e1e2e",
+              primaryTextColor: "#cdd6f4",
+              fontFamily: "Geist Mono",
+            },
+          });
+          mermaidInitialized = true;
+        }
 
         const { svg: renderedSvg } = await mermaid.default.render(
           containerId.current,
@@ -100,7 +132,11 @@ export function MermaidRenderer({ chart }: MermaidRendererProps) {
         );
         if (cancelled) return;
 
-        setSvg(renderedSvg);
+        const sanitizedSvg = DOMPurify.sanitize(renderedSvg, {
+          USE_PROFILES: { svg: true, svgFilters: true },
+          ADD_TAGS: ["foreignObject"],
+        });
+        setSvg(sanitizedSvg);
         setStatus("success");
       } catch (err) {
         if (cancelled) return;

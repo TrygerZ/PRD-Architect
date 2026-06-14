@@ -248,6 +248,7 @@ export function FileUploader({
       <AnimatePresence>
         {error && (
           <motion.div
+            role="alert"
             initial={{ opacity: 0, y: -4 }}
             animate={{ opacity: 1, y: 0 }}
             exit={{ opacity: 0, y: -4 }}
@@ -292,7 +293,7 @@ export function FileUploader({
                     removeFile(file.id);
                   }}
                   aria-label={language === "en" ? "Remove file" : "Hapus file"}
-                  className="p-1.5 rounded-md hover:bg-[var(--color-surface-elevated)] text-[var(--color-text-muted)] hover:text-[var(--color-error)] transition-colors active:scale-[0.97]"
+                  className="min-w-[44px] min-h-[44px] flex items-center justify-center rounded-md hover:bg-[var(--color-surface-elevated)] text-[var(--color-text-muted)] hover:text-[var(--color-error)] transition-colors active:scale-[0.97]"
                 >
                   <X className="w-4 h-4" strokeWidth={1.5} />
                 </button>

@@ -1,4 +1,4 @@
-import { useState, useCallback } from "react";
+import { useState, useCallback, useRef } from "react";
 import { PRDVersion } from "../types";
 
 export function useVersion() {
@@ -8,18 +8,26 @@ export function useVersion() {
   // Task 3.4 — Simpan comments per-versionId, bukan global
   const [commentsByVersion, setCommentsByVersion] = useState<Record<string, Record<string, string>>>({});
 
+  // BUG-06 fix — Ref yang selalu sinkron dengan activeVersionId terbaru,
+  // sehingga setComments tidak perlu activeVersionId di dependency array.
+  const activeVersionIdRef = useRef(activeVersionId);
+  activeVersionIdRef.current = activeVersionId;
+
   const activeVersion = versions.find((v) => v.id === activeVersionId);
 
   // Derived: comments untuk versi yang aktif
   const comments = activeVersionId ? (commentsByVersion[activeVersionId] || {}) : {};
 
-  // Setter yang kompatibel dengan tipe Record<string, string> — menyimpan ke versionId aktif
+  // BUG-06 fix — setComments reference STABIL (empty deps).
+  // Menggunakan ref untuk mengakses activeVersionId terbaru, sehingga
+  // reference tidak berubah saat version switch → React.memo di child components tetap efektif.
   const setComments = useCallback((value: Record<string, string>) => {
     setCommentsByVersion(prev => {
-      if (!activeVersionId) return prev;
-      return { ...prev, [activeVersionId]: value };
+      const currentId = activeVersionIdRef.current;
+      if (!currentId) return prev;
+      return { ...prev, [currentId]: value };
     });
-  }, [activeVersionId]);
+  }, []);
 
   const handleNewPRD = useCallback((isGenerating: boolean, abortFn: () => void) => {
     if (isGenerating) {
