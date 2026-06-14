@@ -13,10 +13,14 @@ export function safeGetLocalStorage(key: string, fallback: string = ''): string 
   }
 }
 
-export function safeSetLocalStorage(key: string, value: string): void {
+export function safeSetLocalStorage(key: string, value: string, onError?: (error: Error) => void): void {
   try {
     localStorage.setItem(key, value);
-  } catch {
-    // localStorage penuh atau disabled — silent fail
+  } catch (e) {
+    const error = e instanceof Error ? e : new Error(String(e));
+    if (onError) {
+      onError(error);
+    }
+    // Still silent fail by default, but caller can now handle it
   }
 }

@@ -2,6 +2,8 @@ import { useState, useEffect, useCallback, useRef } from "react";
 import { AIProvider } from "../types";
 import { safeGetLocalStorage, safeSetLocalStorage } from "../utils/storage";
 
+const VALID_PROVIDERS: AIProvider[] = ["deepseek", "gemini", "opencode"];
+
 export function useSettings() {
   const [provider, setProvider] = useState<AIProvider>("deepseek");
   const [model, setModel] = useState<string>("deepseek-v4-flash");
@@ -10,8 +12,10 @@ export function useSettings() {
   useEffect(() => {
     if (hasLoaded.current) return;
     hasLoaded.current = true;
-    const storedProv = safeGetLocalStorage("PRD_AI_PROVIDER") as AIProvider;
-    if (storedProv) setProvider(storedProv);
+    const storedProv = safeGetLocalStorage("PRD_AI_PROVIDER");
+    if (storedProv && VALID_PROVIDERS.includes(storedProv as AIProvider)) {
+      setProvider(storedProv as AIProvider);
+    }
     const storedModel = safeGetLocalStorage("PRD_AI_MODEL");
     if (storedModel) setModel(storedModel);
   }, []);

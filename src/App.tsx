@@ -67,9 +67,10 @@ export default function App() {
     setIsGenerating(false);
   }, []);
 
-  const handleCancel = () => {
+  // BUG-04 fix — Wrap handleCancel with useCallback to prevent unnecessary re-renders
+  const handleCancel = useCallback(() => {
     abortGeneration();
-  };
+  }, [abortGeneration]);
 
   const handleNewPRD = useCallback(() => {
     // Task 3.11 — Confirm dialog jika sudah ada versi
@@ -79,10 +80,23 @@ export default function App() {
       );
       if (!confirmed) return;
     }
-    versionNewPRD(isGenerating, abortGeneration);
+
+    // CRIT-06 fix — Abort any in-flight generation BEFORE resetting state.
+    // Prevents in-flight callbacks from writing to cleared state.
+    if (abortControllerRef.current) {
+      abortControllerRef.current.abort();
+      abortControllerRef.current = null;
+    }
+    isGeneratingRef.current = false;
+    setIsGenerating(false);
+
+    // Pass false for isGenerating since we already aborted above
+    versionNewPRD(false, abortGeneration);
     setCurrentPrompt("");
     setUploadedFiles([]);
-  }, [versionNewPRD, isGenerating, abortGeneration, versions.length, language]);
+    // BUG-05 fix — Removed `isGenerating` from deps. The function uses
+    // abortControllerRef.current directly, so isGenerating state is not needed.
+  }, [versionNewPRD, abortGeneration, versions.length, language]);
 
   // showToast now provided by useToast hook
 
@@ -96,9 +110,10 @@ export default function App() {
 
   // Load preferensi bahasa dari localStorage (default "id")
   useEffect(() => {
-    const storedLang = safeGetLocalStorage("PRD_LANGUAGE") as "id" | "en";
-    if (storedLang === "id" || storedLang === "en") {
-      setLanguage(storedLang);
+    const VALID_LANGUAGES: Array<"id" | "en"> = ["id", "en"];
+    const storedLang = safeGetLocalStorage("PRD_LANGUAGE");
+    if (storedLang && VALID_LANGUAGES.includes(storedLang as "id" | "en")) {
+      setLanguage(storedLang as "id" | "en");
     }
   }, []);
 
@@ -168,21 +183,17 @@ export default function App() {
     prdMode: PRDMode,
     onSuccess?: () => void,
   ) => {
-    // Task 3.5 — Guard Ghost Version: jika sudah generating, batalkan dan skip buat versi baru
+    // CRIT-05 fix — Guard: reject duplicate calls BEFORE any state changes.
+    // Do NOT abort or nullify the existing controller — the first call owns it.
     if (isGeneratingRef.current) {
-      abortControllerRef.current?.abort();
-      abortControllerRef.current = null;
-      setIsGenerating(false);
-      isGeneratingRef.current = false;
       return;
     }
 
-    setIsGenerating(true);
+    // Set state FIRST, then create controller
     isGeneratingRef.current = true;
+    setIsGenerating(true);
     setError(null);
 
-    // Batalkan controller sebelumnya jika masih aktif
-    abortControllerRef.current?.abort();
     const controller = new AbortController();
     abortControllerRef.current = controller;
 
@@ -200,6 +211,11 @@ export default function App() {
 
     setVersions((prev) => [...prev, newVersion]);
     setActiveVersionId(newVersionId);
+
+    // BUG-03 fix — Clear comments AFTER switching to the new version.
+    // Previously setComments({}) was in handleGenerate BEFORE executeGeneration,
+    // which cleared comments for the OLD activeVersionId (stale closure).
+    setComments({});
 
     const lang = languageRef.current;
 
@@ -239,15 +255,20 @@ export default function App() {
       );
       console.error(err);
     } finally {
-      setIsGenerating(false);
-      isGeneratingRef.current = false;
-      abortControllerRef.current = null;
+      // CRIT-05 fix — Only cleanup if THIS call still owns the controller.
+      // Prevents a rejected duplicate call from nullifying the active controller.
+      if (abortControllerRef.current === controller) {
+        abortControllerRef.current = null;
+        isGeneratingRef.current = false;
+        setIsGenerating(false);
+      }
     }
   }, [customApiKey, provider, model, uploadedFiles]);
 
   const handleGenerate = useCallback(async (prompt: string, type: ProductType = "Unknown") => {
     setProductType(type);
-    setComments({}); // reset komentar saat generate baru
+    // BUG-03 fix — setComments({}) moved inside executeGeneration, AFTER
+    // setActiveVersionId(newVersionId), to clear comments for the NEW version.
     await executeGeneration(prompt, prompt, "initial", type, prdModeRef.current);
   }, [executeGeneration]);
 
@@ -606,7 +627,7 @@ export default function App() {
       {showScrollTop && (
         <button
           onClick={handleScrollTop}
-          className={`fixed bottom-[60px] right-[40px] z-[45] w-[36px] h-[36px] rounded-full bg-[var(--color-surface-elevated)] border border-[var(--color-border)] text-[var(--color-text-secondary)] hover:bg-[var(--color-border-subtle)] hover:text-[var(--color-text-primary)] flex items-center justify-center transition-colors duration-200 no-print will-change-transform focus-visible:ring-2 focus-visible:ring-[var(--color-interactive)] focus-visible:outline-none`}
+          className={`fixed bottom-[60px] right-[40px] z-[45] min-w-[44px] min-h-[44px] rounded-full bg-[var(--color-surface-elevated)] border border-[var(--color-border)] text-[var(--color-text-secondary)] hover:bg-[var(--color-border-subtle)] hover:text-[var(--color-text-primary)] flex items-center justify-center transition-colors duration-200 no-print will-change-transform focus-visible:ring-2 focus-visible:ring-[var(--color-interactive)] focus-visible:outline-none`}
           aria-label={language === "en" ? "Scroll to top" : "Kembali ke atas"}
           title={language === "en" ? "Scroll to top" : "Kembali ke atas"}
         >

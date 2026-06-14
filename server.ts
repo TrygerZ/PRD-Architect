@@ -15,6 +15,31 @@ import helmet from "helmet";
 import cookieParser from "cookie-parser";
 import { fileTypeFromFile } from 'file-type';
 
+// Wave 7 — Track A: Union types for type safety (TS-04 to TS-07)
+type AIProvider = "deepseek" | "gemini" | "opencode";
+type PRDMode = "business" | "technical" | "simple";
+type ProductType = "e-commerce" | "SaaS" | "IoT" | "Mobile App" | "Internal Tool" | "Unknown";
+
+// Wave 7 — Track A: Typed chat request body (TS-03)
+interface ChatRequest {
+  model: string;
+  messages: Array<{ role: "system" | "user"; content: string }>;
+  stream: boolean;
+  max_tokens: number;
+  temperature: number;
+  top_p?: number;
+  seed?: number;
+}
+
+// Wave 7 — Track A: SafeError with brand for pre-sanitized errors (TS-11 to TS-13)
+interface SafeError extends Error {
+  __safe: true;
+}
+
+function markSafe(error: Error): SafeError {
+  return Object.assign(error, { __safe: true as const });
+}
+
 interface SSEChunk {
   text?: string;
   reasoning?: string;
@@ -37,6 +62,34 @@ interface SSEChunk {
 
 dotenv.config();
 
+const MAX_EXTRACTED_CHARS = 5_000_000; // 5MB extracted text limit — prevents decompression bombs
+
+// V-UPLOAD-04: Concurrency limiter for file parsing — prevents memory exhaustion
+// when multiple users upload large files simultaneously
+const MAX_CONCURRENT_PARSES = 3;
+let activeParses = 0;
+const parseQueue: Array<() => void> = [];
+
+function acquireParseSlot(): Promise<void> {
+  return new Promise((resolve) => {
+    if (activeParses < MAX_CONCURRENT_PARSES) {
+      activeParses++;
+      resolve();
+    } else {
+      parseQueue.push(resolve);
+    }
+  });
+}
+
+function releaseParseSlot() {
+  activeParses--;
+  if (parseQueue.length > 0 && activeParses < MAX_CONCURRENT_PARSES) {
+    activeParses++;
+    const next = parseQueue.shift();
+    next!();
+  }
+}
+
 // Lacak semua AbortController upstream yang sedang aktif untuk graceful shutdown (BUG L6)
 const activeGenerations = new Set<AbortController>();
 
@@ -54,16 +107,27 @@ function log(level: 'INFO' | 'WARN' | 'ERROR', message: string, data?: any) {
 // Helper untuk error messages bilingual EN/ID (BUG 4.5)
 const t = (en: string, id: string, lang: 'en' | 'id' = 'en') => lang === 'en' ? en : id;
 
+// Wave 3 — Task 3.3: Safe error messages for upstream API errors (prevents leaking sensitive info)
+const safeErrorMessages: Record<number, { en: string; id: string }> = {
+  401: { en: 'Invalid API key. Please check your settings.', id: 'API key tidak valid. Harap periksa pengaturan Anda.' },
+  403: { en: 'API key does not have access. Please check your settings.', id: 'API key tidak memiliki akses. Harap periksa pengaturan Anda.' },
+  429: { en: 'Rate limit reached. Please wait a moment and try again.', id: 'Batas permintaan tercapai. Harap tunggu sebentar dan coba lagi.' },
+  500: { en: 'AI service error. Please try again.', id: 'Layanan AI error. Harap coba lagi.' },
+  502: { en: 'AI service unavailable. Please try again.', id: 'Layanan AI tidak tersedia. Harap coba lagi.' },
+  503: { en: 'AI service temporarily unavailable. Please try again.', id: 'Layanan AI sementara tidak tersedia. Harap coba lagi.' },
+};
+
 const app = express();
 const PORT = parseInt(process.env.PORT || "3000", 10);
 
 // Trust proxy — memastikan rate limiting bekerja di belakang reverse proxy
 app.set('trust proxy', 1);
 
-// CORS: development merefleksikan semua origin, production dibatasi ke origin yang diizinkan
+// CORS: development menggunakan localhost whitelist, production dibatasi ke origin yang diizinkan
 const PRODUCTION_ORIGINS = (process.env.ALLOWED_ORIGINS || 'https://prd-architect.example.com').split(',').map(s => s.trim());
+const DEVELOPMENT_ORIGINS = ['http://localhost:3000', 'http://localhost:5173', 'http://127.0.0.1:3000', 'http://127.0.0.1:5173'];
 app.use(cors({ 
-  origin: process.env.NODE_ENV === 'production' ? PRODUCTION_ORIGINS : true, 
+  origin: process.env.NODE_ENV === 'production' ? PRODUCTION_ORIGINS : DEVELOPMENT_ORIGINS, 
   credentials: true 
 }));
 // Nonce middleware — menghasilkan nonce per request untuk CSP production
@@ -108,15 +172,42 @@ app.use(express.json({ limit: '10mb' }));
 app.use(express.urlencoded({ extended: true, limit: '10mb' }));
 app.use(cookieParser());
 
+// Wave 8 — Track A: Request ID middleware — untuk audit trail dan debugging (Task 8.1)
+app.use((req, res, next) => {
+  const requestId = crypto.randomUUID();
+  req.headers['x-request-id'] = requestId;
+  res.setHeader('X-Request-Id', requestId);
+  next();
+});
+
+// Auth-specific rate limiter — stricter limit for authentication endpoints (Wave 3 — Task 3.1)
+const authLimiter = rateLimit({
+  windowMs: 15 * 60 * 1000, // 15 minutes
+  max: 5, // 5 attempts per 15 minutes
+  standardHeaders: true,
+  legacyHeaders: false,
+  message: { error: "Too many authentication attempts. Please wait 15 minutes. / Terlalu banyak percobaan autentikasi. Harap tunggu 15 menit." }
+});
+app.use("/api/auth/", authLimiter);
+
 const apiLimiter = rateLimit({
   windowMs: 60 * 1000, // 1 minute
   max: 10,
   standardHeaders: true,
   legacyHeaders: false,
-  skip: (req) => req.path.startsWith('/api/auth/'), // BUG 4.2: Jangan batasi auth endpoints
+  skip: (req) => req.path.startsWith('/api/auth/'), // Auth endpoints have their own stricter limiter
   message: { error: "Too many requests. Please slow down. / Terlalu banyak permintaan. Harap pelan-pelan." }
 });
 app.use("/api/", apiLimiter);
+
+// Wave 8 — Track A: Upload-specific rate limiter — stricter limit for file uploads (Task 8.2 / V-UPLOAD-09)
+const uploadLimiter = rateLimit({
+  windowMs: 60 * 1000, // 1 minute
+  max: 5, // 5 upload requests per minute
+  standardHeaders: true,
+  legacyHeaders: false,
+  message: { error: "Too many upload requests. Please slow down." }
+});
 
 const uploadDir = path.join(os.tmpdir(), "uploads");
 if (!fs.existsSync(uploadDir)) {
@@ -170,11 +261,37 @@ const upload = multer({
   fileFilter: fileFilter
 });
 
+// Sanitize cell values to prevent formula/prompt injection via Excel/CSV (CRIT-02)
+function sanitizeCellForAI(value: any): string {
+  if (value === null || value === undefined) return '';
+  const str = String(value);
+  // Prefix formula characters that could become prompt injection vectors
+  // Characters: =, +, -, @, |, % at the start of a string
+  const dangerousPrefixes = ['=', '+', '-', '@', '|', '%'];
+  if (dangerousPrefixes.some(prefix => str.startsWith(prefix))) {
+    return `'${str}`; // Prefix with single quote to neutralize
+  }
+  return str;
+}
+
 async function extractTextFromFile(filePath: string, mimeType: string, originalName: string): Promise<string> {
   const MAX_CHARS = 50000;
   let text = "";
 
   // Magic bytes verification (defense-in-depth layer 2)
+  // Wave 3 — Task 3.4: Reject binary files when type detection fails or returns null
+  const binaryMimeTypes = [
+    'application/pdf',
+    'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
+    'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+    'application/vnd.ms-excel',
+    'image/jpeg',
+    'image/png',
+    'image/gif',
+    'image/webp'
+  ];
+  const isBinaryFile = binaryMimeTypes.includes(mimeType);
+
   try {
     const detectedType = await fileTypeFromFile(filePath);
     if (detectedType) {
@@ -185,21 +302,50 @@ async function extractTextFromFile(filePath: string, mimeType: string, originalN
         log('WARN', `Magic bytes mismatch: file ${originalName} detected as ${ext}, not in allowed list`);
         return `[SECURITY: File "${originalName}" has mismatched content signature (detected as ${ext}). File rejected.]`;
       }
+    } else {
+      // fileTypeFromFile returned null — could not detect type
+      if (isBinaryFile) {
+        log('WARN', `Could not detect file type for binary file ${originalName} (MIME: ${mimeType})`);
+        return `[SECURITY: Could not verify file type for "${originalName}". File rejected.]`;
+      }
+      // For text types, continue (they may not have magic bytes)
     }
   } catch (magicErr) {
-    log('WARN', `Magic bytes check skipped for ${originalName}:`, magicErr);
-    // Continue with existing logic — file-type may not support all formats
+    log('WARN', `Magic bytes check error for ${originalName}:`, magicErr);
+    // For binary types, reject on error — do NOT skip verification
+    if (isBinaryFile) {
+      return `[SECURITY: Could not verify file integrity for "${originalName}". File rejected.]`;
+    }
+    // For text types, continue (they may not have magic bytes)
   }
   try {
     if (mimeType === 'application/pdf') {
       const dataBuffer = await fsp.readFile(filePath);
+      // Check compressed file size vs buffer — detect bomb ratio
+      if (dataBuffer.length > 0) {
+        const stat = await fsp.stat(filePath);
+        const compressionRatio = stat.size / dataBuffer.length;
+        // If file is highly compressed (ratio > 100), it could be a bomb
+        if (compressionRatio > 100) {
+          log('WARN', `Suspicious compression ratio for ${originalName}: ${compressionRatio.toFixed(1)}x`);
+        }
+      }
       const { PDFParse } = await import("pdf-parse");
       const parser = new PDFParse({ data: dataBuffer });
       const result = await parser.getText({ first: 10 }); // Limit to 10 pages
       text = result.text;
+      // Enforce extracted text limit
+      if (text.length > MAX_EXTRACTED_CHARS) {
+        log('WARN', `Extracted text from ${originalName} exceeds limit: ${text.length} chars (max ${MAX_EXTRACTED_CHARS})`);
+        text = text.substring(0, MAX_EXTRACTED_CHARS) + '\n[TRUNCATED: Content exceeded extraction limit]';
+      }
     } else if (mimeType === 'application/vnd.openxmlformats-officedocument.wordprocessingml.document') {
       const result = await mammoth.extractRawText({ path: filePath });
       text = result.value;
+      if (text.length > MAX_EXTRACTED_CHARS) {
+        log('WARN', `Extracted text from ${originalName} exceeds limit: ${text.length} chars`);
+        text = text.substring(0, MAX_EXTRACTED_CHARS) + '\n[TRUNCATED: Content exceeded extraction limit]';
+      }
     } else if (
       mimeType === 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' || 
       mimeType === 'application/vnd.ms-excel' ||
@@ -230,7 +376,7 @@ async function extractTextFromFile(filePath: string, mimeType: string, originalN
         text += `\n--- Sheet: ${worksheet.name} ---\n`;
         worksheet.eachRow((row) => {
           const rowValues = Array.isArray(row.values) ? row.values.slice(1) : [];
-          text += rowValues.join(',') + '\n';
+          text += rowValues.map(v => sanitizeCellForAI(v)).join(',') + '\n';
         });
       });
     } else if (mimeType.startsWith('image/')) {
@@ -248,7 +394,7 @@ async function extractTextFromFile(filePath: string, mimeType: string, originalN
   return text.substring(0, MAX_CHARS);
 }
 
-app.post("/api/upload-files", (req, res) => {
+app.post("/api/upload-files", uploadLimiter, (req, res) => {
   upload.array('files', 5)(req, res, async (err: any) => {
     // Ekstrak bahasa dari form field (BUG L5 — kirim 'language' dari frontend via FormData)
     const language = (req.body?.language === 'en' || req.body?.language === 'id') ? req.body.language : 'en';
@@ -293,24 +439,31 @@ app.post("/api/upload-files", (req, res) => {
         });
       }
 
-      for (const file of files) {
-        const content = await extractTextFromFile(file.path, file.mimetype, file.originalname);
-        
-        uploadedResults.push({
-          id: crypto.randomUUID(),
-          name: file.originalname,
-          size: file.size,
-          type: file.mimetype,
-          content: content,
-          charCount: content.length
-        });
+      // V-UPLOAD-04: Acquire concurrency slot before parsing files
+      await acquireParseSlot();
+      try {
+        for (const file of files) {
+          const content = await extractTextFromFile(file.path, file.mimetype, file.originalname);
+          
+          uploadedResults.push({
+            id: crypto.randomUUID(),
+            name: file.originalname,
+            size: file.size,
+            type: file.mimetype,
+            content: content,
+            charCount: content.length
+          });
+        }
+      } finally {
+        releaseParseSlot();
       }
 
       res.json(uploadedResults);
-    } catch (error: any) {
+    } catch (error: unknown) {
+      const message = error instanceof Error ? error.message : String(error);
       log('ERROR', "Upload error:", error);
       res.status(500).json({
-        error: error.message || (language === 'en' ? "Failed to process files" : "Gagal memproses file")
+        error: message || (language === 'en' ? "Failed to process files" : "Gagal memproses file")
       });
     } finally {
       // Ensure all temp files are cleaned up even if an error occurs mid-processing
@@ -349,7 +502,7 @@ function getIndustrySpecificPrompt(productType: string): string {
   return "";
 }
 
-function getSystemPrompt(language: string, extraPrompt: string, productType: string = "", prdMode: string = "business") {
+function getSystemPrompt(language: string, extraPrompt: string, productType: string = "", prdMode: PRDMode = "business") {
   const isEn = language === 'en';
   
   if (prdMode === 'business') {
@@ -457,7 +610,7 @@ ${extraPrompt ? '\nAdditional Context from User:\n' + extraPrompt : ''}`;
   }
 }
 
-function getRevisionPrompt(language: string, prdMode: string = 'business') {
+function getRevisionPrompt(language: string, prdMode: PRDMode = 'business') {
   const simpleGuard = prdMode === 'simple'
     ? (language === 'id'
       ? '\n10. INI ADALAH SIMPLE PRD (6 chapter). JANGAN mengubah struktur 6 chapter. JANGAN menambahkan analisis pasar, TAM/SAM/SOM, diagram Mermaid, GTM strategy, technical architecture detail, atau compliance — ini BUKAN Business/Technical PRD.'
@@ -492,7 +645,7 @@ CRITICAL INSTRUCTIONS:
 9. Your output will REPLACE the entire existing document, so you MUST include EVERYTHING${simpleGuard}`;
 }
 
-function getAppendPrompt(language: string, prdMode: string = 'business') {
+function getAppendPrompt(language: string, prdMode: PRDMode = 'business') {
   const simpleGuard = prdMode === 'simple'
     ? (language === 'id'
       ? '\n8. INI ADALAH SIMPLE PRD (6 chapter). JANGAN mengubah struktur 6 chapter. Konten baru harus disisipkan ke dalam 6 chapter yang ada — jangan membuat chapter ke-7.'
@@ -564,13 +717,21 @@ app.post("/api/generate-prd", async (req, res) => {
   res.flushHeaders();
 
   let abortController: AbortController | null = null;
+  // CRIT-03 fix: Hoist idle timer vars before try so catch/finally can access them
+  let idleTimer: ReturnType<typeof setTimeout> | null = null;
+  let idleTimedOut = false;
+  // Wave 3 — Task 3.7: Hoist flushTimeout for defensive cleanup in finally block
+  let flushTimeout: ReturnType<typeof setTimeout> | null = null;
   // Ekstrak language di luar try agar accessible di catch block (BUG L5)
   const language: "id" | "en" = (req.body?.language === 'en' || req.body?.language === 'id') ? req.body.language : 'id';
   try {
-    const { prompt, customApiKey, provider = 'deepseek', model = 'deepseek-v4-flash', productType, uploadedFiles, mode = 'initial', prdMode = 'business' } = req.body;
+    const { prompt, customApiKey, provider: rawProvider = 'deepseek', model = 'deepseek-v4-flash', productType, uploadedFiles, mode = 'initial', prdMode: rawPrdMode = 'business' } = req.body;
+    // Wave 7 — Track A: Narrow types from req.body (TS-04 to TS-07)
+    const provider = rawProvider as AIProvider;
+    const prdMode = rawPrdMode as PRDMode;
 
     // Validate provider
-    const VALID_PROVIDERS = ["deepseek", "gemini", "opencode"];
+    const VALID_PROVIDERS: AIProvider[] = ["deepseek", "gemini", "opencode"];
     if (!VALID_PROVIDERS.includes(provider)) {
       if (!res.writableEnded) {
         res.write(`data: ${JSON.stringify({ error: language === 'en' ? `Invalid provider "${provider}". Must be one of: ${VALID_PROVIDERS.join(", ")}` : `Provider "${provider}" tidak valid. Harus salah satu dari: ${VALID_PROVIDERS.join(", ")}` })}\n\n`);
@@ -588,9 +749,18 @@ app.post("/api/generate-prd", async (req, res) => {
       return;
     }
 
-    if (!prompt) {
+    // Wave 3 — Task 3.2: Prompt length validation
+    const MAX_PROMPT_LENGTH = 10000;
+    if (!prompt || typeof prompt !== 'string') {
       if (!res.writableEnded) {
-        res.write(`data: ${JSON.stringify({ error: language === 'en' ? "Prompt is required" : "Prompt diperlukan" })}\n\n`);
+        res.write(`data: ${JSON.stringify({ error: t('Prompt is required.', 'Prompt wajib diisi.', language) })}\n\n`);
+        res.end();
+      }
+      return;
+    }
+    if (prompt.length > MAX_PROMPT_LENGTH) {
+      if (!res.writableEnded) {
+        res.write(`data: ${JSON.stringify({ error: t(`Prompt too long (max ${MAX_PROMPT_LENGTH} characters).`, `Prompt terlalu panjang (maksimal ${MAX_PROMPT_LENGTH} karakter).`, language) })}\n\n`);
         res.end();
       }
       return;
@@ -702,13 +872,13 @@ app.post("/api/generate-prd", async (req, res) => {
     });
 
     // 1. Konfigurasi semua header terlebih dahulu
-    let fetchHeaders: any = {
+    let fetchHeaders: Record<string, string> = {
       "Content-Type": "application/json",
       "Authorization": "Bearer " + apiKey,
     };
 
     // 2. Siapkan body request
-    let fetchBody: any = {};
+    let fetchBody: ChatRequest;
 
     if (provider === "gemini") {
       fetchBody = {
@@ -718,7 +888,7 @@ app.post("/api/generate-prd", async (req, res) => {
           { role: "user", content: finalUserPrompt }
         ],
         stream: true,
-        max_tokens: 8192,
+        max_tokens: 65536, // Wave 8 — Track A: Increased from 8192 for full PRD generation (Task 8.3 / STREAM-12)
         temperature: 0.1,
       };
     } else {
@@ -729,7 +899,7 @@ app.post("/api/generate-prd", async (req, res) => {
           { role: "user", content: finalUserPrompt }
         ],
         stream: true,
-        max_tokens: 16384,
+        max_tokens: 65536, // Wave 8 — Track A: Increased from 16384 for full PRD generation (Task 8.3 / STREAM-12)
         temperature: 0.1,
         top_p: 0.1,
         seed: 42,
@@ -737,40 +907,47 @@ app.post("/api/generate-prd", async (req, res) => {
     }
 
     // 3. Buat fetchOptions SETELAH semua header dan body selesai dikonfigurasi
-    // Gabungkan client abort signal dengan timeout 120 detik (BUG B1)
-    const timeoutSignal = AbortSignal.timeout(120_000);
-    const combinedSignal = abortController
-      ? AbortSignal.any([abortController.signal, timeoutSignal])
-      : timeoutSignal;
+    // CRIT-03 fix: Replace absolute 120s deadline with idle timeout (reset per chunk)
+    const IDLE_TIMEOUT = 120_000; // 120 seconds of no activity
+
+    const resetIdleTimer = () => {
+      if (idleTimer) clearTimeout(idleTimer);
+      idleTimer = setTimeout(() => {
+        idleTimedOut = true;
+        log('WARN', `Idle timeout (${IDLE_TIMEOUT}ms) reached — no chunks received from upstream`);
+        abortController?.abort();
+        // Send error to client instead of silent [DONE]
+        if (!res.writableEnded) {
+          res.write(`data: ${JSON.stringify({ error: language === 'en'
+            ? 'Generation timed out — no response from AI model for 2 minutes. Please try again.'
+            : 'Generasi berhenti — tidak ada respons dari model AI selama 2 menit. Silakan coba lagi.'
+          })}\n\n`);
+          res.write('data: [DONE]\n\n');
+          res.end();
+        }
+      }, IDLE_TIMEOUT);
+    };
+
+    // Start idle timer before fetch
+    resetIdleTimer();
+
     let fetchOptions: RequestInit = {
       method: "POST",
       headers: fetchHeaders,
-      signal: combinedSignal,
+      signal: abortController?.signal,
       body: JSON.stringify(fetchBody),
     };
 
     const response = await fetch(endpoint, fetchOptions);
 
     if (!response.ok) {
-      log('ERROR', `Provider Error: HTTP ${response.status} from AI provider`);
-      // Map HTTP status code ke error message spesifik (BUG B8)
-      if (response.status === 401 || response.status === 403) {
-        throw new Error(language === 'en'
-          ? 'Invalid API key. Please check your settings.'
-          : 'API key tidak valid. Periksa pengaturan Anda.');
-      } else if (response.status === 429) {
-        throw new Error(language === 'en'
-          ? 'Rate limit exceeded. Please wait a moment and try again.'
-          : 'Batas permintaan terlampaui. Tunggu sebentar dan coba lagi.');
-      } else if (response.status >= 500) {
-        throw new Error(language === 'en'
-          ? `AI provider error (${response.status}). Please try again later.`
-          : `Error penyedia AI (${response.status}). Coba lagi nanti.`);
-      } else {
-        throw new Error(language === 'en'
-          ? `AI provider error (${response.status}). Please check your settings.`
-          : `Error penyedia AI (${response.status}). Periksa pengaturan Anda.`);
-      }
+      // Wave 3 — Task 3.3: Use safe error messages map, log full details server-side only
+      const status = response.status;
+      const safeMsg = safeErrorMessages[status] || { en: 'An error occurred. Please try again.', id: 'Terjadi kesalahan. Harap coba lagi.' };
+      const errorMsg = language === 'en' ? safeMsg.en : safeMsg.id;
+      log('ERROR', `Upstream API error (status ${status}): ${response.statusText}`);
+      const safeError = markSafe(new Error(errorMsg)); // Mark as pre-sanitized
+      throw safeError;
     }
 
     const reader = response.body?.getReader();
@@ -781,20 +958,52 @@ app.post("/api/generate-prd", async (req, res) => {
     let consecutiveParseErrors = 0;
 
     // BUG 4.4: Helper untuk SSE write dengan backpressure handling
+    // Wave 3 — Task 3.6: Added timeout + close-event guard to prevent Promise hang
     const writeChunk = (data: string): Promise<void> => {
-      return new Promise((resolve) => {
-        if (!res.write(data)) {
-          res.once('drain', resolve);
-        } else {
-          resolve();
+      return new Promise((resolve, reject) => {
+        let settled = false;
+        const settle = (fn: () => void) => {
+          if (!settled) {
+            settled = true;
+            fn();
+          }
+        };
+
+        const timeout = setTimeout(() => {
+          settle(() => reject(new Error('writeChunk timeout — response may be closed')));
+        }, 5000);
+
+        const onClose = () => {
+          clearTimeout(timeout);
+          settle(() => resolve()); // Resolve gracefully on client disconnect
+        };
+        res.once('close', onClose);
+
+        const canContinue = res.write(data, 'utf8', (err) => {
+          clearTimeout(timeout);
+          res.removeListener('close', onClose);
+          if (err) {
+            settle(() => reject(err));
+          } else {
+            settle(() => resolve());
+          }
+        });
+
+        if (canContinue) {
+          clearTimeout(timeout);
+          res.removeListener('close', onClose);
+          settle(() => resolve());
         }
       });
     };
 
     while (true) {
-      consecutiveParseErrors = 0; // BUG 4.9: Reset di awal setiap iterasi agar tidak menumpuk
+      // Wave 3 — Task 3.5: Do NOT reset consecutiveParseErrors here — it must only reset on successful parse (inside try block)
       const { done, value } = await reader.read();
       if (done) break;
+
+      // CRIT-03 fix: Reset idle timer on every chunk received from upstream
+      resetIdleTimer();
 
       buffer += decoder.decode(value, { stream: true });
       const lines = buffer.split('\n');
@@ -820,7 +1029,10 @@ app.post("/api/generate-prd", async (req, res) => {
             log('WARN', "Custom provider parse error", e instanceof Error ? e.message : e);
             consecutiveParseErrors++;
             if (consecutiveParseErrors > 5) {
-              throw new Error("Too many malformed chunks from server. Stream aborted.");
+              const parseError = markSafe(new Error(language === 'en'
+                ? 'Too many malformed chunks from server. Stream aborted.'
+                : 'Terlalu banyak chunk rusak dari server. Stream dibatalkan.'));
+              throw parseError;
             }
           }
         }
@@ -845,19 +1057,44 @@ app.post("/api/generate-prd", async (req, res) => {
 
   } catch (error) {
     if (error instanceof Error && error.name === 'AbortError') {
-      log('INFO', 'Request aborted.');
-      if (!res.writableEnded) {
-        res.write(`data: [DONE]\n\n`);
-        res.end();
+      if (idleTimedOut) {
+        // Idle timeout already sent error message + [DONE] to client
+        log('INFO', 'Request aborted due to idle timeout — error already sent to client.');
+      } else {
+        // User-initiated abort (client disconnect)
+        log('INFO', 'Request aborted by client.');
+        if (!res.writableEnded) {
+          res.write(`data: [DONE]\n\n`);
+          res.end();
+        }
       }
       return;
     }
     log('ERROR', "Error generating PRD:", error);
     if (!res.writableEnded) {
-      res.write(`data: ${JSON.stringify({ error: error instanceof Error ? error.message : (language === 'en' ? "Internal server error" : "Kesalahan server internal") })}\n\n`);
+      // Wave 3 — Task 3.3: Only forward pre-sanitized error messages; use generic message for unexpected errors
+      // Wave 7 — Track A: Use SafeError type guard instead of `as any` (TS-11 to TS-13)
+      const isSafeError = error instanceof Error && '__safe' in error && (error as SafeError).__safe === true;
+      const errorMsg = isSafeError
+        ? (error as Error).message
+        : t('An unexpected error occurred. Please try again.', 'Terjadi kesalahan tak terduga. Harap coba lagi.', language);
+      if (!isSafeError && error instanceof Error) {
+        log('ERROR', `Sanitized error message (original): ${error.message}`);
+      }
+      res.write(`data: ${JSON.stringify({ error: errorMsg })}\n\n`);
       res.end();
     }
   } finally {
+    // CRIT-03 fix: Clean up idle timer to prevent memory leaks
+    if (idleTimer) {
+      clearTimeout(idleTimer);
+      idleTimer = null;
+    }
+    // Wave 3 — Task 3.7: Clean up flushTimeout to prevent memory leaks or writes after response end
+    if (flushTimeout) {
+      clearTimeout(flushTimeout);
+      flushTimeout = null;
+    }
     // Bersihkan AbortController dari tracking (BUG L6)
     if (abortController) {
       activeGenerations.delete(abortController);
