@@ -4,9 +4,10 @@ import { sanitizeMermaid } from "../utils/mermaid";
 
 // MRD-08: Module-level flag to avoid re-initializing mermaid on every render
 let mermaidInitialized = false;
-let mermaidModule: any = null;
+type MermaidModule = typeof import("mermaid");
+let mermaidModule: MermaidModule | null = null;
 
-async function getMermaidModule() {
+async function getMermaidModule(): Promise<MermaidModule> {
   if (!mermaidModule) {
     mermaidModule = await import("mermaid");
   }

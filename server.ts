@@ -18,6 +18,7 @@ import { fileTypeFromFile } from 'file-type';
 // Wave 7 — Track A: Union types for type safety (TS-04 to TS-07)
 // Shared with the frontend via /shared/types.ts (single source of truth)
 import type { AIProvider, PRDMode, ProductType } from "./shared/types";
+import { PROVIDER_MODELS } from "./shared/models";
 
 // Wave 7 — Track A: Typed chat request body (TS-03)
 interface ChatRequest {
@@ -237,7 +238,7 @@ const storage = multer.diskStorage({
   }
 });
 
-const fileFilter = (req: any, file: Express.Multer.File, cb: multer.FileFilterCallback) => {
+const fileFilter = (_req: express.Request, file: Express.Multer.File, cb: multer.FileFilterCallback) => {
   try {
     // Whitelist ketat ekstensi file yang diizinkan (defense-in-depth layer 1)
     const allowedExtensions = ['.pdf', '.docx', '.xlsx', '.csv', '.md', '.txt', '.jpg', '.jpeg', '.png', '.gif', '.webp'];
@@ -819,24 +820,11 @@ app.post("/api/generate-prd", async (req, res) => {
       finalUserPrompt += language === 'en' ? forcedDirectiveEn : forcedDirectiveId;
     }
 
-    let apiKeyEnvName = "";
-    let endpoint = "";
-    let modelName = model;
-
-    if (provider === "gemini") {
-      apiKeyEnvName = "GEMINI_API_KEY";
-      // OpenAI-compatible endpoint (stable as of 2025 — Google Generative Language API)
-      endpoint = "https://generativelanguage.googleapis.com/v1beta/openai/chat/completions";
-      if (!modelName) modelName = "gemini-2.5-flash";
-    } else if (provider === "opencode") {
-      apiKeyEnvName = "OPENCODE_API_KEY";
-      endpoint = "https://opencode.ai/zen/v1/chat/completions";
-      if (!modelName) modelName = "deepseek-v4-flash-free";
-    } else {
-      apiKeyEnvName = "DEEPSEEK_API_KEY";
-      endpoint = "https://api.deepseek.com/chat/completions";
-      if (!modelName) modelName = "deepseek-v4-flash";
-    }
+    // Katalog model & endpoint terpusat (shared/models.ts) — hindari drift FE/BE.
+    const providerConfig = PROVIDER_MODELS[provider as AIProvider] ?? PROVIDER_MODELS.deepseek;
+    const apiKeyEnvName = providerConfig.apiKeyEnvName;
+    const endpoint = providerConfig.endpoint;
+    const modelName = model || providerConfig.defaultModel;
 
     // Server-side API key fallback — prioritas: body key > cookie > .env
     const serverKey = process.env[apiKeyEnvName];

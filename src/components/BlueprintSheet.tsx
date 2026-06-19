@@ -1,4 +1,4 @@
-import React, { useState, useEffect, memo, useCallback, useMemo } from "react";
+import React, { useState, useEffect, useRef, memo, useCallback, useMemo } from "react";
 import ReactMarkdown from "react-markdown";
 import remarkGfm from "remark-gfm";
 import {
@@ -7,7 +7,8 @@ import {
   ChevronDown,
   MessageSquareText,
   X,
-  ClipboardCopy
+  ClipboardCopy,
+  GitCompare
 } from "lucide-react";
 import { PRDVersion, PRDMode } from "../types";
 import { formatDate } from "../utils/format";
@@ -28,6 +29,7 @@ interface BlueprintSheetProps {
   isGenerating?: boolean;
   language: "id" | "en";
   onConvertMode?: (mode: PRDMode) => void;
+  onCompareVersions?: () => void;
 }
 
 export const BlueprintSheet = memo(function BlueprintSheet({
@@ -41,6 +43,7 @@ export const BlueprintSheet = memo(function BlueprintSheet({
   isGenerating,
   language,
   onConvertMode,
+  onCompareVersions,
 }: BlueprintSheetProps) {
   const sections = useMemo(() => getSections(content), [content]);
   const totalComments = Object.values(comments).filter(
@@ -215,6 +218,19 @@ className={`fixed bottom-[140px] sm:bottom-[100px] right-[16px] sm:right-[40px] 
               )}
             </div>
             <div className="flex items-center gap-2">
+              {/* Task 3.4 — Bandingkan dua versi */}
+              {onCompareVersions && versions.length > 1 && (
+                <button
+                  type="button"
+                  onClick={onCompareVersions}
+                  className="bg-transparent text-[13px] text-[var(--color-text-secondary)] border border-[var(--color-border)] rounded-sm px-3 py-2 min-h-[36px] flex items-center gap-1.5 hover:bg-[var(--color-surface-elevated)] hover:text-[var(--color-text-primary)] transition-colors focus:outline-none focus-visible:ring-2 focus-visible:ring-[var(--color-interactive)]"
+                  aria-label={language === "en" ? "Compare versions" : "Bandingkan versi"}
+                  title={language === "en" ? "Compare versions" : "Bandingkan versi"}
+                >
+                  <GitCompare size={14} strokeWidth={1.5} />
+                  <span className="hidden sm:inline">{language === "en" ? "Diff" : "Diff"}</span>
+                </button>
+              )}
               {/* Task 1.7 — Convert ke mode lain */}
               {onConvertMode && (
                 <select
@@ -272,22 +288,100 @@ className={`fixed bottom-[140px] sm:bottom-[100px] right-[16px] sm:right-[40px] 
           {sections.map((section, index) => {
             const sectionId = `sec_${section.heading.substring(0, 30).replace(/[^a-zA-Z0-9]/g, '_')}_${index}`;
             return (
-              <SheetSection
+              <LazySection
                 key={sectionId}
-                section={section}
-                sectionId={sectionId}
+                // Task 2.4 — Saat streaming, force-render agar konten yang
+                // mengalir langsung terlihat. Setelah selesai, virtualisasi.
+                forceRender={!!isGenerating}
+                heading={section.heading}
                 index={index}
                 total={sections.length}
-                isCollapsed={collapsedStates[sectionId] || false}
-                onToggleCollapse={handleToggleCollapse}
-                isGenerating={isGenerating}
-                language={language}
-                onOpenFeedback={handleOpenFeedback}
-              />
+              >
+                <SheetSection
+                  section={section}
+                  sectionId={sectionId}
+                  index={index}
+                  total={sections.length}
+                  isCollapsed={collapsedStates[sectionId] || false}
+                  onToggleCollapse={handleToggleCollapse}
+                  isGenerating={isGenerating}
+                  language={language}
+                  onOpenFeedback={handleOpenFeedback}
+                />
+              </LazySection>
             );
           })}
         </div>
       )}
+    </div>
+  );
+});
+
+// Task 2.4 — Virtualisasi konten panjang via IntersectionObserver.
+// Saat section jauh dari viewport (dan PRD sudah selesai dirender),
+// tampilkan placeholder ringan (heading + index) alih-alih merender
+// markdown + Mermaid berat. Saat mendekati viewport, render penuh.
+const LazySection = memo(function LazySection({
+  children,
+  forceRender,
+  heading,
+  index,
+  total,
+}: {
+  children: React.ReactNode;
+  forceRender: boolean;
+  heading: string;
+  index: number;
+  total: number;
+}) {
+  const ref = useRef<HTMLDivElement>(null);
+  const [visible, setVisible] = useState(forceRender);
+
+  useEffect(() => {
+    if (forceRender) {
+      setVisible(true);
+      return;
+    }
+    const el = ref.current;
+    if (!el) return;
+    // Jika IntersectionObserver tidak tersedia, fallback render penuh.
+    if (typeof IntersectionObserver === "undefined") {
+      setVisible(true);
+      return;
+    }
+    const observer = new IntersectionObserver(
+      (entries) => {
+        for (const entry of entries) {
+          if (entry.isIntersecting) {
+            setVisible(true);
+            observer.disconnect();
+          }
+        }
+      },
+      { rootMargin: "600px 0px" }, // preload sebelum benar-benar terlihat
+    );
+    observer.observe(el);
+    return () => observer.disconnect();
+  }, [forceRender]);
+
+  if (visible) {
+    return <>{children}</>;
+  }
+
+  // Placeholder ringan — tinggi kasar dijaga agar scroll tidak "jump".
+  return (
+    <div
+      ref={ref}
+      className="bg-[var(--color-surface)] border border-[var(--color-border)] rounded-md overflow-hidden mb-4 print:hidden"
+      style={{ minHeight: 120 }}
+    >
+      <div className="flex items-center justify-between px-5 py-4 border-b border-[var(--color-border)]">
+        <div className="flex items-center gap-3">
+          <ChevronDown className="w-4 h-4 text-[var(--color-text-muted)] -rotate-90" strokeWidth={1.5} aria-hidden="true" />
+          <h2 className="text-[var(--color-text-primary)] text-[14px] font-semibold truncate">{heading}</h2>
+        </div>
+        <span className="text-[11px] font-mono text-[var(--color-text-muted)]">{index + 1}/{total}</span>
+      </div>
     </div>
   );
 });
@@ -395,10 +489,11 @@ const SheetSection = memo(function SheetSection({
                 td: ({ node, ...props }) => (
                   <td className="px-4 py-3 align-top leading-relaxed text-[var(--color-text-secondary)] print:text-black min-w-[120px] text-[13px]" {...props} />
                 ),
-                pre: ({ node, children, ...props }: { node?: any; children?: React.ReactNode; [key: string]: any }) => {
+                pre: ({ node, children, ...props }: { node?: unknown; children?: React.ReactNode }) => {
                   // MRD-13: Skip outer box for mermaid — MermaidRenderer has its own chrome.
                   // Otherwise we get a double-box (pre box + MermaidRenderer box).
-                  const isMermaid = node?.children?.[0]?.properties?.className?.includes("language-mermaid");
+                  const firstChild = (node as { children?: Array<{ properties?: { className?: string[] } }> } | undefined)?.children?.[0];
+                  const isMermaid = firstChild?.properties?.className?.includes("language-mermaid");
                   if (isMermaid) {
                     return <>{children}</>;
                   }

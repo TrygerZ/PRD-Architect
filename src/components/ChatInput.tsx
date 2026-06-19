@@ -2,6 +2,9 @@ import { useState, useRef, useEffect } from "react";
 import { Send, Paperclip, Loader2, Pause } from "lucide-react";
 import { getQuickPrompts } from "../utils/quickPrompts";
 import { estimateTokens, formatTokenCount } from "../utils/tokens";
+import { safeGetLocalStorage, safeSetLocalStorage } from "../utils/storage";
+
+const DRAFT_KEY = "PRD_DRAFT";
 
 interface ChatInputProps {
   onSend: (text: string) => void;
@@ -27,7 +30,8 @@ export function ChatInput({
   showQuickPrompts = false,
   fileContextChars = 0,
 }: ChatInputProps) {
-  const [prompt, setPrompt] = useState(initialPrompt);
+  // Task 3.5 — Restore draft prompt yang tersimpan saat mount (jika tidak ada initialPrompt)
+  const [prompt, setPrompt] = useState(() => initialPrompt || safeGetLocalStorage(DRAFT_KEY));
   const textareaRef = useRef<HTMLTextAreaElement>(null);
 
   // Task 1.5 — estimasi token input (prompt + konteks file)
@@ -39,11 +43,25 @@ export function ChatInput({
     }
   }, [initialPrompt]);
 
+  // Task 3.5 — Autosave draft prompt ke localStorage (debounce 400ms)
+  useEffect(() => {
+    const t = setTimeout(() => {
+      if (prompt.trim()) {
+        safeSetLocalStorage(DRAFT_KEY, prompt);
+      } else {
+        safeSetLocalStorage(DRAFT_KEY, "");
+      }
+    }, 400);
+    return () => clearTimeout(t);
+  }, [prompt]);
+
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
     if (!prompt.trim() || isGenerating) return;
     onSend(prompt);
     setPrompt("");
+    // Task 3.5 — Hapus draft setelah submit sukses
+    safeSetLocalStorage(DRAFT_KEY, "");
   };
 
   const handleKeyDown = (e: React.KeyboardEvent<HTMLTextAreaElement>) => {

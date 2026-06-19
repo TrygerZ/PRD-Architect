@@ -2,6 +2,7 @@ import { motion } from "motion/react";
 import { getQuickPrompts } from "../utils/quickPrompts";
 import { PRDMode } from "../types";
 import { Briefcase, Code, Zap } from "lucide-react";
+import { useT } from "../hooks/useT";
 
 interface WelcomeScreenProps {
   language: "en" | "id";
@@ -11,6 +12,7 @@ interface WelcomeScreenProps {
 }
 
 export function WelcomeScreen({ language, onQuickPrompt, prdMode, onChangeMode }: WelcomeScreenProps) {
+  const t = useT(language);
   return (
     <div className="w-full flex flex-col items-center justify-center flex-1 h-full pt-[5vh] sm:pt-[10vh]">
       <motion.div 
@@ -20,16 +22,14 @@ export function WelcomeScreen({ language, onQuickPrompt, prdMode, onChangeMode }
         className="text-center w-full max-w-[640px]"
       >
         <h1 className="text-[36px] sm:text-[48px] font-[700] text-[var(--color-text-primary)] mb-2 tracking-tight">
-          PRD Architect
+          {t.welcome.title}
         </h1>
         <p className="text-[15px] text-[var(--color-text-secondary)]">
-          {language === "en" 
-            ? "Describe your product. Get a comprehensive, enterprise-grade PRD."
-            : "Jelaskan produk Anda. Dapatkan PRD komprehensif tingkat enterprise."}
+          {t.welcome.tagline}
         </p>
         <div className="w-12 h-[2px] bg-[var(--color-border)] mx-auto my-6"></div>
 
-        <div role="radiogroup" aria-label={language === "en" ? "PRD Mode" : "Mode PRD"} className="grid grid-cols-1 sm:grid-cols-3 gap-4 mb-8 text-left w-full px-4 sm:px-0 mx-auto">
+        <div role="radiogroup" aria-label={t.welcome.modeGroupLabel} className="grid grid-cols-1 sm:grid-cols-3 gap-4 mb-8 text-left w-full px-4 sm:px-0 mx-auto">
           <button 
             type="button"
             role="radio"
@@ -43,10 +43,10 @@ export function WelcomeScreen({ language, onQuickPrompt, prdMode, onChangeMode }
           >
             <span className={`text-[15px] font-semibold flex items-center justify-center gap-2 ${prdMode === "business" ? "text-[var(--color-text-primary)]" : "text-[var(--color-text-secondary)]"}`}>
               <Briefcase className="w-5 h-5" />
-              {language === "en" ? "Business & Investor Mode" : "Mode Bisnis & Investor"}
+              {t.welcome.businessMode}
             </span>
             <span className="text-[13px] text-[var(--color-text-secondary)]">
-              {language === "en" ? "Focus on business metrics, ROI, and GTM roadmap" : "Fokus pada metrik bisnis, ROI, dan GTM roadmap"}
+              {t.welcome.businessDesc}
             </span>
           </button>
 
@@ -63,10 +63,10 @@ export function WelcomeScreen({ language, onQuickPrompt, prdMode, onChangeMode }
           >
             <span className={`text-[15px] font-semibold flex items-center justify-center gap-2 ${prdMode === "simple" ? "text-[var(--color-text-primary)]" : "text-[var(--color-text-secondary)]"}`}>
               <Zap className="w-5 h-5" />
-              {language === "en" ? "Simple PRD" : "PRD Sederhana"}
+              {t.welcome.simpleMode}
             </span>
             <span className="text-[13px] text-[var(--color-text-secondary)]">
-              {language === "en" ? "Focus on problem, MVP features, and action plan" : "Fokus pada masalah, fitur MVP, dan rencana aksi"}
+              {t.welcome.simpleDesc}
             </span>
           </button>
 
@@ -83,10 +83,10 @@ export function WelcomeScreen({ language, onQuickPrompt, prdMode, onChangeMode }
           >
             <span className={`text-[15px] font-semibold flex items-center justify-center gap-2 ${prdMode === "technical" ? "text-[var(--color-text-primary)]" : "text-[var(--color-text-secondary)]"}`}>
               <Code className="w-5 h-5" />
-              {language === "en" ? "AI Agent & Developer Mode" : "Mode AI Agent & Developer"}
+              {t.welcome.technicalMode}
             </span>
             <span className="text-[13px] text-[var(--color-text-secondary)]">
-              {language === "en" ? "Focus on database schemas, API payloads, and architecture" : "Fokus pada skema database, payload API, dan arsitektur"}
+              {t.welcome.technicalDesc}
             </span>
           </button>
         </div>

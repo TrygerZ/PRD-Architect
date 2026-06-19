@@ -124,9 +124,10 @@ export function FileUploader({
             }
             const results = await response.json();
             content = results[0]?.content || `[Error: Tidak ada konten dari ${file.name}]`;
-          } catch (uploadErr: any) {
+          } catch (uploadErr: unknown) {
             console.error(`Gagal parsing ${file.name}:`, uploadErr);
-            content = `[Error parsing ${file.name}: ${uploadErr.message}]`;
+            const msg = uploadErr instanceof Error ? uploadErr.message : String(uploadErr);
+            content = `[Error parsing ${file.name}: ${msg}]`;
           }
         } else if (file.type.startsWith('image/')) {
           // Image: baca sebagai data URL untuk ditampilkan
@@ -156,9 +157,10 @@ export function FileUploader({
         });
       }
       onFilesChange(prev => [...prev, ...localResults]);
-    } catch (err: any) {
+    } catch (err: unknown) {
       console.error("File Read Error:", err);
-      setError(err.message || "An error occurred while reading files");
+      const msg = err instanceof Error ? err.message : "An error occurred while reading files";
+      setError(msg);
     } finally {
       setIsUploading(false);
     }

@@ -3,6 +3,7 @@ import { Key, X, Check, AlertTriangle } from "lucide-react";
 import { motion, AnimatePresence } from "motion/react";
 
 import { AIProvider } from "../types";
+import { MODELS_BY_PROVIDER, PROVIDER_MODELS } from "../../shared/models";
 import { safeGetLocalStorage, safeSetLocalStorage } from "../utils/storage";
 
 interface ApiKeyModalProps {
@@ -20,7 +21,7 @@ export function ApiKeyModal({
   onSave,
   language,
   initialProvider = "deepseek",
-  initialModel = "deepseek-v4-flash",
+  initialModel = PROVIDER_MODELS.deepseek.defaultModel,
 }: ApiKeyModalProps) {
   const [apiKey, setApiKey] = useState("");
   const [provider, setProvider] = useState<AIProvider>(initialProvider);
@@ -52,17 +53,7 @@ export function ApiKeyModal({
     }
   };
 
-  const MODELS: Record<AIProvider, string[]> = {
-    deepseek: ["deepseek-v4-flash", "deepseek-v4-pro"],
-    gemini: ["gemini-2.5-flash", "gemini-2.5-pro"],
-    opencode: [
-      "deepseek-v4-flash-free",
-      "nemotron-3-ultra-free",
-      "mimo-v2.5-free",
-      "north-mini-code-free",
-      "big-pickle"
-    ]
-  };
+  const MODELS = MODELS_BY_PROVIDER;
 
   useEffect(() => {
     if (isOpen) {

@@ -1,9 +1,14 @@
-import { Settings, Download, Copy, Printer, PanelLeft } from "lucide-react";
+import { useState, useRef, useEffect } from "react";
+import { Settings, Copy, Printer, PanelLeft, ChevronDown, FileText, FileType, FileJson, FileDown } from "lucide-react";
 import { motion } from "motion/react";
+import { useT } from "../hooks/useT";
 
 interface HeaderProps {
   onOpenSettings: () => void;
   onExportMd: () => void;
+  onExportDocx: () => void;
+  onExportPdf: () => void;
+  onExportJson: () => void;
   onCopy: () => void;
   onPrint: () => void;
   hasData: boolean;
@@ -16,6 +21,9 @@ interface HeaderProps {
 export function Header({
   onOpenSettings,
   onExportMd,
+  onExportDocx,
+  onExportPdf,
+  onExportJson,
   onCopy,
   onPrint,
   hasData,
@@ -24,6 +32,40 @@ export function Header({
   minimal = false,
   onToggleSidebar,
 }: HeaderProps) {
+  const [exportOpen, setExportOpen] = useState(false);
+  const exportRef = useRef<HTMLDivElement>(null);
+  const t = useT(language);
+
+  useEffect(() => {
+    if (!exportOpen) return;
+    const handleClick = (e: MouseEvent) => {
+      if (exportRef.current && !exportRef.current.contains(e.target as Node)) {
+        setExportOpen(false);
+      }
+    };
+    const handleKey = (e: KeyboardEvent) => {
+      if (e.key === "Escape") setExportOpen(false);
+    };
+    document.addEventListener("mousedown", handleClick);
+    document.addEventListener("keydown", handleKey);
+    return () => {
+      document.removeEventListener("mousedown", handleClick);
+      document.removeEventListener("keydown", handleKey);
+    };
+  }, [exportOpen]);
+
+  const runExport = (fn: () => void) => {
+    fn();
+    setExportOpen(false);
+  };
+
+  const exportItems: Array<{ label: string; icon: typeof FileText; onClick: () => void }> = [
+    { label: t.header.exportMd, icon: FileText, onClick: onExportMd },
+    { label: t.header.exportDocx, icon: FileType, onClick: onExportDocx },
+    { label: t.header.exportPdf, icon: FileDown, onClick: onExportPdf },
+    { label: t.header.exportJson, icon: FileJson, onClick: onExportJson },
+  ];
+
   return (
     <motion.header 
       initial={{ opacity: 0, y: -20 }}
@@ -35,7 +77,7 @@ export function Header({
         {onToggleSidebar && (
           <button 
             onClick={onToggleSidebar}
-            aria-label={language === "en" ? "Toggle sidebar" : "Buka/Tutup sidebar"}
+            aria-label={t.header.toggleSidebar}
             className="text-[var(--color-text-secondary)] hover:text-[var(--color-text-primary)] transition-[color,transform] duration-200 ease p-2 rounded-sm hover:bg-[var(--color-surface-elevated)] mr-2 focus-visible:ring-2 focus-visible:ring-[var(--color-interactive)] focus-visible:outline-none active:scale-[0.97]"
           >
             <PanelLeft size={18} strokeWidth={1.5} />
@@ -49,55 +91,76 @@ export function Header({
       <div className="flex items-center gap-2 sm:gap-4 ml-auto">
         {!minimal && hasData && (
           <div className="flex items-center gap-1.5 sm:gap-2 mr-2 sm:mr-4 pr-2 sm:pr-6 border-r border-[var(--color-border)]">
-            {/* Export buttons */}
             <button
                onClick={onCopy}
                className="text-[var(--color-text-secondary)] hover:text-[var(--color-text-primary)] transition-[color,transform] duration-200 ease py-2 px-3 flex items-center gap-1.5 text-[13px] font-medium rounded-[6px] hover:bg-[var(--color-surface-elevated)] focus-visible:ring-2 focus-visible:ring-[var(--color-interactive)] focus-visible:outline-none active:scale-[0.97]"
-               aria-label={language === "en" ? "Copy" : "Salin"}
-               title={language === "en" ? "Copy as Text" : "Salin Text"}
+               aria-label={t.header.copy}
+               title={t.header.copyTitle}
             >
               <Copy size={16} strokeWidth={1.5} />
               <span className="hidden sm:inline">
-                {language === "en" ? "Copy" : "Salin"}
+                {t.header.copy}
               </span>
             </button>
-            <button
-               onClick={onExportMd}
-               className="text-[var(--color-text-secondary)] hover:text-[var(--color-text-primary)] transition-[color,transform] duration-200 ease py-2 px-3 flex items-center gap-1.5 text-[13px] font-medium rounded-sm hover:bg-[var(--color-surface-elevated)] focus-visible:ring-2 focus-visible:ring-[var(--color-interactive)] focus-visible:outline-none active:scale-[0.97]"
-               aria-label={language === "en" ? "Download Markdown" : "Unduh Markdown"}
-               title={language === "en" ? "Download Markdown" : "Unduh Markdown"}
-            >
-              <Download size={16} strokeWidth={1.5} />
-              <span className="hidden sm:inline font-mono">MD</span>
-            </button>
+
+            {/* Export dropdown */}
+            <div className="relative" ref={exportRef}>
+              <button
+                onClick={() => setExportOpen((o) => !o)}
+                aria-haspopup="menu"
+                aria-expanded={exportOpen}
+                className="text-[var(--color-text-secondary)] hover:text-[var(--color-text-primary)] transition-[color,transform] duration-200 ease py-2 px-3 flex items-center gap-1.5 text-[13px] font-medium rounded-sm hover:bg-[var(--color-surface-elevated)] focus-visible:ring-2 focus-visible:ring-[var(--color-interactive)] focus-visible:outline-none active:scale-[0.97]"
+                aria-label={t.header.export}
+                title={t.header.export}
+              >
+                <FileDown size={16} strokeWidth={1.5} />
+                <span className="hidden sm:inline">{t.header.export}</span>
+                <ChevronDown size={14} strokeWidth={1.5} className={`transition-transform duration-200 ${exportOpen ? "rotate-180" : ""}`} />
+              </button>
+              {exportOpen && (
+                <div
+                  role="menu"
+                  className="absolute right-0 mt-1 w-[200px] bg-[var(--color-surface)] border border-[var(--color-border)] rounded-md shadow-2xl py-1 z-50"
+                >
+                  {exportItems.map(({ label, icon: Icon, onClick }) => (
+                    <button
+                      key={label}
+                      role="menuitem"
+                      onClick={() => runExport(onClick)}
+                      className="w-full flex items-center gap-2.5 px-3 py-2.5 text-[13px] text-[var(--color-text-secondary)] hover:text-[var(--color-text-primary)] hover:bg-[var(--color-surface-elevated)] transition-colors text-left focus-visible:ring-2 focus-visible:ring-[var(--color-interactive)] focus-visible:outline-none"
+                    >
+                      <Icon size={15} strokeWidth={1.5} />
+                      {label}
+                    </button>
+                  ))}
+                </div>
+              )}
+            </div>
+
             <button
                onClick={onPrint}
                className="text-[var(--color-text-secondary)] hover:text-[var(--color-text-primary)] transition-[color,transform] duration-200 ease py-2 px-3 flex items-center gap-1.5 text-[13px] font-medium rounded-sm hover:bg-[var(--color-surface-elevated)] focus-visible:ring-2 focus-visible:ring-[var(--color-interactive)] focus-visible:outline-none active:scale-[0.97]"
-               aria-label={language === "en" ? "Print to PDF" : "Cetak PDF"}
-               title={language === "en" ? "Print to PDF" : "Cetak PDF"}
+               aria-label={t.header.printTitle}
+               title={t.header.printTitle}
             >
               <Printer size={16} strokeWidth={1.5} />
-              <span className="hidden sm:inline font-mono">PDF</span>
+              <span className="hidden sm:inline font-mono">{t.header.print}</span>
             </button>
           </div>
         )}
         <button
           onClick={onToggleLanguage}
                className="text-[var(--color-text-secondary)] hover:text-[var(--color-text-primary)] transition-[color,transform] duration-200 ease text-[13px] font-mono px-3 py-2 min-h-[36px] rounded-sm hover:bg-[var(--color-surface-elevated)] focus-visible:ring-2 focus-visible:ring-[var(--color-interactive)] focus-visible:outline-none active:scale-[0.97]"
-          aria-label={language === "en" ? "Toggle Language" : "Ganti Bahasa"}
-          title={
-            language === "en"
-              ? "Switch to Indonesian"
-              : "Ganti ke Bahasa Inggris"
-          }
+          aria-label={t.header.toggleLanguage}
+          title={t.header.switchToOther}
         >
           {language === "en" ? "EN" : "ID"}
         </button>
         <button
           onClick={onOpenSettings}
           className="text-[var(--color-text-secondary)] hover:text-[var(--color-text-primary)] transition-[color,transform] duration-200 ease p-2 rounded-sm hover:bg-[var(--color-surface-elevated)] focus-visible:ring-2 focus-visible:ring-[var(--color-interactive)] focus-visible:outline-none active:scale-[0.97]"
-          aria-label={language === "en" ? "Settings" : "Pengaturan"}
-          title={language === "en" ? "Settings" : "Pengaturan"}
+          aria-label={t.header.settings}
+          title={t.header.settings}
         >
           <Settings size={18} strokeWidth={1.5} />
         </button>

@@ -121,7 +121,7 @@ export const generatePRD = async (
                 try {
                   data = JSON.parse(dataStr);
                   consecutiveParseErrors = 0;
-                } catch (e: any) {
+                } catch (e: unknown) {
                   console.warn("Error parsing JSON from SSE", e instanceof Error ? e.message : e);
                   consecutiveParseErrors++;
                   if (consecutiveParseErrors > 5) {
