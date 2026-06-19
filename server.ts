@@ -145,7 +145,11 @@ app.use(helmet({
         ? ["'self'", (req: any, res: any) => `'nonce-${res.locals.nonce}'`]
         : ["'self'", "'unsafe-inline'"],       // 'unsafe-inline' untuk Vite HMR di dev
       styleSrc: ["'self'", "'unsafe-inline'"],         // 'unsafe-inline' untuk Tailwind CSS
-      imgSrc: ["'self'", "data:", "https:"],
+      // imgSrc: "blob:" wajib diizinkan agar export DOCX/PDF bisa merender
+      // diagram Mermaid ke PNG (SVG → blob URL → <img> → canvas). Tanpa ini,
+      // CSP memblokir pemuatan <img src="blob:..."> sehingga rasterisasi gagal
+      // dan export mundur ke fallback kode mentah (diagram tidak jadi gambar).
+      imgSrc: ["'self'", "data:", "https:", "blob:"],
       connectSrc: [
         "'self'",
         "https://api.deepseek.com",

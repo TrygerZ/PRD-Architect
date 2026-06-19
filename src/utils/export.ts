@@ -2,6 +2,21 @@
 // Lazy-import lib berat (docx, jspdf, jspdf-autotable, mermaid) hanya saat dipakai.
 // Mermaid diagram dirender ke PNG (SVG → canvas → dataURL) lalu disisipkan sebagai gambar.
 import { getSections, type Section } from "./sections";
+import { sanitizeMermaid } from "./mermaid";
+
+// Ambil token bahasa pertama dari info-string fenced code block.
+// AI sering menulis fence seperti "```mermaid journey", "```mermaid gantt",
+// "```mermaid graph TD" — token pertama ("mermaid") yang menentukan jenis blok,
+// sisanya hanyalah metadata diagram. Live renderer (react-markdown) juga hanya
+// memakai kata pertama sebagai `language-*`, jadi export harus konsisten.
+function fenceLang(fenceLine: string): string {
+  return fenceLine
+    .trim()
+    .replace(/^```+/, "")
+    .trim()
+    .toLowerCase()
+    .split(/\s+/)[0] || "";
+}
 
 function sanitizeFilename(name: string): string {
   return name.replace(/[^a-zA-Z0-9-_]/g, "_").slice(0, 60);
@@ -67,11 +82,17 @@ const DARK_THEME_CONFIG = {
   },
 };
 
+// htmlLabels: false → mermaid memakai elemen SVG <text> alih-alih <foreignObject>
+// (HTML). foreignObject TIDAK ikut terender saat SVG digambar ke <canvas>,
+// sehingga gambar PNG jadi kosong/gagal. Mematikannya membuat rasterisasi
+// PNG untuk export selalu berhasil.
 const LIGHT_THEME_CONFIG = {
   startOnLoad: false,
   theme: "default" as const,
   fontFamily: "Geist Mono",
   securityLevel: "loose" as const,
+  htmlLabels: false,
+  flowchart: { htmlLabels: false },
 };
 
 /**
@@ -99,8 +120,10 @@ async function renderMermaidToPng(chart: string): Promise<PngResult | null> {
   const mermaid = mermaidMod.default;
   const id = `export-mermaid-${Math.random().toString(36).slice(2, 11)}`;
   try {
-    // Normalisasi input (sama seperti MermaidRenderer)
-    const normalized = chart
+    // Auto-fix syntax AI yang sering invalid (parens/commas tak di-quote),
+    // lalu normalisasi — sama persis dengan MermaidRenderer agar diagram yang
+    // tampil di layar juga berhasil dirender ke gambar saat export.
+    const normalized = sanitizeMermaid(chart)
       .replace(/^\uFEFF/, "")
       .replace(/\r\n/g, "\n")
       .replace(/^\n+/, "")
@@ -115,9 +138,48 @@ async function renderMermaidToPng(chart: string): Promise<PngResult | null> {
 }
 
 /**
+ * Ekstrak dimensi piksel intrinsik dari <svg>.
+ * Mermaid v11 sering menulis width="100%" (bukan piksel) — parseFloat("100%")
+ * menghasilkan 100, yang membuat canvas salah rasio (gambar jadi kecil &
+ * tidak proporsional). Prioritas: atribut width/height numerik → viewBox →
+ * max-width dari style → fallback.
+ */
+function extractSvgDimensions(svgEl: SVGSVGElement): { width: number; height: number } {
+  const wAttr = svgEl.getAttribute("width") || "";
+  const hAttr = svgEl.getAttribute("height") || "";
+
+  // Hanya terima atribut yang berupa angka piksel murni; tolak "100%"/"auto"/ds.
+  let width = /^\d+(\.\d+)?$/.test(wAttr.trim()) ? parseFloat(wAttr) : NaN;
+  let height = /^\d+(\.\d+)?$/.test(hAttr.trim()) ? parseFloat(hAttr) : NaN;
+
+  // viewBox: "min-x min-y width height" → pakai width/height-nya.
+  if (!width || !height) {
+    const viewBox = svgEl.getAttribute("viewBox");
+    if (viewBox) {
+      const parts = viewBox.split(/[\s,]+/).map(parseFloat);
+      const vbW = parts[2];
+      const vbH = parts[3];
+      if (!width && Number.isFinite(vbW) && vbW > 0) width = vbW;
+      if (!height && Number.isFinite(vbH) && vbH > 0) height = vbH;
+    }
+  }
+
+  // Fallback terakhir: max-width dari inline style (mis. "max-width: 1234px").
+  if (!width) {
+    const style = svgEl.getAttribute("style") || "";
+    const m = style.match(/max-width:\s*([\d.]+)\s*px/i);
+    if (m) width = parseFloat(m[1]);
+  }
+
+  if (!width || width <= 0) width = 800;
+  if (!height || height <= 0) height = 600;
+  return { width, height };
+}
+
+/**
  * Konversi SVG string → PNG dataURL via canvas.
- * Memastikan SVG punya width/height eksplisit (beberapa SVG mermaid hanya
- * punya viewBox). Background diisi putih agar terbaca di dokumen terang.
+ * Memastikan SVG punya width/height eksplisit & rasio benar. Background diisi
+ * putih agar terbaca di dokumen terang.
  */
 async function svgToPng(svg: string): Promise<PngResult> {
   return new Promise((resolve, reject) => {
@@ -130,24 +192,16 @@ async function svgToPng(svg: string): Promise<PngResult> {
       return;
     }
 
-    let width = parseFloat(svgEl.getAttribute("width") || "");
-    let height = parseFloat(svgEl.getAttribute("height") || "");
+    const { width, height } = extractSvgDimensions(svgEl);
 
-    if (!width || !height) {
-      const viewBox = svgEl.getAttribute("viewBox");
-      if (viewBox) {
-        const parts = viewBox.split(/[\s,]+/).map(parseFloat);
-        width = width || parts[2] || 800;
-        height = height || parts[3] || 600;
-      } else {
-        width = width || 800;
-        height = height || 600;
-      }
-    }
-
+    // Paksa dimensi piksel eksplisit + preserveAspectRatio default (xMidYMid
+    // meet) agar gambar tidak ter-stretch bila viewBox ratio sedikit beda.
     svgEl.setAttribute("width", String(width));
     svgEl.setAttribute("height", String(height));
-    // Hilangkan constraint max-width yang bisa mencegah render full-size
+    if (!svgEl.getAttribute("preserveAspectRatio")) {
+      svgEl.setAttribute("preserveAspectRatio", "xMidYMid meet");
+    }
+    // Hilangkan constraint max-width yang bisa mencegah render full-size.
     svgEl.style.removeProperty("max-width");
     svgEl.style.maxWidth = String(width) + "px";
 
@@ -245,7 +299,7 @@ export async function exportDocx(content: string, productType: string): Promise<
 
       // Code fence — deteksi bahasa (mermaid vs lain)
       if (trimmed.startsWith("```")) {
-        const lang = trimmed.replace(/^```/, "").trim().toLowerCase();
+        const lang = fenceLang(trimmed);
         const codeLines: string[] = [];
         i++;
         while (i < lines.length && !lines[i].trim().startsWith("```")) {
@@ -256,9 +310,14 @@ export async function exportDocx(content: string, productType: string): Promise<
         if (lang === "mermaid") {
           const png = await renderMermaidToPng(codeLines.join("\n"));
           if (png) {
-            // Skala agar muat di lebar halaman DOCX (~550px dengan margin default)
+            // Skala agar memenuhi lebar konten DOCX (~550px dgn margin default),
+            // BOLEH upscale bila diagram sumber lebih kecil. Tinggi dibatasi
+            // agar satu gambar tidak melebihi ~satu halaman (mencegah gambar
+            // raksasa). Rasio aspek selalu dipertahankan.
             const maxW = 550;
-            const scale = Math.min(1, maxW / png.width);
+            const maxH = 720;
+            let scale = maxW / png.width;
+            if (png.height * scale > maxH) scale = maxH / png.height;
             const dispW = Math.round(png.width * scale);
             const dispH = Math.round(png.height * scale);
             const base64 = png.dataUrl.split(",")[1];
@@ -439,7 +498,7 @@ export async function exportPdf(content: string, productType: string): Promise<v
 
       // Code fence — deteksi mermaid vs lain
       if (trimmed.startsWith("```")) {
-        const lang = trimmed.replace(/^```/, "").trim().toLowerCase();
+        const lang = fenceLang(trimmed);
         const codeLines: string[] = [];
         i++;
         while (i < lines.length && !lines[i].trim().startsWith("```")) {
@@ -450,12 +509,18 @@ export async function exportPdf(content: string, productType: string): Promise<v
         if (lang === "mermaid") {
           const png = await renderMermaidToPng(codeLines.join("\n"));
           if (png) {
-            // Skala agar muat di lebar konten PDF
-            const scale = Math.min(1, maxWidth / png.width);
+            // Skala agar memenuhi lebar konten PDF (boleh upscale bila sumber
+            // kecil). Tinggi dibatasi tinggi halaman agar tidak terpotong /
+            // overflow. Rasio aspek selalu dipertahankan.
+            const maxH = pageHeight - margin * 2;
+            let scale = maxWidth / png.width;
+            if (png.height * scale > maxH) scale = maxH / png.height;
             const dispW = png.width * scale;
             const dispH = png.height * scale;
             ensureSpace(dispH + 10);
-            doc.addImage(png.dataUrl, "PNG", margin, y, dispW, dispH);
+            // Pusatkan horizontal agar selaras dengan DOCX (AlignmentType.CENTER).
+            const x = margin + (maxWidth - dispW) / 2;
+            doc.addImage(png.dataUrl, "PNG", x, y, dispW, dispH);
             y += dispH + 12;
           } else {
             // Fallback: kode mentah
