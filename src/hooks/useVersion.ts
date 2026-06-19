@@ -1,5 +1,6 @@
-import { useState, useCallback, useRef } from "react";
+import { useState, useCallback, useRef, useEffect } from "react";
 import { PRDVersion } from "../types";
+import { saveState, loadState, clearState } from "../utils/persistence";
 
 export function useVersion() {
   const [versions, setVersions] = useState<PRDVersion[]>([]);
@@ -7,6 +8,40 @@ export function useVersion() {
 
   // Task 3.4 — Simpan comments per-versionId, bukan global
   const [commentsByVersion, setCommentsByVersion] = useState<Record<string, Record<string, string>>>({});
+
+  // Task 1.1 — Persistensi riwayat PRD ke IndexedDB.
+  // restored: true setelah upaya restore selesai, agar autosave tidak menimpa
+  // state tersimpan dengan state awal kosong sebelum data dimuat.
+  const restoredRef = useRef(false);
+
+  useEffect(() => {
+    let cancelled = false;
+    loadState().then((s) => {
+      if (!cancelled && s) {
+        if (s.versions?.length) setVersions(s.versions);
+        if (s.commentsByVersion) setCommentsByVersion(s.commentsByVersion);
+        if (s.activeVersionId) setActiveVersionId(s.activeVersionId);
+      }
+      restoredRef.current = true;
+    });
+    return () => {
+      cancelled = true;
+    };
+  }, []);
+
+  // Autosave (debounce 800ms) saat versions/comments/activeVersion berubah
+  useEffect(() => {
+    if (!restoredRef.current) return;
+    const t = setTimeout(() => {
+      saveState({
+        versions,
+        commentsByVersion,
+        activeVersionId,
+        savedAt: Date.now(),
+      });
+    }, 800);
+    return () => clearTimeout(t);
+  }, [versions, commentsByVersion, activeVersionId]);
 
   // BUG-06 fix — Ref yang selalu sinkron dengan activeVersionId terbaru,
   // sehingga setComments tidak perlu activeVersionId di dependency array.
@@ -36,6 +71,8 @@ export function useVersion() {
     setActiveVersionId(null);
     setCommentsByVersion({});
     setVersions([]);
+    // Task 1.1 — Hapus riwayat tersimpan saat user memulai PRD baru
+    clearState();
   }, []);
 
   const handleSwitchVersion = useCallback((vid: string) => {

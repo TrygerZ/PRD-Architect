@@ -1,6 +1,7 @@
 import { useState, useRef, useEffect } from "react";
 import { Send, Paperclip, Loader2, Pause } from "lucide-react";
 import { getQuickPrompts } from "../utils/quickPrompts";
+import { estimateTokens, formatTokenCount } from "../utils/tokens";
 
 interface ChatInputProps {
   onSend: (text: string) => void;
@@ -11,6 +12,8 @@ interface ChatInputProps {
   hasFiles?: boolean;
   initialPrompt?: string;
   showQuickPrompts?: boolean;
+  // Task 1.5 — jumlah karakter konteks file terlampir (untuk estimasi token)
+  fileContextChars?: number;
 }
 
 export function ChatInput({
@@ -22,9 +25,13 @@ export function ChatInput({
   hasFiles = false,
   initialPrompt = "",
   showQuickPrompts = false,
+  fileContextChars = 0,
 }: ChatInputProps) {
   const [prompt, setPrompt] = useState(initialPrompt);
   const textareaRef = useRef<HTMLTextAreaElement>(null);
+
+  // Task 1.5 — estimasi token input (prompt + konteks file)
+  const estimatedTokens = estimateTokens(prompt) + Math.ceil(fileContextChars / 4);
 
   useEffect(() => {
     if (initialPrompt) {
@@ -118,6 +125,20 @@ export function ChatInput({
             </button>
           </div>
         </form>
+
+        {estimatedTokens > 0 && (
+          <div className="flex justify-end -mt-1 mb-2 px-1">
+            <span className="text-[11px] font-mono text-[var(--color-text-muted)]">
+              {language === "en" ? "~" : "~"}{formatTokenCount(estimatedTokens)} {language === "en" ? "tokens" : "token"}
+              {fileContextChars > 0 && (
+                <span className="hidden sm:inline">
+                  {" "}
+                  ({language === "en" ? "incl. files" : "termasuk file"})
+                </span>
+              )}
+            </span>
+          </div>
+        )}
 
         {showQuickPrompts && (
           <div className="grid grid-cols-2 sm:grid-cols-4 gap-2 w-full mt-2">

@@ -21,7 +21,7 @@ export const generatePRD = async (
   mode: string = "initial",
   prdMode: "business" | "technical" | "simple" = "business",
   signal: AbortSignal | undefined,
-  onChunk: (chunk: string) => void,
+  onChunk: (chunk: { text?: string; reasoning?: string }) => void,
 ) => {
   let lastError: Error | null = null;
 
@@ -75,13 +75,15 @@ export const generatePRD = async (
 
       let buffer = "";
       let batchedChunk = "";
+      let batchedReasoning = "";
       let lastFlush = Date.now();
       let flushTimeout: ReturnType<typeof setTimeout> | null = null;
 
       const flush = () => {
-        if (batchedChunk) {
-          onChunk(batchedChunk);
+        if (batchedChunk || batchedReasoning) {
+          onChunk({ text: batchedChunk, reasoning: batchedReasoning });
           batchedChunk = "";
+          batchedReasoning = "";
         }
         if (flushTimeout) clearTimeout(flushTimeout);
       };
@@ -132,8 +134,9 @@ export const generatePRD = async (
                   throw new Error(data.error);
                 }
 
-                if (data.text) {
-                  batchedChunk += data.text;
+                if (data.text || data.reasoning) {
+                  if (data.text) batchedChunk += data.text;
+                  if (data.reasoning) batchedReasoning += data.reasoning;
                   // Throttle flush to avoid blocking UI thread with continuous heavy markdown parsing
                   if (Date.now() - lastFlush > 50) {
                     flush();
@@ -162,7 +165,7 @@ export const generatePRD = async (
               const dataStr = buffer.substring(6);
               if (dataStr !== '[DONE]') {
                 const data: SSEChunk = JSON.parse(dataStr);
-                if (data.text) onChunk(data.text);
+                if (data.text || data.reasoning) onChunk({ text: data.text, reasoning: data.reasoning });
               }
             }
           } catch {

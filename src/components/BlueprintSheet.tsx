@@ -9,10 +9,11 @@ import {
   X,
   ClipboardCopy
 } from "lucide-react";
-import { PRDVersion } from "../types";
+import { PRDVersion, PRDMode } from "../types";
 import { formatDate } from "../utils/format";
 import { MermaidRenderer } from "./MermaidRenderer";
 import { getSections, type Section } from "../utils/sections";
+import { estimateTokens, formatTokenCount } from "../utils/tokens";
 
 export { getSections } from "../utils/sections";
 
@@ -26,6 +27,7 @@ interface BlueprintSheetProps {
   onRevise?: () => void;
   isGenerating?: boolean;
   language: "id" | "en";
+  onConvertMode?: (mode: PRDMode) => void;
 }
 
 export const BlueprintSheet = memo(function BlueprintSheet({
@@ -38,6 +40,7 @@ export const BlueprintSheet = memo(function BlueprintSheet({
   onRevise,
   isGenerating,
   language,
+  onConvertMode,
 }: BlueprintSheetProps) {
   const sections = useMemo(() => getSections(content), [content]);
   const totalComments = Object.values(comments).filter(
@@ -102,7 +105,14 @@ export const BlueprintSheet = memo(function BlueprintSheet({
   // Show content completeness: 100% when done, indeterminate while generating
   const isComplete = content.length > 0 && !isGenerating;
   const showProgress = content.length > 0;
-  const progress = isComplete ? 100 : (isGenerating && content.length > 0 ? 75 : 0);
+  // Task 1.9 — Progress realistis berdasarkan jumlah heading (##) vs ekspektasi per mode.
+  // Capped 95% selama streaming agar tidak terlihat "selesai" sebelum waktunya.
+  const expectedSections = { simple: 6, business: 12, technical: 9 }[activeVersion?.prdMode ?? "business"] ?? 12;
+  const progress = isComplete
+    ? 100
+    : (isGenerating && content.length > 0
+        ? Math.min(95, Math.max(5, Math.round((totalSections / expectedSections) * 100)))
+        : 0);
 
   const handleToggleCollapse = useCallback((sectionId: string) => {
     setCollapsedStates(prev => ({
@@ -198,8 +208,28 @@ className={`fixed bottom-[140px] sm:bottom-[100px] right-[16px] sm:right-[40px] 
               <GitBranch size={14} strokeWidth={1.5} className="text-[var(--color-text-muted)]" />
               <span className="text-[13px] text-[var(--color-text-secondary)]">Version {activeVersionIndex + 1}</span>
               <time dateTime={new Date(activeVersion.timestamp).toISOString()} className="text-[11px] font-mono text-[var(--color-text-muted)]">{formatDate(activeVersion.timestamp, language)}</time>
+              {content.length > 0 && (
+                <span className="text-[11px] font-mono text-[var(--color-text-muted)] hidden sm:inline" title={language === "en" ? "Estimated output tokens" : "Estimasi token output"}>
+                  · ~{formatTokenCount(estimateTokens(content))} {language === "en" ? "tokens" : "token"}
+                </span>
+              )}
             </div>
             <div className="flex items-center gap-2">
+              {/* Task 1.7 — Convert ke mode lain */}
+              {onConvertMode && (
+                <select
+                  className="bg-transparent text-[13px] text-[var(--color-text-secondary)] border border-[var(--color-border)] rounded-sm px-3 py-2 min-h-[36px] focus:outline-none focus:border-[var(--color-interactive)] focus-visible:ring-2 focus-visible:ring-[var(--color-interactive)] disabled:opacity-40 disabled:cursor-not-allowed"
+                  value={activeVersion?.prdMode || "business"}
+                  onChange={(e) => onConvertMode(e.target.value as PRDMode)}
+                  disabled={isGenerating}
+                  aria-label={language === "en" ? "Convert PRD mode" : "Konversi mode PRD"}
+                  title={language === "en" ? "Convert to another mode" : "Konversi ke mode lain"}
+                >
+                  <option value="business" className="bg-[var(--color-bg)] text-[var(--color-text-primary)]">{language === "en" ? "Business" : "Bisnis"}</option>
+                  <option value="simple" className="bg-[var(--color-bg)] text-[var(--color-text-primary)]">{language === "en" ? "Simple" : "Sederhana"}</option>
+                  <option value="technical" className="bg-[var(--color-bg)] text-[var(--color-text-primary)]">{language === "en" ? "Technical" : "Teknis"}</option>
+                </select>
+              )}
               <select 
                 className="bg-transparent text-[13px] text-[var(--color-text-secondary)] border border-[var(--color-border)] rounded-sm px-3 py-2 min-h-[36px] focus:outline-none focus:border-[var(--color-interactive)] focus-visible:ring-2 focus-visible:ring-[var(--color-interactive)]"
                 value={activeVersionId || ""}
@@ -227,7 +257,7 @@ className={`fixed bottom-[140px] sm:bottom-[100px] right-[16px] sm:right-[40px] 
                 <div className={`h-full bg-[var(--color-interactive)] transition-[width] duration-300 ${isGenerating ? 'animate-pulse' : ''}`} style={{width: `${progress}%`}} />
               </div>
               <span className="text-[11px] font-mono text-[var(--color-text-muted)] whitespace-nowrap">
-                {isComplete ? (language === "en" ? "Complete" : "Selesai") : (language === "en" ? "Generating..." : "Menghasilkan...")}
+                {isComplete ? (language === "en" ? "Complete" : "Selesai") : `${language === "en" ? "Generating" : "Menghasilkan"} ${progress}%`}
               </span>
             </div>
           )}

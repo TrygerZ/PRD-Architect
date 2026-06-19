@@ -17,4 +17,5 @@ export interface PRDVersion {
   referencedFilesCount?: number;
   userDisplayPrompt?: string;
   prdMode?: PRDMode;
+  reasoning?: string;
 }

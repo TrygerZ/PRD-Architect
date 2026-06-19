@@ -17,6 +17,7 @@ import { useVersion } from "./hooks/useVersion";
 
 import { Sidebar } from "./components/Sidebar";
 import { ErrorBoundary } from "./components/ErrorBoundary";
+import { ReasoningPanel } from "./components/ReasoningPanel";
 
 export default function App() {
   const [isSettingsOpen, setIsSettingsOpen] = useState(false);
@@ -244,7 +245,13 @@ export default function App() {
           }
           setVersions((prev) =>
             prev.map((v) =>
-              v.id === newVersionId ? { ...v, content: v.content + chunk } : v,
+              v.id === newVersionId
+                ? {
+                    ...v,
+                    content: v.content + (chunk.text ?? ""),
+                    reasoning: (v.reasoning ?? "") + (chunk.reasoning ?? ""),
+                  }
+                : v,
             ),
           );
         },
@@ -354,6 +361,35 @@ export default function App() {
       currentActive.productType,
       currentActive.prdMode || "business",
       () => setComments({}), // hapus komentar setelah revisi berhasil
+    );
+  }, [executeGeneration]);
+
+  // Task 1.7 — Convert PRD yang ada ke mode berbeda (mis. Business → Technical).
+  // Membuat versi baru memakai system prompt mode target dengan PRD lama sebagai konteks.
+  const handleConvertMode = useCallback(async (targetMode: PRDMode) => {
+    const currentActive = activeVersionRef.current;
+    const lang = languageRef.current;
+    if (!currentActive || isGeneratingRef.current) return;
+    if ((currentActive.prdMode || "business") === targetMode) return;
+
+    const MODE_LABEL: Record<PRDMode, { en: string; id: string }> = {
+      business: { en: "Business & Investor", id: "Bisnis & Investor" },
+      simple: { en: "Simple", id: "Sederhana" },
+      technical: { en: "Technical / Developer", id: "Teknis / Developer" },
+    };
+    const label = lang === "en" ? MODE_LABEL[targetMode].en : MODE_LABEL[targetMode].id;
+
+    const convertPrompt = lang === "en"
+      ? `Convert the following existing PRD into a ${MODE_LABEL[targetMode].en} PRD. Preserve the core product idea, scope, and key details, but restructure and rewrite it to fully match the target format.\n\n### EXISTING PRD:\n${currentActive.content}`
+      : `Konversi PRD berikut menjadi PRD mode ${MODE_LABEL[targetMode].id}. Pertahankan ide produk inti, ruang lingkup, dan detail penting, tetapi susun ulang dan tulis ulang agar sepenuhnya sesuai format target.\n\n### PRD SAAT INI:\n${currentActive.content}`;
+
+    setPrdMode(targetMode);
+    await executeGeneration(
+      convertPrompt,
+      lang === "en" ? `Convert to ${label} mode` : `Konversi ke mode ${label}`,
+      "initial",
+      currentActive.productType,
+      targetMode,
     );
   }, [executeGeneration]);
 
@@ -552,7 +588,7 @@ export default function App() {
         <div className="flex-1 flex flex-col relative overflow-hidden">
           <div 
             ref={chatContainerRef}
-            className="flex-1 overflow-y-auto px-4 sm:px-6 pb-[280px]" 
+            className="flex-1 overflow-y-auto px-4 sm:px-6 pb-[220px] sm:pb-[180px]" 
             id="chat-messages-container"
             aria-busy={isGenerating}
             aria-live="polite"
@@ -606,6 +642,13 @@ export default function App() {
                   </p>
                 </div>
 
+                {/* AI Reasoning Panel (model R1/thinking) */}
+                <ReasoningPanel
+                  reasoning={activeVersion?.reasoning}
+                  isGenerating={isGenerating}
+                  language={language}
+                />
+
                 {/* AI Response — BlueprintSheet */}
                 <BlueprintSheet
                   content={prdContent}
@@ -617,6 +660,7 @@ export default function App() {
                   onRevise={handleRevise}
                   isGenerating={isGenerating}
                   language={language}
+                  onConvertMode={handleConvertMode}
                 />
               </div>
             )}
@@ -632,6 +676,7 @@ export default function App() {
             hasFiles={uploadedFiles.length > 0}
             initialPrompt={currentPrompt}
             showQuickPrompts={false}
+            fileContextChars={uploadedFiles.reduce((sum, f) => sum + Math.min(f.charCount ?? 0, 8000), 0)}
           />
         </div>
       </div>
