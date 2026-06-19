@@ -16,9 +16,8 @@ import cookieParser from "cookie-parser";
 import { fileTypeFromFile } from 'file-type';
 
 // Wave 7 — Track A: Union types for type safety (TS-04 to TS-07)
-type AIProvider = "deepseek" | "gemini" | "opencode";
-type PRDMode = "business" | "technical" | "simple";
-type ProductType = "e-commerce" | "SaaS" | "IoT" | "Mobile App" | "Internal Tool" | "Unknown";
+// Shared with the frontend via /shared/types.ts (single source of truth)
+import type { AIProvider, PRDMode, ProductType } from "./shared/types";
 
 // Wave 7 — Track A: Typed chat request body (TS-03)
 interface ChatRequest {
@@ -190,12 +189,26 @@ const authLimiter = rateLimit({
 });
 app.use("/api/auth/", authLimiter);
 
+// Health & readiness endpoints — exempt from rate limiting (defined before apiLimiter)
+app.get("/health", (_req, res) => {
+  res.json({ status: "ok", uptime: process.uptime() });
+});
+app.get("/api/health", (_req, res) => {
+  res.json({
+    status: "ok",
+    uptime: process.uptime(),
+    activeParses,
+    activeGenerations: activeGenerations.size,
+    timestamp: new Date().toISOString(),
+  });
+});
+
 const apiLimiter = rateLimit({
   windowMs: 60 * 1000, // 1 minute
   max: 10,
   standardHeaders: true,
   legacyHeaders: false,
-  skip: (req) => req.path.startsWith('/api/auth/'), // Auth endpoints have their own stricter limiter
+  skip: (req) => req.path.startsWith('/api/auth/') || req.path === '/api/health', // Auth & health have their own handling
   message: { error: "Too many requests. Please slow down. / Terlalu banyak permintaan. Harap pelan-pelan." }
 });
 app.use("/api/", apiLimiter);
@@ -262,17 +275,8 @@ const upload = multer({
 });
 
 // Sanitize cell values to prevent formula/prompt injection via Excel/CSV (CRIT-02)
-function sanitizeCellForAI(value: any): string {
-  if (value === null || value === undefined) return '';
-  const str = String(value);
-  // Prefix formula characters that could become prompt injection vectors
-  // Characters: =, +, -, @, |, % at the start of a string
-  const dangerousPrefixes = ['=', '+', '-', '@', '|', '%'];
-  if (dangerousPrefixes.some(prefix => str.startsWith(prefix))) {
-    return `'${str}`; // Prefix with single quote to neutralize
-  }
-  return str;
-}
+// Implementation lives in ./server/sanitize.ts so it can be unit-tested.
+import { sanitizeCellForAI } from "./server/sanitize";
 
 async function extractTextFromFile(filePath: string, mimeType: string, originalName: string): Promise<string> {
   const MAX_CHARS = 50000;
@@ -689,10 +693,11 @@ app.post("/api/auth/set-key", (req, res) => {
   }
 
   // Simpan di httpOnly cookie — tidak bisa diakses JavaScript (mitigasi XSS)
+  // secure hanya di production: browser menolak `Secure` cookie via HTTP (localhost dev)
   res.cookie('prd_session', apiKey.trim(), {
     httpOnly: true,
     sameSite: 'strict',
-    secure: true, // selalu aktif — browser tetap menerima secure cookie via HTTP di localhost
+    secure: process.env.NODE_ENV === 'production',
     maxAge: 7 * 24 * 60 * 60 * 1000, // 7 hari (BUG 4.10)
     path: '/',
   });
@@ -704,7 +709,7 @@ app.post("/api/auth/clear-key", (_req, res) => {
   res.clearCookie('prd_session', { 
     httpOnly: true, 
     sameSite: 'strict',
-    secure: true,
+    secure: process.env.NODE_ENV === 'production',
     path: '/' 
   });
   res.json({ success: true });
@@ -768,14 +773,27 @@ app.post("/api/generate-prd", async (req, res) => {
 
     let fileContext = '';
     if (Array.isArray(uploadedFiles) && uploadedFiles.length > 0) {
-      fileContext += `\n\n### REFERENSI FILE PENDUKUNG ###\n`;
-      fileContext += `Gunakan referensi dari file-file berikut untuk memperkaya konteks dan akurasi dokumen yang akan di-generate:\n\n`;
-      uploadedFiles.forEach(file => {
-        const truncatedContent = file.content.length > 8000 ? file.content.substring(0, 8000) + "... [TRUNCATED]" : file.content;
-        fileContext += `--- FILE START: ${file.name} (Type: ${file.type}) ---\n`;
-        fileContext += `${truncatedContent}\n`;
-        fileContext += `--- FILE END: ${file.name} ---\n\n`;
-      });
+      // Validasi payload: terima maksimal 5 file, dan hanya field bertipe string
+      const safeFiles = uploadedFiles
+        .filter((file): file is { name: string; type: string; content: string } =>
+          !!file &&
+          typeof file === 'object' &&
+          typeof file.content === 'string' &&
+          typeof file.name === 'string' &&
+          typeof file.type === 'string'
+        )
+        .slice(0, 5);
+
+      if (safeFiles.length > 0) {
+        fileContext += `\n\n### REFERENSI FILE PENDUKUNG ###\n`;
+        fileContext += `Gunakan referensi dari file-file berikut untuk memperkaya konteks dan akurasi dokumen yang akan di-generate:\n\n`;
+        safeFiles.forEach(file => {
+          const truncatedContent = file.content.length > 8000 ? file.content.substring(0, 8000) + "... [TRUNCATED]" : file.content;
+          fileContext += `--- FILE START: ${file.name} (Type: ${file.type}) ---\n`;
+          fileContext += `${truncatedContent}\n`;
+          fileContext += `--- FILE END: ${file.name} ---\n\n`;
+        });
+      }
     }
 
     let finalUserPrompt = prompt + fileContext;
@@ -872,7 +890,7 @@ app.post("/api/generate-prd", async (req, res) => {
     });
 
     // 1. Konfigurasi semua header terlebih dahulu
-    let fetchHeaders: Record<string, string> = {
+    const fetchHeaders: Record<string, string> = {
       "Content-Type": "application/json",
       "Authorization": "Bearer " + apiKey,
     };
@@ -931,7 +949,7 @@ app.post("/api/generate-prd", async (req, res) => {
     // Start idle timer before fetch
     resetIdleTimer();
 
-    let fetchOptions: RequestInit = {
+    const fetchOptions: RequestInit = {
       method: "POST",
       headers: fetchHeaders,
       signal: abortController?.signal,

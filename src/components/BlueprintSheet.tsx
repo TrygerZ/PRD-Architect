@@ -12,6 +12,9 @@ import {
 import { PRDVersion } from "../types";
 import { formatDate } from "../utils/format";
 import { MermaidRenderer } from "./MermaidRenderer";
+import { getSections, type Section } from "../utils/sections";
+
+export { getSections } from "../utils/sections";
 
 interface BlueprintSheetProps {
   content: string; // active version content
@@ -24,52 +27,6 @@ interface BlueprintSheetProps {
   isGenerating?: boolean;
   language: "id" | "en";
 }
-
-type Section = {
-  index: number;
-  level: number;
-  heading: string;
-  content: string;
-};
-
-export const getSections = (content: string): Section[] => {
-  if (!content) return [];
-  const lines = content.split("\n");
-  const sections: Section[] = [];
-  let currentContent: string[] = [];
-  let currentLevel = 2; // Default level
-  let currentHeading = "";
-  for (let i = 0; i < lines.length; i++) {
-    const line = lines[i];
-    // Regex diperketat agar HANYA membaca Heading 2 (## )
-    const match = line.match(/^##\s+(.*)/);
-    if (match) {
-      if (currentContent.length > 0) {
-        sections.push({
-          index: sections.length,
-          level: currentLevel,
-          heading: currentHeading || "Overview", // Cegah hilangnya teks awal
-          content: currentContent.join("\n"),
-        });
-      }
-      currentLevel = 2;
-      currentHeading = match[1];
-      currentContent = [line];
-    } else {
-      currentContent.push(line);
-    }
-  }
-  if (currentContent.length > 0) {
-    sections.push({
-      index: sections.length,
-      level: currentLevel,
-      heading: currentHeading || "Overview",
-      content: currentContent.join("\n"),
-    });
-  }
-  // JANGAN PERNAH menghapus section jika ada isinya, meskipun tanpa judul
-  return sections.filter((s) => s.content.trim().length > 0);
-};
 
 export const BlueprintSheet = memo(function BlueprintSheet({
   content,

@@ -1,7 +1,16 @@
 {
-  "name": "react-example",
+  "name": "prd-architect",
   "private": true,
-  "version": "0.0.0",
+  "version": "1.0.0",
+  "description": "Tri-Mode AI PRD Generator — Simple (6ch), Business (12ch), Technical (9ch) — with real-time streaming",
+  "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/TrygerZ/PRD-Architect.git"
+  },
+  "engines": {
+    "node": ">=18"
+  },
   "type": "module",
   "scripts": {
     "dev": "tsx server.ts",
@@ -9,7 +18,10 @@
     "start": "node dist/server.js",
     "preview": "vite preview",
     "clean": "node -e \"const fs=require('fs'); ['dist','server.js'].forEach(f=>fs.rmSync(f,{recursive:true,force:true}))\"",
-    "lint": "tsc --noEmit"
+    "typecheck": "tsc --noEmit",
+    "test": "vitest run",
+    "test:watch": "vitest",
+    "test:coverage": "vitest run --coverage"
   },
   "dependencies": {
     "@fontsource/geist-mono": "^5.2.5",
@@ -46,10 +58,13 @@
     "@types/node": "^22.14.0",
     "@types/pdf-parse": "^1.1.5",
     "@types/react-dom": "^19.2.3",
+    "@vitest/coverage-v8": "^2.1.9",
     "esbuild": "^0.28.1",
+    "jsdom": "^25.0.1",
     "tailwindcss": "^4.1.14",
     "tsx": "^4.21.0",
     "typescript": "~5.8.2",
-    "vite": "^6.2.3"
+    "vite": "^6.2.3",
+    "vitest": "^2.1.9"
   }
 }

@@ -1,22 +1,12 @@
-export type AIProvider = "deepseek" | "gemini" | "opencode";
-export type PRDMode = "business" | "technical" | "simple";
+// Re-export shared types (single source of truth in /shared/types.ts).
+export type {
+  AIProvider,
+  PRDMode,
+  ProductType,
+  UploadedFile,
+} from "../shared/types";
 
-export type ProductType =
-  | "e-commerce"
-  | "SaaS"
-  | "IoT"
-  | "Mobile App"
-  | "Internal Tool"
-  | "Unknown";
-
-export interface UploadedFile {
-  id: string;
-  name: string;
-  size: number;
-  type: string;
-  content: string;
-  charCount: number;
-}
+import type { PRDMode, ProductType } from "../shared/types";
 
 export interface PRDVersion {
   id: string;
