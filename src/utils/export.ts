@@ -239,6 +239,16 @@ async function renderMermaidToPng(chart: string): Promise<PngResult | null> {
   const mermaidMod = await import("mermaid");
   const mermaid = mermaidMod.default;
   const id = `export-mermaid-${Math.random().toString(36).slice(2, 11)}`;
+  // mermaid.render() tanpa argumen container menyisipkan <div> in-flow
+  // (width:100%) langsung ke document.body. Div itu bertinggi riil sebesar
+  // diagram, sehingga scrollHeight dokumen melonjak sesaat → scrollbar
+  // memanjang → viewport bergeser = layar "bergetar" tiap kali export.
+  // Solusi: sediakan container off-screen position:fixed (terpisah dari flow
+  // dokumen) sebagai argumen ke-3 render() agar layout halaman tak berubah.
+  const host = document.createElement("div");
+  host.style.cssText =
+    "position:fixed;left:-99999px;top:0;width:auto;height:auto;overflow:hidden;pointer-events:none;z-index:-1;opacity:0;";
+  document.body.appendChild(host);
   try {
     // Auto-fix syntax AI yang sering invalid (parens/commas tak di-quote),
     // lalu normalisasi — sama persis dengan MermaidRenderer agar diagram yang
@@ -249,11 +259,13 @@ async function renderMermaidToPng(chart: string): Promise<PngResult | null> {
       .replace(/^\n+/, "")
       .replace(/\n+$/, "\n");
     await mermaid.parse(normalized);
-    const { svg } = await mermaid.render(id, normalized);
+    const { svg } = await mermaid.render(id, normalized, host);
     return await svgToPng(svg);
   } catch (err) {
     console.warn("Mermaid render for export failed:", err);
     return null;
+  } finally {
+    host.remove();
   }
 }
 

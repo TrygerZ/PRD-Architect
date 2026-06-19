@@ -79,10 +79,24 @@ export const MermaidRenderer = memo(function MermaidRenderer({ chart, isGenerati
           throw new Error(`Parse error: ${msg}`);
         }
 
-        const { svg: renderedSvg } = await mermaid.default.render(
-          containerId.current,
-          normalized
-        );
+        // Container off-screen position:fixed mencegah mermaid.render()
+        // menyisipkan <div> in-flow ke document.body (yang mengubah
+        // scrollHeight → viewport bergeser → layar bergetar) dan mencegah
+        // elemen sementara tertinggal di body setelah render.
+        const host = document.createElement("div");
+        host.style.cssText =
+          "position:fixed;left:-99999px;top:0;width:auto;height:auto;overflow:hidden;pointer-events:none;z-index:-1;opacity:0;";
+        document.body.appendChild(host);
+        let renderedSvg: string;
+        try {
+          ({ svg: renderedSvg } = await mermaid.default.render(
+            containerId.current,
+            normalized,
+            host
+          ));
+        } finally {
+          host.remove();
+        }
         if (cancelled) return;
 
         const sanitizedSvg = DOMPurify.sanitize(renderedSvg, {
