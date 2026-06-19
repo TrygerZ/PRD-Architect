@@ -43,6 +43,126 @@ function stripInline(text: string): string {
     .replace(/\[(.+?)\]\((.+?)\)/g, "$1");
 }
 
+/**
+ * Normalisasi teks ke ASCII yang bisa dirender jsPDF dengan font standar
+ * (helvetica/courier = StandardEncoding). Tanpa ini, karakter non-ASCII
+ * di-render sebagai byte mentah UTF-16 → box-drawing (U+25xx) muncul sebagai
+ * "%" (byte tinggi 0x25 = '%'), dan •/—/curly quotes hilang sama sekali.
+ *
+ * Box-drawing (tree art hierarchy ├ │ └ ─) dipetakan ke ASCII line art
+ * (+ - |) sehingga hierarki tetap tampil sebagai garis yang benar.
+ */
+function normalizePdfText(s: string): string {
+  return s
+    // ─ ━ ─ garis horizontal → '-'
+    .replace(/[\u2500\u2501\u2504\u2505\u2506\u2507\u2508\u2509\u250A\u250B\u254C\u254D]/g, "-")
+    // │ ┃ garis vertikal → '|'
+    .replace(/[\u2502\u2503\u2507\u250E\u250F\u254E\u254F]/g, "|")
+    // sudut & tee (┌ ┐ └ ┘ ├ ┤ ┬ ┴ ┼ dsb) → '+'
+    .replace(/[\u250C\u250D\u2510\u2511\u2514\u2515\u2518\u2519\u251C\u251D\u251E\u251F\u2520\u2521\u2522\u2523\u2524\u2525\u2526\u2527\u2528\u2529\u252A\u252B\u252C\u252D\u252E\u252F\u2530\u2531\u2532\u2533\u2534\u2535\u2536\u2537\u2538\u2539\u253A\u253B\u253C\u253D\u253E\u253F\u2540\u2541\u2542\u2543\u2544\u2545\u2546\u2547\u2548\u2549\u254A\u254B]/g, "+")
+    // garis ganda ═ ║
+    .replace(/\u2550/g, "=")
+    .replace(/\u2551/g, "|")
+    // bullet • ◉ ◯ → '*' (bullet list)
+    .replace(/[\u2022\u25CF\u25CB]/g, "*")
+    // dash – — → '-'
+    .replace(/[\u2010\u2011\u2012\u2013\u2014\u2015]/g, "-")
+    .replace(/\u2026/g, "...") // … ellipsis
+    // curly quotes → lurus
+    .replace(/[\u2018\u2019\u201A\u2032\u02B9]/g, "'")
+    .replace(/[\u201C\u201D\u201E\u2033\u02BA]/g, '"')
+    // panah
+    .replace(/\u2192/g, "->")
+    .replace(/\u2190/g, "<-")
+    .replace(/\u2191/g, "^")
+    .replace(/\u2193/g, "v")
+    .replace(/\u21D2/g, "=>")
+    .replace(/\u21D0/g, "<=")
+    // simbol umum
+    .replace(/\u00A0/g, " ")            // nbsp
+    .replace(/\u00B0/g, " deg")         // °
+    .replace(/\u00B1/g, "+/-")          // ±
+    .replace(/\u00D7/g, "x")            // ×
+    .replace(/\u00F7/g, "/")            // ÷
+    .replace(/\u2264/g, "<=")           // ≤
+    .replace(/\u2265/g, ">=")           // ≥
+    .replace(/\u2260/g, "!=")           // ≠
+    .replace(/\u2248/g, "~=")           // ≈
+    .replace(/\u20AC/g, "EUR")          // €
+    .replace(/\u00A9/g, "(c)")          // ©
+    .replace(/\u00AE/g, "(R)")          // ®
+    .replace(/\u2122/g, "TM")           // ™
+    // Safety net: buang sisa char non-ASCII (0x80-0xFF juga tidak dirender
+    // helvetica StandardEncoding) agar tidak muncul byte mentah / "%".
+    .replace(/[^\x20-\x7E\r\n\t]/g, "");
+}
+
+// Segment teks dengan gaya inline (dipakai renderer PDF rich-text).
+// Mendukung: **bold**, *italic*, `code`, [link](url). Urutan pengecekan
+// ** sebelum * penting agar tidak salah-token.
+interface InlineSeg {
+  text: string;
+  bold?: boolean;
+  italic?: boolean;
+  code?: boolean;
+}
+
+function parseInline(text: string): InlineSeg[] {
+  const segs: InlineSeg[] = [];
+  const push = (t: string, s: Partial<InlineSeg> = {}) => {
+    if (t) segs.push({ text: t, ...s });
+  };
+  let i = 0;
+  while (i < text.length) {
+    // **bold**
+    if (text.startsWith("**", i)) {
+      const end = text.indexOf("**", i + 2);
+      if (end !== -1) {
+        push(text.slice(i + 2, end), { bold: true });
+        i = end + 2;
+        continue;
+      }
+    }
+    // *italic*
+    if (text[i] === "*") {
+      const end = text.indexOf("*", i + 1);
+      if (end !== -1) {
+        push(text.slice(i + 1, end), { italic: true });
+        i = end + 1;
+        continue;
+      }
+    }
+    // `code`
+    if (text[i] === "`") {
+      const end = text.indexOf("`", i + 1);
+      if (end !== -1) {
+        push(text.slice(i + 1, end), { code: true });
+        i = end + 1;
+        continue;
+      }
+    }
+    // [text](url) — tampilkan label saja
+    if (text[i] === "[") {
+      const close = text.indexOf("]", i + 1);
+      if (close !== -1 && text[close + 1] === "(") {
+        const urlEnd = text.indexOf(")", close + 2);
+        if (urlEnd !== -1) {
+          push(text.slice(i + 1, close));
+          i = urlEnd + 1;
+          continue;
+        }
+      }
+    }
+    // Akumulasi teks biasa sampai karakter spesial berikutnya.
+    let j = i;
+    while (j < text.length && text[j] !== "*" && text[j] !== "`" && text[j] !== "[") j++;
+    if (j === i) j++; // maju minimal 1 jika char spesial tak ter-match
+    push(text.slice(i, j));
+    i = j;
+  }
+  return segs;
+}
+
 interface ParsedTable {
   header: string[];
   rows: string[][];
@@ -480,13 +600,97 @@ export async function exportPdf(content: string, productType: string): Promise<v
     doc.setFontSize(fontSize);
     doc.setFont("helvetica", opts.bold ? "bold" : "normal");
     const indent = opts.indent ?? 0;
-    const wrapped = doc.splitTextToSize(text, maxWidth - indent) as string[];
+    // Normalisasi: kode fallback (mermaid/non-mermaid) bisa berisi char
+    // non-ASCII (box-drawing, dll) yang jsPDF render sebagai "%"/byte mentah.
+    const safe = normalizePdfText(text);
+    const wrapped = doc.splitTextToSize(safe, maxWidth - indent) as string[];
     const lineHeight = fontSize * 1.4;
     for (const w of wrapped) {
       ensureSpace(lineHeight);
       doc.text(w, margin + indent, y);
       y += lineHeight;
     }
+  };
+
+  // Renderer teks rich (bold/italic/code inline) dengan word-wrap manual &
+  // hanging indent. jsPDF splitTextToSize tidak mendukung font campuran per
+  // token, jadi kita bungkus per-kata sambil melacak gaya tiap token.
+  const writeRichText = (
+    text: string,
+    fontSize: number,
+    opts: { bold?: boolean; italic?: boolean; indent?: number; hangingIndent?: number } = {},
+  ) => {
+    const baseBold = opts.bold ?? false;
+    const baseItalic = opts.italic ?? false;
+    const firstIndent = opts.indent ?? 0;
+    const hangIndent = opts.hangingIndent ?? firstIndent;
+    const lineHeight = fontSize * 1.4;
+    const rightEdge = margin + maxWidth;
+    doc.setFontSize(fontSize);
+
+    const setFontFor = (seg: InlineSeg) => {
+      const bold = baseBold || !!seg.bold;
+      const italic = baseItalic || !!seg.italic;
+      const style = bold && italic ? "bolditalic" : bold ? "bold" : italic ? "italic" : "normal";
+      doc.setFont(seg.code ? "courier" : "helvetica", style);
+    };
+
+    // Tokenisasi per segmen → kata & spasi (spasi dipertahankan).
+    // Normalisasi tiap token ke ASCII saat dirender (bukan saat parseInline,
+    // agar marker markdown ** * ` [ sudah terkonsumsi dan tak tertukar dgn
+    // hasil normalisasi mis. • → '*').
+    const tokens: { text: string; seg: InlineSeg; space: boolean }[] = [];
+    for (const seg of parseInline(text)) {
+      for (const part of seg.text.split(/(\s+)/)) {
+        if (part === "") continue;
+        tokens.push({ text: part, seg, space: /^\s+$/.test(part) });
+      }
+    }
+
+    let x = margin + firstIndent;
+    let hasContent = false;
+    const newLine = () => {
+      y += lineHeight;
+      x = margin + hangIndent;
+      hasContent = false;
+      ensureSpace(lineHeight);
+    };
+
+    ensureSpace(lineHeight);
+    for (const tok of tokens) {
+      setFontFor(tok.seg);
+      const renderText = normalizePdfText(tok.text);
+      const w = doc.getTextWidth(renderText);
+      if (tok.space) {
+        if (!hasContent) continue; // buang spasi di awal baris
+        if (x + w > rightEdge) {
+          newLine();
+        } else {
+          doc.text(renderText, x, y);
+          x += w;
+        }
+        continue;
+      }
+      // kata: bungkus bila tidak muat di sisa baris
+      if (hasContent && x + w > rightEdge) {
+        newLine();
+        setFontFor(tok.seg);
+      }
+      doc.text(renderText, x, y);
+      x += w;
+      hasContent = true;
+    }
+    if (hasContent) y += lineHeight;
+  };
+
+  const drawHorizontalRule = () => {
+    ensureSpace(14);
+    doc.setDrawColor(210, 210, 210);
+    doc.setLineWidth(0.75);
+    doc.line(margin, y, margin + maxWidth, y);
+    doc.setDrawColor(0, 0, 0);
+    doc.setLineWidth(1);
+    y += 12;
   };
 
   const lines = content.split("\n");
@@ -549,9 +753,14 @@ export async function exportPdf(content: string, productType: string): Promise<v
         }
         i--;
 
+        // Normalisasi sel ke ASCII — autoTable merender via jsPDF juga, sehingga
+        // char non-ASCII (•, —, box-drawing) sama rusaknya bila tak dinormalisasi.
+        const head = [header.map(normalizePdfText)];
+        const body = bodyRows.map((r) => r.map(normalizePdfText));
+
         autoTable(doc, {
-          head: [header],
-          body: bodyRows,
+          head,
+          body,
           startY: y,
           margin: { left: margin, right: margin },
           theme: "grid",
@@ -571,33 +780,78 @@ export async function exportPdf(content: string, productType: string): Promise<v
         continue;
       }
 
-      const headingMatch = trimmed.match(/^(#{1,6})\s+(.*)/);
-      if (headingMatch) {
-        const depth = headingMatch[1].length;
-        const size = depth === 1 ? 20 : depth === 2 ? 16 : 13;
-        y += 8;
-        writeWrapped(stripInline(headingMatch[2]), size, { bold: true });
-        y += 2;
+      // Horizontal rule (--- / *** / ___) — gambar garis tipis, bukan teks dash.
+      // PRD memakai "---" sebagai pemisah antar user story / edge case.
+      if (/^(---|\*\*\*|___)\s*$/.test(trimmed)) {
+        drawHorizontalRule();
         continue;
       }
 
+      // Heading — hierarki visual jelas via ukuran + spacing + garis bawah (H2).
+      const headingMatch = trimmed.match(/^(#{1,6})\s+(.*)/);
+      if (headingMatch) {
+        const depth = headingMatch[1].length;
+        const size = depth === 1 ? 22 : depth === 2 ? 18 : depth === 3 ? 14 : 12;
+        const headLineH = size * 1.4;
+        y += depth === 2 ? 18 : depth === 3 ? 14 : 10;
+        ensureSpace(headLineH + 12);
+        const yBefore = y;
+        writeRichText(headingMatch[2], size, { bold: true });
+        // Garis bawah tipis untuk H2 (chapter) agar pemisah bab terlihat jelas.
+        // ruleAt = sedikit di bawah baseline baris terakhir heading.
+        if (depth === 2) {
+          const ruleAt = y - headLineH + 5;
+          doc.setDrawColor(200, 200, 200);
+          doc.setLineWidth(0.5);
+          doc.line(margin, ruleAt, margin + maxWidth, ruleAt);
+          doc.setDrawColor(0, 0, 0);
+          doc.setLineWidth(1);
+          y = ruleAt + 8;
+        } else {
+          y = Math.max(y, yBefore + headLineH) + 4;
+        }
+        continue;
+      }
+
+      // List item — bullet/angka dengan hanging indent agar baris lanjutan
+      // rapi sejajar di bawah teks (bukan di bawah bullet).
       const listMatch = trimmed.match(/^[-*+]\s+(.*)/);
       if (listMatch) {
-        writeWrapped(`•  ${stripInline(listMatch[1])}`, 11, { indent: 12 });
+        writeRichText(`•  ${listMatch[1]}`, 11, { indent: 12, hangingIndent: 24 });
+        y += 2;
         continue;
       }
       const orderedMatch = trimmed.match(/^(\d+\.)\s+(.*)/);
       if (orderedMatch) {
-        writeWrapped(`${orderedMatch[1]}  ${stripInline(orderedMatch[2])}`, 11, { indent: 12 });
+        writeRichText(`${orderedMatch[1]}  ${orderedMatch[2]}`, 11, { indent: 12, hangingIndent: 26 });
+        y += 2;
+        continue;
+      }
+
+      // Blockquote — italik, menjorok, dengan garis vertikal di kiri.
+      const quoteMatch = trimmed.match(/^>\s?(.*)/);
+      if (quoteMatch) {
+        const yStart = y;
+        writeRichText(quoteMatch[1], 11, { italic: true, indent: 20, hangingIndent: 20 });
+        const barTop = yStart - 9;
+        const barBottom = y - 3;
+        doc.setDrawColor(180, 180, 180);
+        doc.setLineWidth(2);
+        doc.line(margin + 8, barTop, margin + 8, barBottom);
+        doc.setDrawColor(0, 0, 0);
+        doc.setLineWidth(1);
+        y += 4;
         continue;
       }
 
       if (trimmed.length === 0) {
-        y += 6;
+        y += 4;
         continue;
       }
 
-      writeWrapped(stripInline(trimmed), 11);
+      // Paragraf biasa — rich text (bold/italic/code) + spasi setelah.
+      writeRichText(trimmed, 11);
+      y += 6;
     }
   });
 
