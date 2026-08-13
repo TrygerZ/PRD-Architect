@@ -292,9 +292,8 @@ className={`fixed bottom-[140px] sm:bottom-[100px] right-[16px] sm:right-[40px] 
             return (
               <LazySection
                 key={sectionId}
-                // Task 2.4 — Saat streaming, force-render agar konten yang
-                // mengalir langsung terlihat. Setelah selesai, virtualisasi.
-                forceRender={!!isGenerating}
+                // Saat streaming, hanya force render seksi terakhir yang sedang bertambah
+                forceRender={!!isGenerating && index === sections.length - 1}
                 heading={section.heading}
                 index={index}
                 total={sections.length}
