@@ -76,12 +76,13 @@ export function VersionDiff({
     >
       <div
         role="dialog"
-        aria-label={language === "en" ? "Compare versions" : "Bandingkan versi"}
+        aria-modal="true"
+        aria-labelledby="diff-dialog-title"
         className="w-full max-w-[900px] max-h-[85vh] bg-[var(--color-surface)] border border-[var(--color-border)] rounded-md shadow-2xl flex flex-col"
         onClick={(e) => e.stopPropagation()}
       >
         <div className="flex items-center justify-between px-6 py-4 border-b border-[var(--color-border)]">
-          <h2 className="text-[16px] font-semibold text-[var(--color-text-primary)] flex items-center gap-2">
+          <h2 id="diff-dialog-title" className="text-[16px] font-semibold text-[var(--color-text-primary)] flex items-center gap-2">
             <GitCompare size={16} strokeWidth={1.5} className="text-[var(--color-text-secondary)]" />
             {language === "en" ? "Compare Versions" : "Bandingkan Versi"}
           </h2>

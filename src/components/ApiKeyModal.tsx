@@ -124,6 +124,9 @@ export function ApiKeyModal({
             animate={{ opacity: 1, scale: 1, y: 0 }}
             exit={{ opacity: 0, scale: 0.95, y: 10 }}
             transition={{ duration: 0.2, ease: "easeOut" }}
+            role="dialog"
+            aria-modal="true"
+            aria-labelledby="modal-settings-title"
             className="w-full max-w-[480px] bg-[var(--color-surface)] p-8 border border-[var(--color-border)] rounded-md shadow-2xl relative"
             onClick={e => e.stopPropagation()}
           >
@@ -137,7 +140,7 @@ export function ApiKeyModal({
               <div className="w-[32px] h-[32px] rounded-sm bg-[var(--color-surface-elevated)] border border-[var(--color-border)] flex items-center justify-center">
                 <Key className="text-[var(--color-text-secondary)]" size={16} strokeWidth={1.5} />
               </div>
-              <h2 className="text-[18px] font-semibold text-[var(--color-text-primary)]">
+              <h2 id="modal-settings-title" className="text-[18px] font-semibold text-[var(--color-text-primary)]">
                 {language === "en" ? "Settings" : "Pengaturan"}
               </h2>
             </div>
