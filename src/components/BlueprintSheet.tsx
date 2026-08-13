@@ -170,9 +170,11 @@ className={`fixed bottom-[140px] sm:bottom-[100px] right-[16px] sm:right-[40px] 
             <button
               onClick={onRevise}
               disabled={isGenerating || totalComments === 0}
+              aria-label={language === "en" ? "Regenerate PRD" : "Buat Ulang PRD"}
+              title={language === "en" ? "Regenerate PRD" : "Buat Ulang PRD"}
               className={`px-3 py-2 text-[13px] font-medium transition-[color,transform,opacity] duration-200 ease flex items-center gap-2 disabled:opacity-40 disabled:cursor-not-allowed rounded-sm active:scale-[0.97] active:opacity-80 ${
-                totalComments > 0 
-                  ? "bg-[var(--color-text-primary)] text-[var(--color-bg)] hover:bg-[var(--color-text-primary)]" 
+                totalComments > 0
+                  ? "bg-[var(--color-text-primary)] text-[var(--color-bg)] hover:bg-[var(--color-text-primary)]"
                   : "bg-transparent text-[var(--color-text-muted)]"
               }`}
             >

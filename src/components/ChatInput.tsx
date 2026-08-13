@@ -102,6 +102,8 @@ export function ChatInput({
 
           <textarea
             ref={textareaRef}
+            id="prd-prompt-input"
+            name="prompt"
             aria-label={language === "en" ? "Product description input" : "Input deskripsi produk"}
             value={prompt}
             onChange={(e) => setPrompt(e.target.value)}

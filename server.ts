@@ -152,6 +152,8 @@ app.use(helmet({
       imgSrc: ["'self'", "data:", "https:", "blob:"],
       connectSrc: [
         "'self'",
+        "ws://localhost:*",
+        "http://localhost:*",
         "https://api.deepseek.com",
         "https://generativelanguage.googleapis.com",
         "https://opencode.ai",

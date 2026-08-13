@@ -420,8 +420,8 @@ export default function App() {
           onClose={handleSidebarClose}
         />
 
-        {/* Chat Area */}
-        <div className="flex-1 flex flex-col relative overflow-hidden">
+        {/* Main Content Area */}
+        <main className="flex-1 flex flex-col relative overflow-hidden">
           <div 
             ref={chatContainerRef}
             className="flex-1 overflow-y-auto px-4 sm:px-6 pb-[220px] sm:pb-[180px]" 
@@ -523,7 +523,7 @@ export default function App() {
             showQuickPrompts={false}
             fileContextChars={uploadedFiles.reduce((sum, f) => sum + Math.min(f.charCount ?? 0, 8000), 0)}
           />
-        </div>
+        </main>
       </div>
 
       <Suspense fallback={null}>

@@ -150,15 +150,15 @@ export function Header({
         )}
         <button
           onClick={onToggleLanguage}
-               className="text-[var(--color-text-secondary)] hover:text-[var(--color-text-primary)] transition-[color,transform] duration-200 ease text-[13px] font-mono px-3 py-2 min-h-[36px] rounded-sm hover:bg-[var(--color-surface-elevated)] focus-visible:ring-2 focus-visible:ring-[var(--color-interactive)] focus-visible:outline-none active:scale-[0.97]"
-          aria-label={t.header.toggleLanguage}
+          className="text-[var(--color-text-secondary)] hover:text-[var(--color-text-primary)] transition-[color,transform] duration-200 ease text-[13px] font-mono px-3 py-2 min-h-[36px] sm:min-h-[44px] rounded-sm hover:bg-[var(--color-surface-elevated)] focus-visible:ring-2 focus-visible:ring-[var(--color-interactive)] focus-visible:outline-none active:scale-[0.97]"
+          aria-label={`${t.header.toggleLanguage}: ${language.toUpperCase()}`}
           title={t.header.switchToOther}
         >
           {language === "en" ? "EN" : "ID"}
         </button>
         <button
           onClick={onOpenSettings}
-          className="text-[var(--color-text-secondary)] hover:text-[var(--color-text-primary)] transition-[color,transform] duration-200 ease p-2 rounded-sm hover:bg-[var(--color-surface-elevated)] focus-visible:ring-2 focus-visible:ring-[var(--color-interactive)] focus-visible:outline-none active:scale-[0.97]"
+          className="text-[var(--color-text-secondary)] hover:text-[var(--color-text-primary)] transition-[color,transform] duration-200 ease p-2.5 rounded-sm hover:bg-[var(--color-surface-elevated)] focus-visible:ring-2 focus-visible:ring-[var(--color-interactive)] focus-visible:outline-none active:scale-[0.97]"
           aria-label={t.header.settings}
           title={t.header.settings}
         >
