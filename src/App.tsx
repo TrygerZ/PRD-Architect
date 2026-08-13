@@ -176,10 +176,12 @@ export default function App() {
   // ...
 
   // Selalu sinkronkan ref dengan activeVersion terbaru (untuk handleAppend/handleRevise)
-  activeVersionRef.current = activeVersion;
-  commentsRef.current = comments;
-  languageRef.current = language;
-  prdModeRef.current = prdMode;
+  useEffect(() => {
+    activeVersionRef.current = activeVersion;
+    commentsRef.current = comments;
+    languageRef.current = language;
+    prdModeRef.current = prdMode;
+  }, [activeVersion, comments, language, prdMode]);
   const prdContent = activeVersion?.content || "";
   const hasMessage = !!activeVersionId || versions.length > 0;
   const userPrompt = activeVersion?.prompt || "";
