@@ -737,7 +737,7 @@ app.post("/api/generate-prd", async (req, res) => {
   // Ekstrak language di luar try agar accessible di catch block (BUG L5)
   const language: "id" | "en" = (req.body?.language === 'en' || req.body?.language === 'id') ? req.body.language : 'id';
   try {
-    const { prompt, customApiKey, provider: rawProvider = 'deepseek', model = 'deepseek-v4-flash', productType, uploadedFiles, mode = 'initial', prdMode: rawPrdMode = 'business' } = req.body;
+    const { prompt, provider: rawProvider = 'deepseek', model = 'deepseek-v4-flash', productType, uploadedFiles, mode = 'initial', prdMode: rawPrdMode = 'business' } = req.body;
     // Wave 7 — Track A: Narrow types from req.body (TS-04 to TS-07)
     const provider = rawProvider as AIProvider;
     const prdMode = rawPrdMode as PRDMode;
@@ -832,10 +832,10 @@ app.post("/api/generate-prd", async (req, res) => {
     const endpoint = providerConfig.endpoint;
     const modelName = model || providerConfig.defaultModel;
 
-    // Server-side API key fallback — prioritas: body key > cookie > .env
+    // Server-side API key resolution — prioritas: cookie > .env
     const serverKey = process.env[apiKeyEnvName];
     const cookieKey = req.cookies?.prd_session;
-    const apiKey = customApiKey || cookieKey || serverKey;
+    const apiKey = cookieKey || serverKey;
 
     if (!apiKey) {
       if (!res.writableEnded) {

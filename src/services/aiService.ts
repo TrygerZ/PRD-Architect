@@ -12,7 +12,7 @@ const MAX_BUFFER_SIZE = 1024 * 1024; // 1MB buffer limit
 
 export const generatePRD = async (
   prompt: string,
-  customApiKey: string | undefined,
+  _customApiKey: string | undefined,
   provider: AIProvider,
   model: string,
   language: "id" | "en",
@@ -34,7 +34,6 @@ export const generatePRD = async (
         },
         body: JSON.stringify({
           prompt,
-          customApiKey,
           provider,
           model,
           language,
