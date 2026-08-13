@@ -55,7 +55,8 @@ export const MermaidRenderer = memo(function MermaidRenderer({ chart, isGenerati
             startOnLoad: false,
             theme: "dark",
             fontFamily: "Geist Mono",
-            securityLevel: "loose",
+            securityLevel: "strict",
+            htmlLabels: false,
             themeVariables: {
               primaryColor: "#1e1e2e",
               primaryTextColor: "#cdd6f4",
@@ -101,7 +102,7 @@ export const MermaidRenderer = memo(function MermaidRenderer({ chart, isGenerati
 
         const sanitizedSvg = DOMPurify.sanitize(renderedSvg, {
           USE_PROFILES: { svg: true, svgFilters: true },
-          ADD_TAGS: ["foreignObject"],
+          FORBID_TAGS: ["script", "iframe", "object", "embed"],
         });
         svgRef.current = sanitizedSvg;
         lastRenderTimeRef.current = Date.now();
