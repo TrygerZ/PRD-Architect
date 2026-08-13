@@ -1,6 +1,7 @@
 // Task 3.1 — Export PRD ke DOCX, PDF, dan JSON terstruktur.
 // Lazy-import lib berat (docx, jspdf, jspdf-autotable, mermaid) hanya saat dipakai.
 // Mermaid diagram dirender ke PNG (SVG → canvas → dataURL) lalu disisipkan sebagai gambar.
+import DOMPurify from "dompurify";
 import { getSections, type Section } from "./sections";
 import { sanitizeMermaid } from "./mermaid";
 
@@ -210,7 +211,7 @@ const LIGHT_THEME_CONFIG = {
   startOnLoad: false,
   theme: "default" as const,
   fontFamily: "Geist Mono",
-  securityLevel: "loose" as const,
+  securityLevel: "strict" as const,
   htmlLabels: false,
   flowchart: { htmlLabels: false },
 };
@@ -260,7 +261,11 @@ async function renderMermaidToPng(chart: string): Promise<PngResult | null> {
       .replace(/\n+$/, "\n");
     await mermaid.parse(normalized);
     const { svg } = await mermaid.render(id, normalized, host);
-    return await svgToPng(svg);
+    const sanitized = DOMPurify.sanitize(svg, {
+      USE_PROFILES: { svg: true, svgFilters: true },
+      FORBID_TAGS: ["script", "iframe", "object", "embed"],
+    });
+    return await svgToPng(sanitized);
   } catch (err) {
     console.warn("Mermaid render for export failed:", err);
     return null;
@@ -276,6 +281,24 @@ async function renderMermaidToPng(chart: string): Promise<PngResult | null> {
  * tidak proporsional). Prioritas: atribut width/height numerik → viewBox →
  * max-width dari style → fallback.
  */
+function extractMermaidCharts(markdown: string): string[] {
+  const lines = markdown.split("\n");
+  const charts: string[] = [];
+  for (let i = 0; i < lines.length; i++) {
+    const trimmed = lines[i].trim();
+    if (trimmed.startsWith("```") && fenceLang(trimmed) === "mermaid") {
+      const codeLines: string[] = [];
+      i++;
+      while (i < lines.length && !lines[i].trim().startsWith("```")) {
+        codeLines.push(lines[i]);
+        i++;
+      }
+      charts.push(codeLines.join("\n"));
+    }
+  }
+  return charts;
+}
+
 function extractSvgDimensions(svgEl: SVGSVGElement): { width: number; height: number } {
   const wAttr = svgEl.getAttribute("width") || "";
   const hAttr = svgEl.getAttribute("height") || "";
@@ -376,6 +399,16 @@ async function svgToPng(svg: string): Promise<PngResult> {
 // --- DOCX --------------------------------------------------------------------
 
 export async function exportDocx(content: string, productType: string): Promise<void> {
+  const charts = extractMermaidCharts(content);
+  const chartImageMap = new Map<string, PngResult | null>();
+  if (charts.length > 0) {
+    await withLightMermaid(async () => {
+      const results = await Promise.all(charts.map((c) => renderMermaidToPng(c)));
+      charts.forEach((c, idx) => {
+        chartImageMap.set(c, results[idx]);
+      });
+    });
+  }
   const docx = await import("docx");
   const {
     Document,
@@ -440,7 +473,8 @@ export async function exportDocx(content: string, productType: string): Promise<
         }
 
         if (lang === "mermaid") {
-          const png = await renderMermaidToPng(codeLines.join("\n"));
+          const chartCode = codeLines.join("\n");
+          const png = chartImageMap.get(chartCode) ?? (await renderMermaidToPng(chartCode));
           if (png) {
             // Skala agar memenuhi lebar konten DOCX (~550px dgn margin default),
             // BOLEH upscale bila diagram sumber lebih kecil. Tinggi dibatasi
@@ -589,6 +623,16 @@ export async function exportDocx(content: string, productType: string): Promise<
 // --- PDF (client-side via jsPDF + autoTable) --------------------------------
 
 export async function exportPdf(content: string, productType: string): Promise<void> {
+  const charts = extractMermaidCharts(content);
+  const chartImageMap = new Map<string, PngResult | null>();
+  if (charts.length > 0) {
+    await withLightMermaid(async () => {
+      const results = await Promise.all(charts.map((c) => renderMermaidToPng(c)));
+      charts.forEach((c, idx) => {
+        chartImageMap.set(c, results[idx]);
+      });
+    });
+  }
   const { jsPDF } = await import("jspdf");
   const autoTableMod = await import("jspdf-autotable");
   const autoTable = autoTableMod.default;
@@ -723,7 +767,8 @@ export async function exportPdf(content: string, productType: string): Promise<v
         }
 
         if (lang === "mermaid") {
-          const png = await renderMermaidToPng(codeLines.join("\n"));
+          const chartCode = codeLines.join("\n");
+          const png = chartImageMap.get(chartCode) ?? (await renderMermaidToPng(chartCode));
           if (png) {
             // Skala agar memenuhi lebar konten PDF (boleh upscale bila sumber
             // kecil). Tinggi dibatasi tinggi halaman agar tidak terpotong /
