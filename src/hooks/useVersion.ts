@@ -40,7 +40,22 @@ export function useVersion() {
         savedAt: Date.now(),
       });
     }, 800);
-    return () => clearTimeout(t);
+
+    const handleBeforeUnload = () => {
+      saveState({
+        versions,
+        commentsByVersion,
+        activeVersionId,
+        savedAt: Date.now(),
+      });
+    };
+
+    window.addEventListener("beforeunload", handleBeforeUnload);
+
+    return () => {
+      clearTimeout(t);
+      window.removeEventListener("beforeunload", handleBeforeUnload);
+    };
   }, [versions, commentsByVersion, activeVersionId]);
 
   // BUG-06 fix — Ref yang selalu sinkron dengan activeVersionId terbaru,
