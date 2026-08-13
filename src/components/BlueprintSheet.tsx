@@ -418,6 +418,86 @@ const SheetSection = memo(function SheetSection({
     }
   };
 
+  const markdownComponents = useMemo(
+    () => ({
+      a: ({ href, children, ...props }: React.AnchorHTMLAttributes<HTMLAnchorElement>) => (
+        <a href={href} target="_blank" rel="noreferrer noopener" {...props}>
+          {children}
+        </a>
+      ),
+      h2: () => null,
+      h3: ({ node, children, ...props }: React.HTMLAttributes<HTMLHeadingElement> & { node?: unknown }) => (
+        <h3 className="relative group/h3" {...props}>
+          {children}
+        </h3>
+      ),
+      table: ({ node, ...props }: React.HTMLAttributes<HTMLTableElement> & { node?: unknown }) => (
+        <div className="w-full overflow-x-auto my-6 rounded-md border border-[var(--color-border)] bg-[var(--color-surface)] print:border-gray-300 print:bg-transparent print:shadow-none">
+          <table className="w-full text-sm text-left border-collapse" {...props} />
+        </div>
+      ),
+      thead: ({ node, ...props }: React.HTMLAttributes<HTMLTableSectionElement> & { node?: unknown }) => (
+        <thead className="bg-[var(--color-surface-elevated)] text-[var(--color-text-primary)] border-b border-[var(--color-border)] print:bg-gray-100 print:text-black print:border-gray-300" {...props} />
+      ),
+      th: ({ node, ...props }: React.ThHTMLAttributes<HTMLTableCellElement> & { node?: unknown }) => (
+        <th className="px-4 py-3 font-semibold whitespace-nowrap text-[13px]" {...props} />
+      ),
+      tbody: ({ node, ...props }: React.HTMLAttributes<HTMLTableSectionElement> & { node?: unknown }) => (
+        <tbody className="divide-y divide-[var(--color-border)] print:divide-gray-200" {...props} />
+      ),
+      td: ({ node, ...props }: React.TdHTMLAttributes<HTMLTableCellElement> & { node?: unknown }) => (
+        <td className="px-4 py-3 align-top leading-relaxed text-[var(--color-text-secondary)] print:text-black min-w-[120px] text-[13px]" {...props} />
+      ),
+      pre: ({ node, children, ...props }: { node?: unknown; children?: React.ReactNode }) => {
+        const firstChild = (node as { children?: Array<{ properties?: { className?: string[] } }> } | undefined)?.children?.[0];
+        const isMermaid = firstChild?.properties?.className?.includes("language-mermaid");
+        if (isMermaid) {
+          return <>{children}</>;
+        }
+        return (
+          <div className="relative my-6 rounded-md border border-[var(--color-border)] bg-[var(--color-surface)] overflow-hidden print:bg-gray-50 print:border-gray-300">
+            <div className="px-4 py-2 border-b border-[var(--color-border)] bg-[var(--color-surface-elevated)] flex items-center justify-between">
+              <div className="flex gap-1.5">
+                <div className="w-3 h-3 rounded-full bg-[var(--color-border-subtle)]"></div>
+                <div className="w-3 h-3 rounded-full bg-[var(--color-border-subtle)]"></div>
+                <div className="w-3 h-3 rounded-full bg-[var(--color-border-subtle)]"></div>
+              </div>
+            </div>
+            <pre className="p-4 overflow-x-auto m-0 bg-transparent text-[13px] font-mono text-[var(--color-text-primary)] print:text-black" {...props}>
+              {children}
+            </pre>
+          </div>
+        );
+      },
+      code: ({ node, className, children, ...props }: { node?: unknown; className?: string; children?: React.ReactNode }) => {
+        const match = /language-(\w+)/.exec(className || "");
+        if (match?.[1] === "mermaid") {
+          const raw = Array.isArray(children)
+            ? children.filter((c) => typeof c === "string").join("")
+            : typeof children === "string"
+              ? children
+              : String(children ?? "");
+          const chartStr = raw.replace(/[\r\n]+$/, "");
+          return <MermaidRenderer chart={chartStr} isGenerating={isGenerating} />;
+        }
+        const isInline = !match && !String(children).includes("\n");
+        if (isInline) {
+          return (
+            <code className="px-1.5 py-0.5 mx-0.5 rounded-[4px] bg-[var(--color-surface-elevated)] border border-[var(--color-border)] text-[13px] font-mono text-[var(--color-text-secondary)] print:bg-gray-100 print:text-black" {...props}>
+              {children}
+            </code>
+          );
+        }
+        return (
+          <code className={`font-mono text-[13px] text-[var(--color-text-primary)] ${className || ""}`} {...props}>
+            {children}
+          </code>
+        );
+      },
+    }),
+    [isGenerating],
+  );
+
   return (
     <div className="bg-[var(--color-surface)] border border-[var(--color-border)] rounded-md overflow-hidden mb-4 print:bg-transparent print:border-none print:shadow-none print:p-0">
       {/* Header — click to collapse */}
@@ -462,88 +542,7 @@ const SheetSection = memo(function SheetSection({
           >
             <ReactMarkdown
               remarkPlugins={[remarkGfm]}
-              components={{
-                a: ({ href, children, ...props }: React.AnchorHTMLAttributes<HTMLAnchorElement>) => (
-                  <a href={href} target="_blank" rel="noreferrer noopener" {...props}>
-                    {children}
-                  </a>
-                ),
-                h2: () => null, // h2 is already displayed in the card header
-                h3: ({node, children, ...props}) => (
-                  <h3 className="relative group/h3" {...props}>
-                    {children}
-                  </h3>
-                ),
-                table: ({ node, ...props }) => (
-                  <div className="w-full overflow-x-auto my-6 rounded-md border border-[var(--color-border)] bg-[var(--color-surface)] print:border-gray-300 print:bg-transparent print:shadow-none">
-                    <table className="w-full text-sm text-left border-collapse" {...props} />
-                  </div>
-                ),
-                thead: ({ node, ...props }) => (
-                  <thead className="bg-[var(--color-surface-elevated)] text-[var(--color-text-primary)] border-b border-[var(--color-border)] print:bg-gray-100 print:text-black print:border-gray-300" {...props} />
-                ),
-                th: ({ node, ...props }) => (
-                  <th className="px-4 py-3 font-semibold whitespace-nowrap text-[13px]" {...props} />
-                ),
-                tbody: ({ node, ...props }) => (
-                  <tbody className="divide-y divide-[var(--color-border)] print:divide-gray-200" {...props} />
-                ),
-                td: ({ node, ...props }) => (
-                  <td className="px-4 py-3 align-top leading-relaxed text-[var(--color-text-secondary)] print:text-black min-w-[120px] text-[13px]" {...props} />
-                ),
-                pre: ({ node, children, ...props }: { node?: unknown; children?: React.ReactNode }) => {
-                  // MRD-13: Skip outer box for mermaid — MermaidRenderer has its own chrome.
-                  // Otherwise we get a double-box (pre box + MermaidRenderer box).
-                  const firstChild = (node as { children?: Array<{ properties?: { className?: string[] } }> } | undefined)?.children?.[0];
-                  const isMermaid = firstChild?.properties?.className?.includes("language-mermaid");
-                  if (isMermaid) {
-                    return <>{children}</>;
-                  }
-                  return (
-                  <div className="relative my-6 rounded-md border border-[var(--color-border)] bg-[var(--color-surface)] overflow-hidden print:bg-gray-50 print:border-gray-300">
-                    <div className="px-4 py-2 border-b border-[var(--color-border)] bg-[var(--color-surface-elevated)] flex items-center justify-between">
-                       <div className="flex gap-1.5">
-                         <div className="w-3 h-3 rounded-full bg-[var(--color-border-subtle)]"></div>
-                         <div className="w-3 h-3 rounded-full bg-[var(--color-border-subtle)]"></div>
-                         <div className="w-3 h-3 rounded-full bg-[var(--color-border-subtle)]"></div>
-                       </div>
-                    </div>
-                    <pre className="p-4 overflow-x-auto m-0 bg-transparent text-[13px] font-mono text-[var(--color-text-primary)] print:text-black" {...props}>
-                      {children}
-                    </pre>
-                  </div>
-                  );
-                },
-                code: ({ node, className, children, ...props }: { node?: unknown; className?: string; children?: React.ReactNode }) => {
-                  const match = /language-(\w+)/.exec(className || "");
-                  // Mermaid diagram rendering
-                  if (match?.[1] === "mermaid") {
-                    // MRD-12: react-markdown v10 passes children either as string
-                    // or array-of-strings (per line). String() on array comma-joins.
-                    // Handle both cases + normalize line endings.
-                    const raw = Array.isArray(children)
-                      ? children.filter(c => typeof c === "string").join("")
-                      : typeof children === "string"
-                        ? children
-                        : String(children ?? "");
-                    const chartStr = raw.replace(/[\r\n]+$/, "");
-                    return <MermaidRenderer chart={chartStr} isGenerating={isGenerating} />;
-                  }
-                  const isInline = !match && !String(children).includes("\n");
-                  if (isInline) {
-                    return (
-                      <code className="px-1.5 py-0.5 mx-0.5 rounded-[4px] bg-[var(--color-surface-elevated)] border border-[var(--color-border)] text-[13px] font-mono text-[var(--color-text-secondary)] print:bg-gray-100 print:text-black" {...props}>
-                        {children}
-                      </code>
-                    );
-                  }
-                  return (
-                    <code className={`font-mono text-[13px] text-[var(--color-text-primary)] ${className || ""}`} {...props}>
-                      {children}
-                    </code>
-                  );
-                },
-              }}
+              components={markdownComponents}
             >
               {section.content}
             </ReactMarkdown>
