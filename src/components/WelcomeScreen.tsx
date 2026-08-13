@@ -29,7 +29,22 @@ export function WelcomeScreen({ language, onQuickPrompt, prdMode, onChangeMode }
         </p>
         <div className="w-12 h-[2px] bg-[var(--color-border)] mx-auto my-6"></div>
 
-        <div role="radiogroup" aria-label={t.welcome.modeGroupLabel} className="grid grid-cols-1 sm:grid-cols-3 gap-4 mb-8 text-left w-full px-4 sm:px-0 mx-auto">
+        <div
+          role="radiogroup"
+          aria-label={t.welcome.modeGroupLabel}
+          className="grid grid-cols-1 sm:grid-cols-3 gap-4 mb-8 text-left w-full px-4 sm:px-0 mx-auto"
+          onKeyDown={(e) => {
+            const modes: PRDMode[] = ["business", "simple", "technical"];
+            const currIdx = modes.indexOf(prdMode);
+            if (e.key === "ArrowRight" || e.key === "ArrowDown") {
+              e.preventDefault();
+              onChangeMode(modes[(currIdx + 1) % modes.length]);
+            } else if (e.key === "ArrowLeft" || e.key === "ArrowUp") {
+              e.preventDefault();
+              onChangeMode(modes[(currIdx - 1 + modes.length) % modes.length]);
+            }
+          }}
+        >
           <button 
             type="button"
             role="radio"

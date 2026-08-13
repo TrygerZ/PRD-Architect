@@ -32,6 +32,8 @@ export const Sidebar = memo(function Sidebar({
         />
       )}
       <div
+        role="region"
+        aria-label={language === "en" ? "Sidebar navigation" : "Navigasi sidebar"}
         className={`
           h-full bg-[var(--color-surface)] border-r border-[var(--color-border)] overflow-y-auto shrink-0
           transition-transform duration-200 ease-in-out flex flex-col
