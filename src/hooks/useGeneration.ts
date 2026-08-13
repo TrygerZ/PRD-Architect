@@ -52,6 +52,7 @@ export function useGeneration({
   const abortGeneration = useCallback(() => {
     abortControllerRef.current?.abort();
     abortControllerRef.current = null;
+    isGeneratingRef.current = false;
     setIsGenerating(false);
     setIsConnecting(false);
   }, []);
