@@ -1,7 +1,7 @@
 // Shared types used by both the frontend (src/) and backend (server.ts).
 // Single source of truth to avoid duplicate, drifting definitions.
 
-export type AIProvider = "deepseek" | "gemini" | "opencode";
+export type AIProvider = "deepseek" | "gemini" | "opencode" | "nine_router";
 
 export type PRDMode = "business" | "technical" | "simple";
 

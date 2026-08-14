@@ -37,6 +37,12 @@ export const PROVIDER_MODELS: Record<AIProvider, ProviderConfig> = {
       "big-pickle",
     ],
   },
+  nine_router: {
+    endpoint: "https://api.9router.com/v1/chat/completions",
+    apiKeyEnvName: "NINE_ROUTER_API_KEY",
+    defaultModel: "gpt-4o-mini",
+    models: ["gpt-4o-mini", "claude-3-5-sonnet", "deepseek-v3", "gemini-2.5-flash"],
+  },
 };
 
 // Map FE-friendly: { provider: string[] }

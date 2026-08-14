@@ -30,7 +30,7 @@ const FileUploader = lazy(() =>
 export default function App() {
   const [isSettingsOpen, setIsSettingsOpen] = useState(false);
   const [customApiKey, setCustomApiKey] = useState("");
-  const { provider, model, persistSettings } = useSettings();
+  const { provider, model, customEndpoint, persistSettings } = useSettings();
   const [productType, setProductType] = useState<ProductType>("Unknown");
   const [language, setLanguage] = useState<"id" | "en">("id");
   const { showScrollTop, handleScroll: onContainerScroll } = useScroll();
@@ -82,6 +82,7 @@ export default function App() {
     customApiKey,
     provider,
     model,
+    customEndpoint,
     uploadedFiles,
     languageRef,
     prdModeRef,
@@ -346,9 +347,9 @@ export default function App() {
   // === Stable Callback References (P1 — useCallback) ===
   const handleOpenSettings = useCallback(() => setIsSettingsOpen(true), []);
   const handleSettingsClose = useCallback(() => setIsSettingsOpen(false), []);
-  const handleSettingsSave = useCallback((key: string, p: AIProvider, m: string) => {
+  const handleSettingsSave = useCallback((key: string, p: AIProvider, m: string, endpoint?: string) => {
     setCustomApiKey(key);
-    persistSettings(p, m);
+    persistSettings(p, m, endpoint);
   }, [persistSettings]);
   const handleToggleLanguage = useCallback(() => {
     setLanguage((lang) => {
@@ -536,6 +537,7 @@ export default function App() {
           language={language}
           initialProvider={provider}
           initialModel={model}
+          initialEndpoint={customEndpoint}
         />
       </Suspense>
 

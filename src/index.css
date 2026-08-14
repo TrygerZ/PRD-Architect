@@ -2,39 +2,51 @@
 @plugin "@tailwindcss/typography";
 
 @theme {
-  --color-bg: #111111;
-  --color-surface: #1a1a1a;
-  --color-surface-elevated: #222222;
-  --color-border: #2a2a2a;
-  --color-text-primary: #f5f5f5;
-  --color-text-secondary: #999999;
-  --color-text-muted: #9a9a9a;
-  --color-interactive: #8b8bff;
-  --color-interactive-hover: #8888ff;
-  --color-interactive-subtle: rgba(102, 102, 255, 0.1);
-  --color-border-subtle: #333333;
+  /* Obsidian & Electric Amber Palette */
+  --color-bg: #080809;
+  --color-surface: #111113;
+  --color-surface-elevated: #18181b;
+  --color-surface-highlight: #222226;
+  --color-border: #232328;
+  --color-border-subtle: #19191d;
+  --color-border-hover: #32323a;
 
-  --color-error: #cf6666;
-  --color-error-hover: #a33a3a;
-  --color-error-bg: rgba(207, 102, 102, 0.1);
-  --color-warning: #c9a84c;
-  --color-mode-business: #4466ff;
-  --color-mode-business-bg: #112233;
-  --color-mode-technical: #a855f7;
-  --color-mode-technical-bg: #221133;
-  --color-mode-simple: #10B981;
-  --color-mode-simple-bg: rgba(16, 185, 129, 0.1);
-  --color-success: #22c55e;
+  --color-text-primary: #f4f4f7;
+  --color-text-secondary: #a1a1aa;
+  --color-text-muted: #71717a;
 
+  /* Electric Amber Focus Accent */
+  --color-interactive: #f59e0b;
+  --color-interactive-hover: #d97706;
+  --color-interactive-subtle: rgba(245, 158, 11, 0.08);
+
+  --color-error: #ef4444;
+  --color-error-hover: #dc2626;
+  --color-error-bg: rgba(239, 68, 68, 0.1);
+  --color-warning: #f59e0b;
+  --color-success: #10b981;
+
+  --color-mode-business: #f59e0b;
+  --color-mode-business-bg: rgba(245, 158, 11, 0.05);
+  --color-mode-technical: #38bdf8;
+  --color-mode-technical-bg: rgba(56, 189, 248, 0.05);
+  --color-mode-simple: #10b981;
+  --color-mode-simple-bg: rgba(16, 185, 129, 0.05);
+
+  --radius-xs: 4px;
   --radius-sm: 6px;
   --radius-md: 8px;
-  --radius-lg: 12px;
+  --radius-lg: 10px;
+  --radius-xl: 12px;
+  --radius-2xl: 16px;
 
-  --ease-default: cubic-bezier(0.4, 0, 0.2, 1);
-  --shadow-fab: 0 4px 16px rgba(0, 0, 0, 0.4);
+  --ease-default: cubic-bezier(0.16, 1, 0.3, 1);
+  --shadow-subtle: 0 1px 2px 0 rgba(0, 0, 0, 0.4);
+  --shadow-card: 0 4px 20px -2px rgba(0, 0, 0, 0.5), 0 1px 3px 0 rgba(0, 0, 0, 0.4);
+  --shadow-floating: 0 20px 40px -10px rgba(0, 0, 0, 0.7), 0 0 0 1px rgba(255, 255, 255, 0.04);
 
-  --font-geist: 'Geist Sans', system-ui, -apple-system, sans-serif;
-  --font-mono: 'Geist Mono', 'JetBrains Mono', monospace;
+  --font-geist: 'Geist Sans', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+  --font-mono: 'Geist Mono', 'JetBrains Mono', ui-monospace, monospace;
   --font-body: var(--font-geist);
   --font-display: var(--font-geist);
 }
@@ -47,10 +59,12 @@
     -webkit-font-smoothing: antialiased;
     -moz-osx-font-smoothing: grayscale;
     overflow-x: hidden;
+    letter-spacing: -0.012em;
   }
-  
+
   h1, h2, h3, h4, h5, h6 {
     font-weight: 600;
+    letter-spacing: -0.025em;
   }
 }
 
@@ -59,19 +73,19 @@ html {
   scroll-behavior: smooth;
 }
 ::-webkit-scrollbar {
-  width: 8px;
-  height: 8px;
+  width: 5px;
+  height: 5px;
 }
 ::-webkit-scrollbar-track {
-  background: var(--color-bg);
+  background: transparent;
 }
 ::-webkit-scrollbar-thumb {
-  background: #2a2a2a;
+  background: #232328;
   border-radius: 9999px;
-  transition: background 200ms ease;
+  transition: background 150ms ease;
 }
 ::-webkit-scrollbar-thumb:hover {
-  background: var(--color-text-muted);
+  background: #3b3b42;
 }
 
 /* Reduced motion */
@@ -93,7 +107,6 @@ html {
   .card, .panel, .glass-panel {
     background: transparent !important;
     border: 1px solid #ccc !important;
-    box-shadow: none !important;
   }
   header {
     display: none !important;

@@ -67,37 +67,42 @@ export function Header({
   ];
 
   return (
-    <motion.header 
-      initial={{ opacity: 0, y: -20 }}
+    <motion.header
+      initial={{ opacity: 0, y: -6 }}
       animate={{ opacity: 1, y: 0 }}
-      transition={{ duration: 0.3 }}
-      className="fixed top-0 inset-x-0 h-12 bg-[var(--color-bg)] border-b border-[var(--color-border)] z-50 flex items-center justify-between px-4 no-print"
+      transition={{ duration: 0.2 }}
+      className="fixed top-0 inset-x-0 h-12 bg-[var(--color-bg)]/90 backdrop-blur-md border-b border-[var(--color-border)] z-50 flex items-center justify-between px-4 no-print"
     >
-      <div className="flex items-center shrink-0 gap-3">
+      <div className="flex items-center shrink-0 gap-2.5">
         {onToggleSidebar && (
-          <button 
+          <button
             onClick={onToggleSidebar}
             aria-label={t.header.toggleSidebar}
-            className="text-[var(--color-text-secondary)] hover:text-[var(--color-text-primary)] transition-[color,transform] duration-200 ease p-2 rounded-sm hover:bg-[var(--color-surface-elevated)] mr-2 focus-visible:ring-2 focus-visible:ring-[var(--color-interactive)] focus-visible:outline-none active:scale-[0.97]"
+            className="text-[var(--color-text-secondary)] hover:text-[var(--color-text-primary)] transition-colors p-1.5 rounded-lg hover:bg-[var(--color-surface-elevated)] focus-visible:ring-2 focus-visible:ring-[var(--color-interactive)] focus-visible:outline-none cursor-pointer"
           >
-            <PanelLeft size={18} strokeWidth={1.5} />
+            <PanelLeft size={16} strokeWidth={1.5} />
           </button>
         )}
-        <h1 className="text-[18px] font-[600] tracking-[-0.02em] text-[var(--color-text-primary)]">
-          PRD <span className="hidden sm:inline">Architect</span>
-        </h1>
+        <div className="flex items-center gap-2">
+          <div className="w-5 h-5 rounded bg-[var(--color-interactive)] flex items-center justify-center text-[#080809] font-mono text-[10px] font-bold">
+            P
+          </div>
+          <h1 className="text-[14px] font-medium tracking-tight text-[var(--color-text-primary)]">
+            PRD <span className="text-[var(--color-text-muted)] font-normal">Architect</span>
+          </h1>
+        </div>
       </div>
 
-      <div className="flex items-center gap-2 sm:gap-4 ml-auto">
+      <div className="flex items-center gap-1.5 ml-auto">
         {!minimal && hasData && (
-          <div className="flex items-center gap-1.5 sm:gap-2 mr-2 sm:mr-4 pr-2 sm:pr-6 border-r border-[var(--color-border)]">
+          <div className="flex items-center gap-1 mr-1 pr-2 border-r border-[var(--color-border)]">
             <button
                onClick={onCopy}
-               className="text-[var(--color-text-secondary)] hover:text-[var(--color-text-primary)] transition-[color,transform] duration-200 ease py-2 px-3 flex items-center gap-1.5 text-[13px] font-medium rounded-[6px] hover:bg-[var(--color-surface-elevated)] focus-visible:ring-2 focus-visible:ring-[var(--color-interactive)] focus-visible:outline-none active:scale-[0.97]"
+               className="text-[var(--color-text-secondary)] hover:text-[var(--color-text-primary)] transition-colors py-1 px-2 flex items-center gap-1.5 text-[11.5px] font-medium rounded-md hover:bg-[var(--color-surface-elevated)] focus-visible:ring-2 focus-visible:ring-[var(--color-interactive)] focus-visible:outline-none cursor-pointer"
                aria-label={t.header.copy}
                title={t.header.copyTitle}
             >
-              <Copy size={16} strokeWidth={1.5} />
+              <Copy size={13} strokeWidth={1.5} />
               <span className="hidden sm:inline">
                 {t.header.copy}
               </span>
@@ -109,27 +114,27 @@ export function Header({
                 onClick={() => setExportOpen((o) => !o)}
                 aria-haspopup="menu"
                 aria-expanded={exportOpen}
-                className="text-[var(--color-text-secondary)] hover:text-[var(--color-text-primary)] transition-[color,transform] duration-200 ease py-2 px-3 flex items-center gap-1.5 text-[13px] font-medium rounded-sm hover:bg-[var(--color-surface-elevated)] focus-visible:ring-2 focus-visible:ring-[var(--color-interactive)] focus-visible:outline-none active:scale-[0.97]"
+                className="text-[var(--color-text-secondary)] hover:text-[var(--color-text-primary)] transition-colors py-1 px-2 flex items-center gap-1.5 text-[11.5px] font-medium rounded-md hover:bg-[var(--color-surface-elevated)] focus-visible:ring-2 focus-visible:ring-[var(--color-interactive)] focus-visible:outline-none cursor-pointer"
                 aria-label={t.header.export}
                 title={t.header.export}
               >
-                <FileDown size={16} strokeWidth={1.5} />
+                <FileDown size={13} strokeWidth={1.5} />
                 <span className="hidden sm:inline">{t.header.export}</span>
-                <ChevronDown size={14} strokeWidth={1.5} className={`transition-transform duration-200 ${exportOpen ? "rotate-180" : ""}`} />
+                <ChevronDown size={11} strokeWidth={1.5} className={`transition-transform duration-150 ${exportOpen ? "rotate-180" : ""}`} />
               </button>
               {exportOpen && (
                 <div
                   role="menu"
-                  className="absolute right-0 mt-1 w-[200px] bg-[var(--color-surface)] border border-[var(--color-border)] rounded-md shadow-2xl py-1 z-50"
+                  className="absolute right-0 mt-1 w-[180px] bg-[var(--color-surface)] border border-[var(--color-border)] rounded-xl shadow-floating py-1 z-50"
                 >
                   {exportItems.map(({ label, icon: Icon, onClick }) => (
                     <button
                       key={label}
                       role="menuitem"
                       onClick={() => runExport(onClick)}
-                      className="w-full flex items-center gap-2.5 px-3 py-2.5 text-[13px] text-[var(--color-text-secondary)] hover:text-[var(--color-text-primary)] hover:bg-[var(--color-surface-elevated)] transition-colors text-left focus-visible:ring-2 focus-visible:ring-[var(--color-interactive)] focus-visible:outline-none"
+                      className="w-full flex items-center gap-2 px-3 py-1.5 text-[12px] text-[var(--color-text-secondary)] hover:text-[var(--color-text-primary)] hover:bg-[var(--color-surface-elevated)] transition-colors text-left focus-visible:ring-2 focus-visible:ring-[var(--color-interactive)] focus-visible:outline-none cursor-pointer"
                     >
-                      <Icon size={15} strokeWidth={1.5} />
+                      <Icon size={13} strokeWidth={1.5} />
                       {label}
                     </button>
                   ))}
@@ -139,18 +144,18 @@ export function Header({
 
             <button
                onClick={onPrint}
-               className="text-[var(--color-text-secondary)] hover:text-[var(--color-text-primary)] transition-[color,transform] duration-200 ease py-2 px-3 flex items-center gap-1.5 text-[13px] font-medium rounded-sm hover:bg-[var(--color-surface-elevated)] focus-visible:ring-2 focus-visible:ring-[var(--color-interactive)] focus-visible:outline-none active:scale-[0.97]"
+               className="text-[var(--color-text-secondary)] hover:text-[var(--color-text-primary)] transition-colors py-1 px-2 flex items-center gap-1.5 text-[11.5px] font-medium rounded-md hover:bg-[var(--color-surface-elevated)] focus-visible:ring-2 focus-visible:ring-[var(--color-interactive)] focus-visible:outline-none cursor-pointer"
                aria-label={t.header.printTitle}
                title={t.header.printTitle}
             >
-              <Printer size={16} strokeWidth={1.5} />
+              <Printer size={13} strokeWidth={1.5} />
               <span className="hidden sm:inline font-mono">{t.header.print}</span>
             </button>
           </div>
         )}
         <button
           onClick={onToggleLanguage}
-          className="text-[var(--color-text-secondary)] hover:text-[var(--color-text-primary)] transition-[color,transform] duration-200 ease text-[13px] font-mono px-3 py-2 min-h-[36px] sm:min-h-[44px] rounded-sm hover:bg-[var(--color-surface-elevated)] focus-visible:ring-2 focus-visible:ring-[var(--color-interactive)] focus-visible:outline-none active:scale-[0.97]"
+          className="text-[var(--color-text-secondary)] hover:text-[var(--color-text-primary)] transition-colors text-[11.5px] font-mono px-2 py-1 rounded-md hover:bg-[var(--color-surface-elevated)] focus-visible:ring-2 focus-visible:ring-[var(--color-interactive)] focus-visible:outline-none cursor-pointer"
           aria-label={`${t.header.toggleLanguage}: ${language.toUpperCase()}`}
           title={t.header.switchToOther}
         >
@@ -158,11 +163,11 @@ export function Header({
         </button>
         <button
           onClick={onOpenSettings}
-          className="text-[var(--color-text-secondary)] hover:text-[var(--color-text-primary)] transition-[color,transform] duration-200 ease p-2.5 rounded-sm hover:bg-[var(--color-surface-elevated)] focus-visible:ring-2 focus-visible:ring-[var(--color-interactive)] focus-visible:outline-none active:scale-[0.97]"
+          className="text-[var(--color-text-secondary)] hover:text-[var(--color-text-primary)] transition-colors p-1.5 rounded-md hover:bg-[var(--color-surface-elevated)] focus-visible:ring-2 focus-visible:ring-[var(--color-interactive)] focus-visible:outline-none cursor-pointer"
           aria-label={t.header.settings}
           title={t.header.settings}
         >
-          <Settings size={18} strokeWidth={1.5} />
+          <Settings size={15} strokeWidth={1.5} />
         </button>
       </div>
     </motion.header>

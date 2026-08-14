@@ -11,6 +11,7 @@ interface UseGenerationArgs {
   customApiKey: string;
   provider: AIProvider;
   model: string;
+  customEndpoint?: string;
   uploadedFiles: UploadedFile[];
   // Refs agar handler selalu membaca state terbaru tanpa stale closure.
   // App tetap pemilik state; hook ini hanya meminjam referensi.
@@ -30,6 +31,7 @@ export function useGeneration({
   customApiKey,
   provider,
   model,
+  customEndpoint,
   uploadedFiles,
   languageRef,
   prdModeRef,
@@ -131,6 +133,7 @@ export function useGeneration({
               ),
             );
           },
+          customEndpoint,
         );
         onSuccess?.();
       } catch (err: unknown) {

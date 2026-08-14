@@ -157,6 +157,8 @@ app.use(helmet({
         "https://api.deepseek.com",
         "https://generativelanguage.googleapis.com",
         "https://opencode.ai",
+        "https://api.9router.com",
+        "https:",
       ],
       fontSrc: ["'self'"],
       objectSrc: ["'none'"],
@@ -737,13 +739,13 @@ app.post("/api/generate-prd", async (req, res) => {
   // Ekstrak language di luar try agar accessible di catch block (BUG L5)
   const language: "id" | "en" = (req.body?.language === 'en' || req.body?.language === 'id') ? req.body.language : 'id';
   try {
-    const { prompt, provider: rawProvider = 'deepseek', model = 'deepseek-v4-flash', productType, uploadedFiles, mode = 'initial', prdMode: rawPrdMode = 'business' } = req.body;
+    const { prompt, provider: rawProvider = 'deepseek', model = 'deepseek-v4-flash', customEndpoint, productType, uploadedFiles, mode = 'initial', prdMode: rawPrdMode = 'business' } = req.body;
     // Wave 7 — Track A: Narrow types from req.body (TS-04 to TS-07)
     const provider = rawProvider as AIProvider;
     const prdMode = rawPrdMode as PRDMode;
 
     // Validate provider
-    const VALID_PROVIDERS: AIProvider[] = ["deepseek", "gemini", "opencode"];
+    const VALID_PROVIDERS: AIProvider[] = ["deepseek", "gemini", "opencode", "nine_router"];
     if (!VALID_PROVIDERS.includes(provider)) {
       if (!res.writableEnded) {
         res.write(`data: ${JSON.stringify({ error: language === 'en' ? `Invalid provider "${provider}". Must be one of: ${VALID_PROVIDERS.join(", ")}` : `Provider "${provider}" tidak valid. Harus salah satu dari: ${VALID_PROVIDERS.join(", ")}` })}\n\n`);
@@ -752,8 +754,8 @@ app.post("/api/generate-prd", async (req, res) => {
       return;
     }
 
-    // BUG 4.7: Validasi format model name (hanya alfanumerik, titik, strip, underscore)
-    if (model && !/^[a-zA-Z0-9._-]+$/.test(model)) {
+    // BUG 4.7: Validasi format model name (hanya alfanumerik, titik, strip, underscore, slash, colon)
+    if (model && !/^[a-zA-Z0-9._/:-]+$/.test(model)) {
       if (!res.writableEnded) {
         res.write(`data: ${JSON.stringify({ error: t('Invalid model format', 'Format model tidak valid', language) })}\n\n`);
         res.end();
@@ -829,7 +831,21 @@ app.post("/api/generate-prd", async (req, res) => {
     // Katalog model & endpoint terpusat (shared/models.ts) — hindari drift FE/BE.
     const providerConfig = PROVIDER_MODELS[provider as AIProvider] ?? PROVIDER_MODELS.deepseek;
     const apiKeyEnvName = providerConfig.apiKeyEnvName;
-    const endpoint = providerConfig.endpoint;
+    let endpoint = providerConfig.endpoint;
+
+    // Support custom endpoint URL (khususnya untuk 9router / custom proxy)
+    if (provider === "nine_router" && typeof customEndpoint === "string" && customEndpoint.trim()) {
+      const trimmed = customEndpoint.trim();
+      try {
+        const parsed = new URL(trimmed);
+        if (parsed.protocol === "http:" || parsed.protocol === "https:") {
+          endpoint = trimmed;
+        }
+      } catch {
+        // Abaikan jika invalid URL, fallback ke default endpoint
+      }
+    }
+
     const modelName = model || providerConfig.defaultModel;
 
     // Server-side API key resolution — prioritas: cookie > .env

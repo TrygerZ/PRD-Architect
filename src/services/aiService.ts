@@ -22,6 +22,7 @@ export const generatePRD = async (
   prdMode: "business" | "technical" | "simple" = "business",
   signal: AbortSignal | undefined,
   onChunk: (chunk: { text?: string; reasoning?: string }) => void,
+  customEndpoint?: string,
 ) => {
   let lastError: Error | null = null;
 
@@ -36,6 +37,7 @@ export const generatePRD = async (
           prompt,
           provider,
           model,
+          customEndpoint,
           language,
           productType,
           uploadedFiles,

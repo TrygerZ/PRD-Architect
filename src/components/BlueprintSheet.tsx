@@ -8,7 +8,9 @@ import {
   MessageSquareText,
   X,
   ClipboardCopy,
-  GitCompare
+  GitCompare,
+  Layers,
+  Sparkles
 } from "lucide-react";
 import { PRDVersion, PRDMode } from "../types";
 import { formatDate } from "../utils/format";
@@ -99,17 +101,12 @@ export const BlueprintSheet = memo(function BlueprintSheet({
     return () => document.removeEventListener('keydown', handleTabTrap);
   }, [isFeedbackDrawerOpen]);
 
-  // Progress UI tracking removed to enhance scrolling performance.
-
   const activeVersion = versions.find(v => v.id === activeVersionId) || versions[versions.length - 1];
   const activeVersionIndex = activeVersion ? versions.findIndex(v => v.id === activeVersion.id) : 0;
-  
+
   const totalSections = sections.length;
-  // Show content completeness: 100% when done, indeterminate while generating
   const isComplete = content.length > 0 && !isGenerating;
   const showProgress = content.length > 0;
-  // Task 1.9 — Progress realistis berdasarkan jumlah heading (##) vs ekspektasi per mode.
-  // Capped 95% selama streaming agar tidak terlihat "selesai" sebelum waktunya.
   const expectedSections = { simple: 6, business: 12, technical: 9 }[activeVersion?.prdMode ?? "business"] ?? 12;
   const progress = isComplete
     ? 100
@@ -135,20 +132,25 @@ export const BlueprintSheet = memo(function BlueprintSheet({
         <ReactMarkdown remarkPlugins={[remarkGfm]}>{content}</ReactMarkdown>
       </div>
 
-      {/* FAB button */}
+      {/* Floating Action Button for Feedback */}
       <button
         onClick={() => setIsFeedbackDrawerOpen(!isFeedbackDrawerOpen)}
-className={`fixed bottom-[140px] sm:bottom-[100px] right-[16px] sm:right-[40px] z-[50] w-[48px] h-[48px] rounded-full flex items-center justify-center transition-[color,transform,opacity] duration-200 ease no-print will-change-transform focus-visible:ring-2 focus-visible:ring-[var(--color-interactive)] focus-visible:outline-none active:scale-[0.97] active:opacity-80 ${
-          isFeedbackDrawerOpen 
-            ? "bg-[var(--color-border)] text-[var(--color-text-primary)] shadow-none" 
-            : "bg-[var(--color-text-primary)] hover:bg-[var(--color-text-primary)] text-[var(--color-bg)] shadow-fab"
+        className={`fixed bottom-[130px] sm:bottom-[90px] right-[20px] sm:right-[32px] z-[50] w-[44px] h-[44px] rounded-xl flex items-center justify-center transition-all duration-200 no-print cursor-pointer focus-visible:ring-2 focus-visible:ring-[var(--color-interactive)] focus-visible:outline-none ${
+          isFeedbackDrawerOpen
+            ? "bg-[var(--color-surface-elevated)] text-[var(--color-text-primary)] border border-[var(--color-border)] shadow-none"
+            : "bg-[var(--color-interactive)] hover:bg-[var(--color-interactive-hover)] text-white shadow-floating"
         }`}
         aria-label={language === "en" ? (isFeedbackDrawerOpen ? "Close feedback" : "Open feedback") : (isFeedbackDrawerOpen ? "Tutup umpan balik" : "Buka umpan balik")}
       >
         {isFeedbackDrawerOpen ? (
-          <X size={20} strokeWidth={1.5} />
+          <X size={18} strokeWidth={1.5} />
         ) : (
-          <MessageSquareText size={20} strokeWidth={1.5} />
+          <div className="relative">
+            <MessageSquareText size={18} strokeWidth={1.5} />
+            {totalComments > 0 && (
+              <span className="absolute -top-1 -right-1.5 w-2.5 h-2.5 rounded-full bg-[var(--color-error)]" />
+            )}
+          </div>
         )}
       </button>
 
@@ -157,42 +159,45 @@ className={`fixed bottom-[140px] sm:bottom-[100px] right-[16px] sm:right-[40px] 
         data-feedback-drawer
         role="dialog"
         aria-label={language === "en" ? "Feedback panel" : "Panel umpan balik"}
-        className={`fixed top-12 right-0 bottom-0 w-full sm:w-[400px] sm:max-w-[100vw] bg-[var(--color-surface)] border-l border-[var(--color-border)] z-[45] transition-transform duration-200 ease overflow-y-auto overscroll-contain no-print ${
+        className={`fixed top-13 right-0 bottom-0 w-full sm:w-[420px] sm:max-w-[100vw] bg-[var(--color-surface)] border-l border-[var(--color-border)] z-[45] transition-transform duration-200 ease-out overflow-y-auto overscroll-contain no-print shadow-floating ${
           isFeedbackDrawerOpen ? "translate-x-0" : "translate-x-full"
         }`}
       >
-        <div className="p-6 pb-24">
-          <div className="flex items-center justify-between mb-8 pb-4 border-b border-[var(--color-border)]">
-            <h2 className="text-[18px] font-semibold text-[var(--color-text-primary)] flex items-center gap-2">
-              <MessageSquareText size={16} strokeWidth={1.5} className="text-[var(--color-text-secondary)]" />
-              {language === "en" ? "Feedback" : "Umpan Balik"}
-            </h2>
+        <div className="p-5 pb-24">
+          <div className="flex items-center justify-between mb-6 pb-4 border-b border-[var(--color-border)]">
+            <div className="flex items-center gap-2">
+              <div className="w-7 h-7 rounded-lg bg-[var(--color-surface-elevated)] flex items-center justify-center text-[var(--color-text-secondary)]">
+                <MessageSquareText size={15} strokeWidth={1.5} />
+              </div>
+              <h2 className="text-[15px] font-semibold text-[var(--color-text-primary)]">
+                {language === "en" ? "Review & Feedback" : "Review & Umpan Balik"}
+              </h2>
+            </div>
             <button
               onClick={onRevise}
               disabled={isGenerating || totalComments === 0}
               aria-label={language === "en" ? "Regenerate PRD" : "Buat Ulang PRD"}
               title={language === "en" ? "Regenerate PRD" : "Buat Ulang PRD"}
-              className={`px-3 py-2 text-[13px] font-medium transition-[color,transform,opacity] duration-200 ease flex items-center gap-2 disabled:opacity-40 disabled:cursor-not-allowed rounded-sm active:scale-[0.97] active:opacity-80 ${
+              className={`px-3 py-1.5 text-[12px] font-medium transition-all duration-150 flex items-center gap-1.5 disabled:opacity-40 disabled:cursor-not-allowed rounded-lg cursor-pointer ${
                 totalComments > 0
-                  ? "bg-[var(--color-text-primary)] text-[var(--color-bg)] hover:bg-[var(--color-text-primary)]"
-                  : "bg-transparent text-[var(--color-text-muted)]"
+                  ? "bg-[var(--color-interactive)] text-white hover:bg-[var(--color-interactive-hover)]"
+                  : "bg-transparent text-[var(--color-text-muted)] border border-[var(--color-border)]"
               }`}
             >
-              <RefreshCw className={`w-4 h-4 ${isGenerating ? "animate-spin" : ""}`} strokeWidth={1.5} />
-              <span className="hidden sm:inline">
+              <RefreshCw className={`w-3.5 h-3.5 ${isGenerating ? "animate-spin" : ""}`} strokeWidth={1.5} />
+              <span>
                 {language === "en" ? "Regenerate" : "Buat Ulang"}
               </span>
             </button>
           </div>
 
-          <div className="space-y-4">
-            {/* Hanya render feedback cards jika drawer terbuka (lazy rendering untuk hemat render cycle) */}
+          <div className="space-y-3">
             {isFeedbackDrawerOpen && sections.map((section, index) => {
               const sectionId = `sec_${section.heading.substring(0, 30).replace(/[^a-zA-Z0-9]/g, '_')}_${index}`;
               const currentComment = comments[sectionId] || "";
 
               return (
-                <FeedbackCard 
+                <FeedbackCard
                   key={sectionId}
                   section={section}
                   comment={currentComment}
@@ -206,93 +211,99 @@ className={`fixed bottom-[140px] sm:bottom-[100px] right-[16px] sm:right-[40px] 
       </div>
 
       {activeVersion && (
-        <>
-          {/* Version Info Header */}
-          <div className="flex items-center justify-between mb-4">
-            <div className="flex items-center gap-2">
-              <GitBranch size={14} strokeWidth={1.5} className="text-[var(--color-text-muted)]" />
-              <span className="text-[13px] text-[var(--color-text-secondary)]">Version {activeVersionIndex + 1}</span>
-              <time dateTime={new Date(activeVersion.timestamp).toISOString()} className="text-[11px] font-mono text-[var(--color-text-muted)]">{formatDate(activeVersion.timestamp, language)}</time>
+        <div className="mb-6">
+          {/* Document Meta Toolbar */}
+          <div className="p-3 bg-[var(--color-surface)] border border-[var(--color-border)] rounded-xl mb-3 flex flex-wrap items-center justify-between gap-3 shadow-card">
+            {/* Left metadata */}
+            <div className="flex items-center gap-2 flex-wrap">
+              <div className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg bg-[var(--color-surface-elevated)] border border-[var(--color-border)] text-[12px] font-medium text-[var(--color-text-primary)]">
+                <GitBranch size={13} strokeWidth={1.5} className="text-[var(--color-interactive)]" />
+                <span>Version {activeVersionIndex + 1}</span>
+              </div>
+              <time dateTime={new Date(activeVersion.timestamp).toISOString()} className="text-[12px] font-mono text-[var(--color-text-muted)]">
+                {formatDate(activeVersion.timestamp, language)}
+              </time>
               {content.length > 0 && (
-                <span className="text-[11px] font-mono text-[var(--color-text-muted)] hidden sm:inline" title={language === "en" ? "Estimated output tokens" : "Estimasi token output"}>
+                <span className="text-[12px] font-mono text-[var(--color-text-muted)] hidden sm:inline" title={language === "en" ? "Estimated output tokens" : "Estimasi token output"}>
                   · ~{formatTokenCount(estimateTokens(content))} {language === "en" ? "tokens" : "token"}
                 </span>
               )}
             </div>
+
+            {/* Right actions */}
             <div className="flex items-center gap-2">
-              {/* Task 3.4 — Bandingkan dua versi */}
               {onCompareVersions && versions.length > 1 && (
                 <button
                   type="button"
                   onClick={onCompareVersions}
-                  className="bg-transparent text-[13px] text-[var(--color-text-secondary)] border border-[var(--color-border)] rounded-sm px-3 py-2 min-h-[36px] flex items-center gap-1.5 hover:bg-[var(--color-surface-elevated)] hover:text-[var(--color-text-primary)] transition-colors focus:outline-none focus-visible:ring-2 focus-visible:ring-[var(--color-interactive)]"
+                  className="bg-[var(--color-surface-elevated)] text-[12px] text-[var(--color-text-secondary)] border border-[var(--color-border)] rounded-lg px-2.5 py-1.5 flex items-center gap-1.5 hover:text-[var(--color-text-primary)] hover:border-[var(--color-border-hover)] transition-all cursor-pointer focus:outline-none focus-visible:ring-2 focus-visible:ring-[var(--color-interactive)]"
                   aria-label={language === "en" ? "Compare versions" : "Bandingkan versi"}
                   title={language === "en" ? "Compare versions" : "Bandingkan versi"}
                 >
-                  <GitCompare size={14} strokeWidth={1.5} />
-                  <span className="hidden sm:inline">{language === "en" ? "Diff" : "Diff"}</span>
+                  <GitCompare size={13} strokeWidth={1.5} />
+                  <span>{language === "en" ? "Diff" : "Diff"}</span>
                 </button>
               )}
-              {/* Task 1.7 — Convert ke mode lain */}
+
               {onConvertMode && (
                 <select
-                  className="bg-transparent text-[13px] text-[var(--color-text-secondary)] border border-[var(--color-border)] rounded-sm px-3 py-2 min-h-[36px] focus:outline-none focus:border-[var(--color-interactive)] focus-visible:ring-2 focus-visible:ring-[var(--color-interactive)] disabled:opacity-40 disabled:cursor-not-allowed"
+                  className="bg-[var(--color-surface-elevated)] text-[12px] text-[var(--color-text-secondary)] border border-[var(--color-border)] rounded-lg px-2.5 py-1.5 focus:outline-none focus:border-[var(--color-interactive)] focus-visible:ring-2 focus-visible:ring-[var(--color-interactive)] disabled:opacity-40 disabled:cursor-not-allowed cursor-pointer"
                   value={activeVersion?.prdMode || "business"}
                   onChange={(e) => onConvertMode(e.target.value as PRDMode)}
                   disabled={isGenerating}
                   aria-label={language === "en" ? "Convert PRD mode" : "Konversi mode PRD"}
                   title={language === "en" ? "Convert to another mode" : "Konversi ke mode lain"}
                 >
-                  <option value="business" className="bg-[var(--color-bg)] text-[var(--color-text-primary)]">{language === "en" ? "Business" : "Bisnis"}</option>
-                  <option value="simple" className="bg-[var(--color-bg)] text-[var(--color-text-primary)]">{language === "en" ? "Simple" : "Sederhana"}</option>
-                  <option value="technical" className="bg-[var(--color-bg)] text-[var(--color-text-primary)]">{language === "en" ? "Technical" : "Teknis"}</option>
+                  <option value="business" className="bg-[var(--color-surface-elevated)] text-[var(--color-text-primary)]">{language === "en" ? "Business" : "Bisnis"}</option>
+                  <option value="simple" className="bg-[var(--color-surface-elevated)] text-[var(--color-text-primary)]">{language === "en" ? "Simple" : "Sederhana"}</option>
+                  <option value="technical" className="bg-[var(--color-surface-elevated)] text-[var(--color-text-primary)]">{language === "en" ? "Technical" : "Teknis"}</option>
                 </select>
               )}
-              <select 
-                className="bg-transparent text-[13px] text-[var(--color-text-secondary)] border border-[var(--color-border)] rounded-sm px-3 py-2 min-h-[36px] focus:outline-none focus:border-[var(--color-interactive)] focus-visible:ring-2 focus-visible:ring-[var(--color-interactive)]"
+
+              <select
+                className="bg-[var(--color-surface-elevated)] text-[12px] text-[var(--color-text-secondary)] border border-[var(--color-border)] rounded-lg px-2.5 py-1.5 focus:outline-none focus:border-[var(--color-interactive)] focus-visible:ring-2 focus-visible:ring-[var(--color-interactive)] cursor-pointer"
                 value={activeVersionId || ""}
                 onChange={(e) => onSwitchVersion?.(e.target.value)}
                 aria-label={language === "en" ? "Select version" : "Pilih versi"}
               >
                 {versions.map((v, i) => (
-                  <option key={v.id} value={v.id} className="bg-[var(--color-bg)] text-[var(--color-text-primary)]">Version {i + 1}</option>
+                  <option key={v.id} value={v.id} className="bg-[var(--color-surface-elevated)] text-[var(--color-text-primary)]">Version {i + 1}</option>
                 ))}
               </select>
             </div>
           </div>
-          
-          {/* Progress Bar Header */}
+
+          {/* Progress Bar */}
           {showProgress && totalSections > 0 && (
-            <div className="flex items-center gap-4 px-1 mb-6">
+            <div className="flex items-center gap-3 px-1 mb-4">
               <div
-                className="flex-1 h-[2px] bg-[var(--color-border)] rounded overflow-hidden"
+                className="flex-1 h-[3px] bg-[var(--color-border)] rounded-full overflow-hidden"
                 role="progressbar"
                 aria-valuenow={progress}
                 aria-valuemin={0}
                 aria-valuemax={100}
                 aria-label={isGenerating ? (language === "en" ? "Generating PRD..." : "Membuat PRD...") : (language === "en" ? "PRD Complete" : "PRD Selesai")}
               >
-                <div className={`h-full bg-[var(--color-interactive)] transition-[width] duration-300 ${isGenerating ? 'animate-pulse' : ''}`} style={{width: `${progress}%`}} />
+                <div className={`h-full bg-[var(--color-interactive)] rounded-full transition-all duration-300 ${isGenerating ? 'animate-pulse' : ''}`} style={{width: `${progress}%`}} />
               </div>
               <span className="text-[11px] font-mono text-[var(--color-text-muted)] whitespace-nowrap">
-                {isComplete ? (language === "en" ? "Complete" : "Selesai") : `${language === "en" ? "Generating" : "Menghasilkan"} ${progress}%`}
+                {isComplete ? (language === "en" ? "100% Complete" : "100% Selesai") : `${progress}%`}
               </span>
             </div>
           )}
-        </>
+        </div>
       )}
 
       {/* Main Content Area */}
       {!content && isGenerating ? (
         <LoadingSkeleton />
       ) : (
-        <div className="space-y-0" data-prd-content="true">
+        <div className="space-y-3.5" data-prd-content="true">
           {sections.map((section, index) => {
             const sectionId = `sec_${section.heading.substring(0, 30).replace(/[^a-zA-Z0-9]/g, '_')}_${index}`;
             return (
               <LazySection
                 key={sectionId}
-                // Saat streaming, hanya force render seksi terakhir yang sedang bertambah
                 forceRender={!!isGenerating && index === sections.length - 1}
                 heading={section.heading}
                 index={index}
@@ -318,10 +329,6 @@ className={`fixed bottom-[140px] sm:bottom-[100px] right-[16px] sm:right-[40px] 
   );
 });
 
-// Task 2.4 — Virtualisasi konten panjang via IntersectionObserver.
-// Saat section jauh dari viewport (dan PRD sudah selesai dirender),
-// tampilkan placeholder ringan (heading + index) alih-alih merender
-// markdown + Mermaid berat. Saat mendekati viewport, render penuh.
 const LazySection = memo(function LazySection({
   children,
   forceRender,
@@ -345,7 +352,6 @@ const LazySection = memo(function LazySection({
     }
     const el = ref.current;
     if (!el) return;
-    // Jika IntersectionObserver tidak tersedia, fallback render penuh.
     if (typeof IntersectionObserver === "undefined") {
       setVisible(true);
       return;
@@ -359,7 +365,7 @@ const LazySection = memo(function LazySection({
           }
         }
       },
-      { rootMargin: "600px 0px" }, // preload sebelum benar-benar terlihat
+      { rootMargin: "600px 0px" },
     );
     observer.observe(el);
     return () => observer.disconnect();
@@ -369,15 +375,14 @@ const LazySection = memo(function LazySection({
     return <>{children}</>;
   }
 
-  // Placeholder ringan — tinggi kasar dijaga agar scroll tidak "jump".
   return (
     <div
       ref={ref}
-      className="bg-[var(--color-surface)] border border-[var(--color-border)] rounded-md overflow-hidden mb-4 print:hidden"
-      style={{ minHeight: 120 }}
+      className="bg-[var(--color-surface)] border border-[var(--color-border)] rounded-xl overflow-hidden mb-3 print:hidden"
+      style={{ minHeight: 100 }}
     >
-      <div className="flex items-center justify-between px-5 py-4 border-b border-[var(--color-border)]">
-        <div className="flex items-center gap-3">
+      <div className="flex items-center justify-between px-5 py-3.5 border-b border-[var(--color-border)]">
+        <div className="flex items-center gap-2.5">
           <ChevronDown className="w-4 h-4 text-[var(--color-text-muted)] -rotate-90" strokeWidth={1.5} aria-hidden="true" />
           <h2 className="text-[var(--color-text-primary)] text-[14px] font-semibold truncate">{heading}</h2>
         </div>
@@ -408,7 +413,7 @@ const SheetSection = memo(function SheetSection({
   language: "id" | "en";
   onOpenFeedback: () => void;
 }) {
-  
+
   const copySection = async () => {
     try {
       await navigator.clipboard.writeText(section.heading + "\n\n" + section.content);
@@ -426,26 +431,26 @@ const SheetSection = memo(function SheetSection({
       ),
       h2: () => null,
       h3: ({ node, children, ...props }: React.HTMLAttributes<HTMLHeadingElement> & { node?: unknown }) => (
-        <h3 className="relative group/h3" {...props}>
+        <h3 className="relative text-[16px] font-semibold text-[var(--color-text-primary)] mt-6 mb-3 tracking-tight" {...props}>
           {children}
         </h3>
       ),
       table: ({ node, ...props }: React.HTMLAttributes<HTMLTableElement> & { node?: unknown }) => (
-        <div className="w-full overflow-x-auto my-6 rounded-md border border-[var(--color-border)] bg-[var(--color-surface)] print:border-gray-300 print:bg-transparent print:shadow-none">
-          <table className="w-full text-sm text-left border-collapse" {...props} />
+        <div className="w-full overflow-x-auto my-5 rounded-lg border border-[var(--color-border)] bg-[var(--color-surface-elevated)]/40 print:border-gray-300 print:bg-transparent">
+          <table className="w-full text-[13px] text-left border-collapse" {...props} />
         </div>
       ),
       thead: ({ node, ...props }: React.HTMLAttributes<HTMLTableSectionElement> & { node?: unknown }) => (
-        <thead className="bg-[var(--color-surface-elevated)] text-[var(--color-text-primary)] border-b border-[var(--color-border)] print:bg-gray-100 print:text-black print:border-gray-300" {...props} />
+        <thead className="bg-[var(--color-surface-elevated)] text-[var(--color-text-primary)] border-b border-[var(--color-border)] print:bg-gray-100 print:text-black" {...props} />
       ),
       th: ({ node, ...props }: React.ThHTMLAttributes<HTMLTableCellElement> & { node?: unknown }) => (
-        <th className="px-4 py-3 font-semibold whitespace-nowrap text-[13px]" {...props} />
+        <th className="px-4 py-2.5 font-semibold whitespace-nowrap text-[12px] text-[var(--color-text-primary)]" {...props} />
       ),
       tbody: ({ node, ...props }: React.HTMLAttributes<HTMLTableSectionElement> & { node?: unknown }) => (
         <tbody className="divide-y divide-[var(--color-border)] print:divide-gray-200" {...props} />
       ),
       td: ({ node, ...props }: React.TdHTMLAttributes<HTMLTableCellElement> & { node?: unknown }) => (
-        <td className="px-4 py-3 align-top leading-relaxed text-[var(--color-text-secondary)] print:text-black min-w-[120px] text-[13px]" {...props} />
+        <td className="px-4 py-2.5 align-top leading-relaxed text-[var(--color-text-secondary)] print:text-black min-w-[120px] text-[13px]" {...props} />
       ),
       pre: ({ node, children, ...props }: { node?: unknown; children?: React.ReactNode }) => {
         const firstChild = (node as { children?: Array<{ properties?: { className?: string[] } }> } | undefined)?.children?.[0];
@@ -454,14 +459,7 @@ const SheetSection = memo(function SheetSection({
           return <>{children}</>;
         }
         return (
-          <div className="relative my-6 rounded-md border border-[var(--color-border)] bg-[var(--color-surface)] overflow-hidden print:bg-gray-50 print:border-gray-300">
-            <div className="px-4 py-2 border-b border-[var(--color-border)] bg-[var(--color-surface-elevated)] flex items-center justify-between">
-              <div className="flex gap-1.5">
-                <div className="w-3 h-3 rounded-full bg-[var(--color-border-subtle)]"></div>
-                <div className="w-3 h-3 rounded-full bg-[var(--color-border-subtle)]"></div>
-                <div className="w-3 h-3 rounded-full bg-[var(--color-border-subtle)]"></div>
-              </div>
-            </div>
+          <div className="relative my-5 rounded-lg border border-[var(--color-border)] bg-[var(--color-surface-elevated)] overflow-hidden">
             <pre className="p-4 overflow-x-auto m-0 bg-transparent text-[13px] font-mono text-[var(--color-text-primary)] print:text-black" {...props}>
               {children}
             </pre>
@@ -482,7 +480,7 @@ const SheetSection = memo(function SheetSection({
         const isInline = !match && !String(children).includes("\n");
         if (isInline) {
           return (
-            <code className="px-1.5 py-0.5 mx-0.5 rounded-[4px] bg-[var(--color-surface-elevated)] border border-[var(--color-border)] text-[13px] font-mono text-[var(--color-text-secondary)] print:bg-gray-100 print:text-black" {...props}>
+            <code className="px-1.5 py-0.5 mx-0.5 rounded-md bg-[var(--color-surface-elevated)] border border-[var(--color-border)] text-[12px] font-mono text-[var(--color-interactive)]" {...props}>
               {children}
             </code>
           );
@@ -498,10 +496,10 @@ const SheetSection = memo(function SheetSection({
   );
 
   return (
-    <div className="bg-[var(--color-surface)] border border-[var(--color-border)] rounded-md overflow-hidden mb-4 print:bg-transparent print:border-none print:shadow-none print:p-0">
+    <div className="bg-[var(--color-surface)] border border-[var(--color-border)] rounded-xl overflow-hidden shadow-card transition-all duration-200 hover:border-[var(--color-border-hover)]">
       {/* Header — click to collapse */}
-      <div 
-        className={`flex items-center justify-between px-5 py-4 border-b border-[var(--color-border)] cursor-pointer select-none transition-colors no-print focus-visible:ring-2 focus-visible:ring-[var(--color-interactive)] focus-visible:outline-none ${isCollapsed ? 'bg-[var(--color-surface)] hover:bg-[var(--color-surface-elevated)]' : 'bg-[var(--color-surface-elevated)] hover:bg-[var(--color-surface-elevated)]'}`}
+      <div
+        className={`flex items-center justify-between px-5 py-3.5 border-b border-[var(--color-border)] cursor-pointer select-none transition-colors no-print focus-visible:ring-2 focus-visible:ring-[var(--color-interactive)] focus-visible:outline-none ${isCollapsed ? 'bg-[var(--color-surface)] hover:bg-[var(--color-surface-elevated)]/50' : 'bg-[var(--color-surface-elevated)]/40 hover:bg-[var(--color-surface-elevated)]/70'}`}
         onClick={() => onToggleCollapse(sectionId)}
         role="button"
         tabIndex={0}
@@ -509,64 +507,63 @@ const SheetSection = memo(function SheetSection({
         aria-expanded={!isCollapsed}
         aria-controls={`section-content-${sectionId}`}
       >
-        <div className="flex items-center gap-3">
-          <ChevronDown className={`w-4 h-4 text-[var(--color-text-muted)] transition-transform duration-200 ${isCollapsed ? '-rotate-90' : ''}`} strokeWidth={1.5} aria-hidden="true" />
+        <div className="flex items-center gap-2.5">
+          <ChevronDown className={`w-4 h-4 text-[var(--color-text-muted)] transition-transform duration-150 ${isCollapsed ? '-rotate-90' : ''}`} strokeWidth={1.5} aria-hidden="true" />
           <h2 className="text-[var(--color-text-primary)] text-[14px] font-semibold" id={`${sectionId}-heading`}>{section.heading}</h2>
         </div>
         <div className="flex items-center gap-2">
-          <span className="text-[11px] font-mono text-[var(--color-text-muted)]">{index + 1}/{total}</span>
+          <span className="text-[11px] font-mono text-[var(--color-text-muted)] px-2 py-0.5 rounded-md bg-[var(--color-surface-elevated)] border border-[var(--color-border)]">{index + 1}/{total}</span>
         </div>
       </div>
 
       {/* Content — collapsible */}
-      <div id={`section-content-${sectionId}`} className="grid transition-[grid-template-rows] duration-300 ease-[var(--ease-default)] print:max-h-none" style={{ gridTemplateRows: isCollapsed ? '0fr' : '1fr' }} role="region">
-          <div className="overflow-hidden">
-        <div className="px-5 py-4">
-          <div
-            id={`${sectionId}-content`}
-            className="w-full prose prose-invert max-w-none 
-              prose-headings:font-normal prose-headings:text-[var(--color-text-primary)]
-              prose-h1:text-[36px] sm:prose-h1:text-[48px] prose-h1:mt-8 prose-h1:mb-4 prose-h1:leading-[1.15]
-              prose-h2:hidden
-              prose-h3:text-[18px] prose-h3:mt-8 prose-h3:font-semibold
-              prose-p:text-[var(--color-text-secondary)] prose-p:text-[15px] prose-p:leading-[1.6] prose-p:mb-4
-              prose-a:text-[var(--color-interactive)] hover:prose-a:text-[var(--color-interactive-hover)] prose-a:no-underline transition-colors
-              prose-li:text-[var(--color-text-secondary)] prose-li:text-[15px] prose-li:my-1
-              prose-strong:text-[var(--color-text-primary)] prose-strong:font-medium
-              prose-ul:pl-6 prose-ul:mb-6 prose-ol:pl-6 prose-ol:mb-6
-              prose-hr:border-[var(--color-border)] prose-hr:my-8
-              prose-blockquote:border-l-2 prose-blockquote:border-[var(--color-text-muted)] prose-blockquote:pl-4 prose-blockquote:text-[var(--color-text-muted)]
-              print:prose-p:text-black print:prose-li:text-black print:prose-headings:text-black print:prose-strong:text-black
-            "
-          >
-            <ReactMarkdown
-              remarkPlugins={[remarkGfm]}
-              components={markdownComponents}
+      <div id={`section-content-${sectionId}`} className="grid transition-[grid-template-rows] duration-200 ease-out print:max-h-none" style={{ gridTemplateRows: isCollapsed ? '0fr' : '1fr' }} role="region">
+        <div className="overflow-hidden">
+          <div className="px-6 py-5">
+            <div
+              id={`${sectionId}-content`}
+              className="w-full prose prose-invert max-w-none
+                prose-headings:font-semibold prose-headings:text-[var(--color-text-primary)]
+                prose-h2:hidden
+                prose-h3:text-[16px] prose-h3:mt-6 prose-h3:mb-2
+                prose-p:text-[var(--color-text-secondary)] prose-p:text-[14px] prose-p:leading-[1.65] prose-p:mb-3.5
+                prose-a:text-[var(--color-interactive)] hover:prose-a:text-[var(--color-interactive-hover)] prose-a:no-underline transition-colors
+                prose-li:text-[var(--color-text-secondary)] prose-li:text-[14px] prose-li:my-1
+                prose-strong:text-[var(--color-text-primary)] prose-strong:font-semibold
+                prose-ul:pl-5 prose-ul:mb-4 prose-ol:pl-5 prose-ol:mb-4
+                prose-hr:border-[var(--color-border)] prose-hr:my-6
+                prose-blockquote:border-l-2 prose-blockquote:border-[var(--color-interactive)] prose-blockquote:pl-4 prose-blockquote:text-[var(--color-text-muted)]
+                print:prose-p:text-black print:prose-li:text-black print:prose-headings:text-black print:prose-strong:text-black
+              "
             >
-              {section.content}
-            </ReactMarkdown>
+              <ReactMarkdown
+                remarkPlugins={[remarkGfm]}
+                components={markdownComponents}
+              >
+                {section.content}
+              </ReactMarkdown>
+            </div>
+          </div>
+
+          {/* Footer — actions */}
+          <div className="flex items-center justify-end gap-2 px-5 py-2.5 border-t border-[var(--color-border)] bg-[var(--color-surface-elevated)]/20 no-print">
+            <button
+              className="text-[11px] text-[var(--color-text-muted)] hover:text-[var(--color-text-primary)] transition-colors flex items-center gap-1.5 px-2 py-1 rounded-md hover:bg-[var(--color-surface-elevated)] cursor-pointer focus-visible:ring-2 focus-visible:ring-[var(--color-interactive)] focus-visible:outline-none"
+              onClick={copySection}
+              aria-label={language === "en" ? "Copy section" : "Salin bagian"}
+            >
+              <ClipboardCopy size={13} strokeWidth={1.5} /> {language === "en" ? "Copy" : "Salin"}
+            </button>
+            <button
+              className="text-[11px] text-[var(--color-text-muted)] hover:text-[var(--color-text-primary)] transition-colors flex items-center gap-1.5 px-2 py-1 rounded-md hover:bg-[var(--color-surface-elevated)] cursor-pointer focus-visible:ring-2 focus-visible:ring-[var(--color-interactive)] focus-visible:outline-none"
+              onClick={onOpenFeedback}
+              aria-label={language === "en" ? "Open feedback" : "Buka umpan balik"}
+            >
+              <MessageSquareText size={13} strokeWidth={1.5} /> {language === "en" ? "Feedback" : "Umpan Balik"}
+            </button>
           </div>
         </div>
-
-        {/* Footer — actions */}
-        <div className="flex items-center justify-end gap-3 px-5 py-3 border-t border-[var(--color-border)] no-print">
-          <button 
-            className="text-[12px] text-[var(--color-text-muted)] hover:text-[var(--color-text-secondary)] transition-colors flex items-center gap-1.5 focus-visible:ring-2 focus-visible:ring-[var(--color-interactive)] focus-visible:outline-none active:opacity-70" 
-            onClick={copySection}
-            aria-label={language === "en" ? "Copy section" : "Salin bagian"}
-          >
-            <ClipboardCopy size={14} strokeWidth={1.5} /> {language === "en" ? "Copy" : "Salin"}
-          </button>
-          <button 
-            className="text-[12px] text-[var(--color-text-muted)] hover:text-[var(--color-text-secondary)] transition-colors flex items-center gap-1.5 focus-visible:ring-2 focus-visible:ring-[var(--color-interactive)] focus-visible:outline-none active:opacity-70"
-            onClick={onOpenFeedback}
-            aria-label={language === "en" ? "Open feedback" : "Buka umpan balik"}
-          >
-            <MessageSquareText size={14} strokeWidth={1.5} /> {language === "en" ? "Feedback" : "Umpan Balik"}
-          </button>
-        </div>
       </div>
-    </div>
     </div>
   );
 });
@@ -590,74 +587,58 @@ function FeedbackCard({
   }, [comment]);
 
   return (
-    <div className="bg-[var(--color-surface)] border border-[var(--color-border)] rounded-md p-4 text-left">
-      <div className="font-medium text-[13px] text-[var(--color-text-primary)] mb-2 truncate" title={section.heading}>
+    <div className="bg-[var(--color-surface-elevated)] border border-[var(--color-border)] rounded-xl p-3.5 text-left transition-all hover:border-[var(--color-border-hover)]">
+      <div className="font-medium text-[13px] text-[var(--color-text-primary)] mb-1.5 truncate" title={section.heading}>
         {section.heading}
       </div>
 
       {isEditing ? (
         <div className="flex flex-col gap-2 mt-2">
           <textarea
-            autoFocus
             value={tempComment}
             onChange={(e) => setTempComment(e.target.value)}
-            className="flex-grow w-full bg-[var(--color-bg)] border border-[var(--color-border)] text-[var(--color-text-primary)] text-[13px] p-3 rounded-sm focus:outline-none focus:border-[var(--color-interactive)] focus-visible:ring-2 focus-visible:ring-[var(--color-interactive)] transition-[border-color] duration-200 ease min-h-[100px] resize-y"
-            aria-label={language === "en" ? "Feedback for section" : "Umpan balik untuk bagian"}
-            placeholder={
-              language === "en"
-                ? "Add your feedback here..."
-                : "Tuliskan revisi kamu di sini..."
-            }
+            placeholder={language === "en" ? "Enter feedback or revision notes..." : "Tulis catatan revisi..."}
+            className="w-full p-2.5 text-[12px] bg-[var(--color-surface)] text-[var(--color-text-primary)] border border-[var(--color-border)] rounded-lg outline-none focus:border-[var(--color-interactive)] min-h-[70px] resize-y font-mono"
+            autoFocus
           />
-          <div className="flex gap-2 justify-end mt-2">
+          <div className="flex items-center justify-end gap-2">
             <button
               onClick={() => {
-                setIsEditing(false);
                 setTempComment(comment);
+                setIsEditing(false);
               }}
-              className="px-3 py-2 text-[13px] text-[var(--color-text-secondary)] hover:text-[var(--color-text-primary)] hover:bg-[var(--color-surface-elevated)] transition-[color] duration-200 ease rounded-sm font-medium active:opacity-70"
+              className="px-2.5 py-1 text-[11px] text-[var(--color-text-muted)] hover:text-[var(--color-text-primary)] rounded-md hover:bg-[var(--color-surface)] cursor-pointer"
             >
               {language === "en" ? "Cancel" : "Batal"}
             </button>
             <button
               onClick={() => {
-                setIsEditing(false);
                 onCommentChange(tempComment);
+                setIsEditing(false);
               }}
-              className="px-3 py-2 text-[13px] bg-[var(--color-text-primary)] text-[var(--color-bg)] font-medium rounded-sm hover:bg-[var(--color-text-primary)] transition-[color,transform,opacity] duration-200 ease active:scale-[0.97] active:opacity-80"
+              className="px-3 py-1 text-[11px] bg-[var(--color-interactive)] text-white rounded-md hover:bg-[var(--color-interactive-hover)] cursor-pointer"
             >
               {language === "en" ? "Save" : "Simpan"}
             </button>
           </div>
         </div>
       ) : (
-        <div
-          onClick={() => setIsEditing(true)}
-          onKeyDown={(e) => {
-            if (e.key === 'Enter' || e.key === ' ') {
-              e.preventDefault();
-              setIsEditing(true);
-            }
-          }}
-          role="button"
-          tabIndex={0}
-          aria-label={comment
-            ? (language === "en" ? "Edit feedback for this section" : "Edit umpan balik untuk bagian ini")
-            : (language === "en" ? "Add feedback for this section" : "Tambah umpan balik untuk bagian ini")
-          }
-          className={`text-[13px] rounded-sm transition-[color,border-color] duration-200 ease cursor-pointer border mt-2 focus-visible:ring-2 focus-visible:ring-[var(--color-interactive)] focus-visible:outline-none ${
-            comment 
-              ? "text-[var(--color-text-secondary)] p-3 bg-[var(--color-bg)] border-[var(--color-border)] hover:border-[var(--color-text-muted)]" 
-              : "text-[var(--color-text-muted)] p-3 border-dashed border-[var(--color-border)] bg-transparent hover:border-[var(--color-text-muted)] hover:text-[var(--color-text-secondary)]"
-          }`}
-        >
+        <div>
           {comment ? (
-            <div className="whitespace-pre-wrap leading-[1.6]">{comment}</div>
+            <div className="text-[12px] text-[var(--color-text-secondary)] bg-[var(--color-surface)] p-2.5 rounded-lg border border-[var(--color-border)] font-mono whitespace-pre-wrap">
+              {comment}
+            </div>
           ) : (
-             language === "en"
-                ? "Click to add revision notes..."
-                : "Klik untuk tambah revisi..."
+            <p className="text-[11px] text-[var(--color-text-muted)] italic">
+              {language === "en" ? "No feedback for this section." : "Belum ada catatan."}
+            </p>
           )}
+          <button
+            onClick={() => setIsEditing(true)}
+            className="mt-2 text-[11px] text-[var(--color-interactive)] hover:underline cursor-pointer"
+          >
+            {comment ? (language === "en" ? "Edit feedback" : "Ubah catatan") : (language === "en" ? "+ Add feedback" : "+ Tambah catatan")}
+          </button>
         </div>
       )}
     </div>
@@ -666,22 +647,10 @@ function FeedbackCard({
 
 function LoadingSkeleton() {
   return (
-    <div className="space-y-4 no-print w-full">
-      {[1, 2, 3, 4, 5, 6].map((i) => (
-        <div key={i} className="bg-[var(--color-surface)] border border-[var(--color-border)] rounded-md overflow-hidden mb-4 animate-pulse">
-          <div className="h-[48px] bg-[var(--color-surface-elevated)] border-b border-[var(--color-border)] flex items-center px-5">
-            <div className="w-4 h-4 rounded bg-[var(--color-border-subtle)] mr-3" />
-            <div className="h-4 bg-[var(--color-border-subtle)] rounded w-1/3" />
-          </div>
-          <div className="p-5 space-y-3">
-            <div className="h-3 bg-[var(--color-surface-elevated)] rounded w-full" />
-            <div className="h-3 bg-[var(--color-surface-elevated)] rounded w-3/4" />
-            <div className="h-3 bg-[var(--color-surface-elevated)] rounded w-1/2" />
-          </div>
-        </div>
-      ))}
+    <div className="space-y-4 animate-pulse">
+      <div className="h-10 bg-[var(--color-surface-elevated)] rounded-xl border border-[var(--color-border)]" />
+      <div className="h-40 bg-[var(--color-surface)] rounded-xl border border-[var(--color-border)]" />
+      <div className="h-40 bg-[var(--color-surface)] rounded-xl border border-[var(--color-border)]" />
     </div>
   );
 }
-
-

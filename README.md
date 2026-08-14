@@ -35,7 +35,8 @@ It features a **Tri-Mode** generation engine, each with comprehensively enhanced
 ## ✨ Features
 
 - 🌓 **Tri-Mode Generation**: Clean toggle between ⚡ Simple PRD (early-stage MVP), 💼 Business/Investor strategies, and 💻 deep Technical specifications.
-- 🧠 **Bring Your Own Model (BYOM)**: Seamlessly switch between AI providers (DeepSeek, Gemini, **OpenCode Zen**) and select specific models via the in-app Settings UI.
+- 🧠 **Bring Your Own Model (BYOM)**: Seamlessly switch between AI providers (DeepSeek, Gemini, OpenCode Zen, **9router / Custom Proxy**) and select specific models via the in-app Settings UI.
+- 🌐 **Custom Endpoint Support**: 9router option allows entering custom endpoint URLs, API keys, and custom model names.
 - 🆓 **Free AI Models**: OpenCode Zen provides 5 free models (deepseek-v4-flash-free, nemotron-3-ultra-free, mimo-v2.5-free, north-mini-code-free, big-pickle) — no credit card required.
 - 📊 **Live Mermaid Diagrams**: Generated PRDs include rich, interactive diagrams rendered in real-time — System Context (graph), Entity Relationships (ERD), User Journeys (journey), Gantt Roadmaps (gantt), and Data Flows (sequenceDiagram).
 - 🛡️ **Auto-Sanitized Mermaid Syntax**: AI-generated diagram syntax is automatically fixed (parentheses in labels, commas, edge labels) ensuring diagrams always render without errors.
