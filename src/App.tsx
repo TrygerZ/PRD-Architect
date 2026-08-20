@@ -8,6 +8,7 @@ import type { PRDVersion } from "./types";
 import DOMPurify from "dompurify";
 import { ArrowUp, X } from "lucide-react";
 import { safeGetLocalStorage, safeSetLocalStorage } from "./utils/storage";
+import { buildPrintHtml, downloadMarkdown } from "./utils/printTemplate";
 import { useSettings } from "./hooks/useSettings";
 import { useToast } from "./hooks/useToast";
 import { useScroll } from "./hooks/useScroll";
@@ -204,15 +205,7 @@ export default function App() {
 
   const handleExportMd = () => {
     if (!prdContent) return;
-    const blob = new Blob([prdContent], { type: "text/markdown" });
-    const url = URL.createObjectURL(blob);
-    const a = document.createElement("a");
-    a.href = url;
-    a.download = `PRD_${productType.replace(/ /g, "_")}_${new Date().getTime()}.md`;
-    document.body.appendChild(a);
-    a.click();
-    document.body.removeChild(a);
-    URL.revokeObjectURL(url);
+    downloadMarkdown(prdContent, productType);
   };
 
   // Task 3.1 — Export DOCX/PDF/JSON native (lazy-load lib berat di utils/export).
@@ -272,66 +265,7 @@ export default function App() {
     if (element) {
       const printWindow = window.open("", "_blank");
       if (printWindow) {
-        const html = `
-          <html>
-            <head>
-              <title>${productType} - PRD</title>
-              <style>
-                :root {
-                  --color-bg: #ffffff;
-                  --color-surface: #fafafa;
-                  --color-text-primary: #111111;
-                  --color-text-secondary: #555555;
-                  --color-text-muted: #767676;
-                  --color-border: #dddddd;
-                }
-                body { 
-                  font-family: 'Geist Sans', -apple-system, sans-serif; 
-                  line-height: 1.6; 
-                  color: #333;
-                  padding: 40px;
-                  max-width: 800px;
-                  margin: 0 auto;
-                }
-                h1 { 
-                  font-family: 'Geist Sans', -apple-system, sans-serif; 
-                  font-weight: 700; 
-                  color: #111; 
-                  margin-top: 24px; 
-                  margin-bottom: 16px; 
-                }
-                h2, h3, h4 { color: #111; margin-top: 32px; margin-bottom: 16px; font-weight: 600; }
-                p { margin-bottom: 16px; }
-                ul, ol { margin-bottom: 16px; padding-left: 24px; }
-                li { margin-bottom: 8px; }
-                table { width: 100%; border-collapse: collapse; margin-bottom: 24px; }
-                th, td { border: 1px solid #ddd; padding: 12px; text-align: left; }
-                th { background-color: #f9f9f9; font-weight: 600; }
-                code { 
-                  background-color: #f4f4f5; 
-                  padding: 2px 6px; 
-                  border-radius: 4px; 
-                  font-family: 'Geist Mono', ui-monospace, sans-serif;
-                  font-size: 0.9em;
-                }
-                blockquote {
-                  border-left: 4px solid #ddd;
-                  padding-left: 16px;
-                  color: #666;
-                  margin-left: 0;
-                  margin-right: 0;
-                }
-                @media print {
-                  body { padding: 0; }
-                  @page { margin: 2cm; }
-                }
-              </style>
-            </head>
-            <body>
-              ${DOMPurify.sanitize(element.innerHTML)}
-            </body>
-          </html>
-        `;
+        const html = buildPrintHtml(productType, DOMPurify.sanitize(element.innerHTML));
         printWindow.document.write(html);
         printWindow.document.close();
         printWindow.focus();
