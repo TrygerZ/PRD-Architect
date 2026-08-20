@@ -26,6 +26,9 @@ const ApiKeyModal = lazy(() =>
 const FileUploader = lazy(() =>
   import("./components/FileUploader").then((m) => ({ default: m.FileUploader })),
 );
+const WbsCanvas = lazy(() =>
+  import("./components/WbsCanvas").then((m) => ({ default: m.WbsCanvas })),
+);
 
 export default function App() {
   const [isSettingsOpen, setIsSettingsOpen] = useState(false);
@@ -56,6 +59,7 @@ export default function App() {
   const [isDiffOpen, setIsDiffOpen] = useState(false);
   const [currentPrompt, setCurrentPrompt] = useState("");
   const [prdMode, setPrdMode] = useState<PRDMode>("business");
+  const [view, setView] = useState<"document" | "wbs">("document");
 
   const chatContainerRef = useRef<HTMLDivElement>(null);
   const languageRef = useRef(language);
@@ -186,6 +190,11 @@ export default function App() {
   const prdContent = activeVersion?.content || "";
   const hasMessage = !!activeVersionId || versions.length > 0;
   const userPrompt = activeVersion?.prompt || "";
+
+  // Reset view ke document saat tidak ada konten (PRD baru / cleared).
+  useEffect(() => {
+    if (!prdContent && view === "wbs") setView("document");
+  }, [prdContent, view]);
 
   // ============================================================
   // Task 2.3 — Logika generasi (executeGeneration, handleGenerate,
@@ -409,6 +418,8 @@ export default function App() {
         onToggleLanguage={handleToggleLanguage}
         minimal={!hasMessage}
         onToggleSidebar={handleToggleSidebar}
+        view={view}
+        onViewChange={setView}
       />
 
       <div className="flex flex-1 pt-12 min-h-0 max-h-screen">
@@ -425,6 +436,22 @@ export default function App() {
 
         {/* Main Content Area */}
         <main className="flex-1 flex flex-col relative overflow-hidden">
+          {/* WBS Canvas view — menggantikan BlueprintSheet, lazy-render */}
+          {view === "wbs" && hasMessage && prdContent ? (
+            <Suspense
+              fallback={
+                <div className="flex-1 flex items-center justify-center text-[13px] font-mono text-[var(--color-text-muted)]">
+                  {language === "en" ? "Loading WBS canvas..." : "Memuat canvas WBS..."}
+                </div>
+              }
+            >
+              <WbsCanvas
+                content={prdContent}
+                prdMode={activeVersion?.prdMode}
+                language={language}
+              />
+            </Suspense>
+          ) : (
           <div 
             ref={chatContainerRef}
             className="flex-1 overflow-y-auto px-4 sm:px-6 pb-[220px] sm:pb-[180px]" 
@@ -513,6 +540,7 @@ export default function App() {
               </div>
             )}
           </div>
+          )}
 
           {/* Input — fixed bottom */}
           <ChatInput

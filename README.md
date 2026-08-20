@@ -42,11 +42,41 @@ It features a **Tri-Mode** generation engine, each with comprehensively enhanced
 - 🛡️ **Auto-Sanitized Mermaid Syntax**: AI-generated diagram syntax is automatically fixed (parentheses in labels, commas, edge labels) ensuring diagrams always render without errors.
 - ⚡ **Highly Stable Real-time Streaming**: Built with robust connection handling that supports infinite generation times—perfect for deep reasoning models (R1) without arbitrary timeouts.
 - 📏 **Precision Markdown Parsing**: Accurately segregates and renders complex Markdown documents in the UI purely based on primary chapter headings.
+- 🕸️ **WBS Canvas View**: Visualize any generated PRD as an interactive Work Breakdown Structure (React Flow) — features and sub-features parsed straight from the markdown, color-coded by MoSCoW priority, with zoom/pan and click-to-inspect detail panels.
 - 💬 **Interactive Revisions**: Leave feedback on the generated document to incrementally refine and polish the PRD, complete with a version control system to switch between generation attempts.
 - 📄 **Advanced File Context Support**: Upload reference files (PDF, DOCX, XLSX, Excel, CSV, text, and Images) to provide robust additional context and enrich the generated document.
 - 🌏 **Bilingual Support & Quick Prompts**: Full generation, system prompts, and pre-built quick prompt starters supported seamlessly in both English and Indonesian.
 - 🎨 **Minimalist UI**: A sleek, dark-themed interface built for focus, speed, and aesthetics with Lucide React icons replacing standard emojis.
 - 📤 **Export Ready**: Instantly copy to clipboard, download as Markdown (`.md`), or print directly to PDF.
+
+## 🕸️ WBS Canvas
+
+Once a PRD has been generated, switch from **Document** to **WBS Canvas** using the tabs in the header. The canvas renders the PRD as an interactive Work Breakdown Structure tree — modules → features → sub-features parsed from the markdown, color-coded by MoSCoW priority, laid out as a hierarchical tree.
+
+**Interactions:**
+
+- **Zoom / Pan** — mouse wheel to zoom, drag to pan (or use the controls at the bottom-left); the minimap gives an overview and supports navigation. The canvas is clamped (min zoom 0.3, initial fit max 1.2) so it never shrinks to unreadable.
+- **Modules start collapsed** — the canvas opens showing the root + module cards, each with a `+N` badge; click the **chevron** on any node to expand/collapse its subtree (collapse state resets when you leave the tab).
+- **Click or press Enter/Space on a node** → opens a slide-in detail panel with the node's title, priority badge, the raw markdown detail snippet from the PRD, and its sub-items.
+- **Close the detail panel** — click the backdrop, the close button, or press `Esc`.
+
+**Parsing:** features are extracted automatically from the PRD markdown:
+
+- **`### Feature Breakdown (WBS)` section** → hierarchical modules → features → sub-features (all modes); merged with MoSCoW priorities via title matching.
+- **MoSCoW tables** → priority/feature source (business & technical modes).
+- **`### FEAT-XX` spec blocks** → features with feature codes (simple mode fallback).
+- **Any `###` heading** → last-resort fallback.
+
+Note that parse quality depends on how closely the LLM follows the strict output format enforced in `server.ts` (FORMATTING REQUIREMENT, which now mandates the breakdown section in every mode). When a source is missing or malformed, the canvas shows an info banner with warnings instead of failing.
+
+**Legacy PRDs** (generated before the breakdown contract) still work via the flat fallbacks, but the canvas renders wide — every feature is a top-level sibling. Regenerating the PRD produces the breakdown section and a compact, module-collapsed canvas.
+
+**Limitations:**
+
+- **Read-only view** — node positions are computed deterministically per render and are **not** persisted; dragging a node does not survive a re-render.
+- Parsing is heuristic and tolerant: undocumented or non-conforming PRD markdown degrades to fallback strategies with warnings.
+
+See **[docs/WBS-CANVAS.md](docs/WBS-CANVAS.md)** for the full technical reference: parser architecture, API contracts, layout algorithm, and maintenance instructions.
 
 ## 🛠️ Tech Stack
 

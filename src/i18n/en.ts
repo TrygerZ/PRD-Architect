@@ -26,6 +26,11 @@ export const en = {
     toggleSidebar: "Toggle sidebar",
     switchToOther: "Switch to Indonesian",
   },
+  wbs: {
+    document: "Document",
+    canvas: "WBS Canvas",
+    canvasLabel: "View Work Breakdown Structure canvas",
+  },
 };
 
 export type Dict = typeof en;

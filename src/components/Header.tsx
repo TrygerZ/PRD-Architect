@@ -1,5 +1,5 @@
 import { useState, useRef, useEffect } from "react";
-import { Settings, Copy, Printer, PanelLeft, ChevronDown, FileText, FileType, FileJson, FileDown } from "lucide-react";
+import { Settings, Copy, Printer, PanelLeft, ChevronDown, FileText, FileType, FileJson, FileDown, Network } from "lucide-react";
 import { motion } from "motion/react";
 import { useT } from "../hooks/useT";
 
@@ -16,6 +16,8 @@ interface HeaderProps {
   onToggleLanguage: () => void;
   minimal?: boolean;
   onToggleSidebar?: () => void;
+  view?: "document" | "wbs";
+  onViewChange?: (view: "document" | "wbs") => void;
 }
 
 export function Header({
@@ -31,6 +33,8 @@ export function Header({
   onToggleLanguage,
   minimal = false,
   onToggleSidebar,
+  view = "document",
+  onViewChange,
 }: HeaderProps) {
   const [exportOpen, setExportOpen] = useState(false);
   const exportRef = useRef<HTMLDivElement>(null);
@@ -96,6 +100,42 @@ export function Header({
       <div className="flex items-center gap-1.5 ml-auto">
         {!minimal && hasData && (
           <div className="flex items-center gap-1 mr-1 pr-2 border-r border-[var(--color-border)]">
+            {/* View tabs: Document / WBS Canvas */}
+            {onViewChange && (
+              <div
+                role="tablist"
+                aria-label={language === "en" ? "View mode" : "Mode tampilan"}
+                className="flex items-center gap-0.5 p-0.5 mr-1 rounded-lg bg-[var(--color-surface-elevated)] border border-[var(--color-border)]"
+              >
+                <button
+                  role="tab"
+                  aria-selected={view === "document"}
+                  onClick={() => onViewChange("document")}
+                  className={`flex items-center gap-1.5 px-2 py-1 text-[11.5px] font-medium rounded-md transition-colors focus-visible:ring-2 focus-visible:ring-[var(--color-interactive)] focus-visible:outline-none cursor-pointer ${
+                    view === "document"
+                      ? "bg-[var(--color-surface-highlight)] text-[var(--color-text-primary)]"
+                      : "text-[var(--color-text-muted)] hover:text-[var(--color-text-secondary)]"
+                  }`}
+                >
+                  <FileText size={12} strokeWidth={1.5} aria-hidden="true" />
+                  <span className="hidden sm:inline">{t.wbs.document}</span>
+                </button>
+                <button
+                  role="tab"
+                  aria-selected={view === "wbs"}
+                  onClick={() => onViewChange("wbs")}
+                  title={t.wbs.canvasLabel}
+                  className={`flex items-center gap-1.5 px-2 py-1 text-[11.5px] font-medium rounded-md transition-colors focus-visible:ring-2 focus-visible:ring-[var(--color-interactive)] focus-visible:outline-none cursor-pointer ${
+                    view === "wbs"
+                      ? "bg-[var(--color-surface-highlight)] text-[var(--color-text-primary)]"
+                      : "text-[var(--color-text-muted)] hover:text-[var(--color-text-secondary)]"
+                  }`}
+                >
+                  <Network size={12} strokeWidth={1.5} aria-hidden="true" />
+                  <span className="hidden md:inline">{t.wbs.canvas}</span>
+                </button>
+              </div>
+            )}
             <button
                onClick={onCopy}
                className="text-[var(--color-text-secondary)] hover:text-[var(--color-text-primary)] transition-colors py-1 px-2 flex items-center gap-1.5 text-[11.5px] font-medium rounded-md hover:bg-[var(--color-surface-elevated)] focus-visible:ring-2 focus-visible:ring-[var(--color-interactive)] focus-visible:outline-none cursor-pointer"

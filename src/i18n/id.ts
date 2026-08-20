@@ -28,4 +28,9 @@ export const id: Dict = {
     toggleSidebar: "Buka/Tutup sidebar",
     switchToOther: "Ganti ke Bahasa Inggris",
   },
+  wbs: {
+    document: "Dokumen",
+    canvas: "WBS Canvas",
+    canvasLabel: "Lihat canvas Work Breakdown Structure",
+  },
 };
