@@ -1,4 +1,4 @@
-import { useMemo, useState, useCallback } from "react";
+import { useMemo, useState, useCallback, useLayoutEffect, useRef } from "react";
 import { AnimatePresence } from "motion/react";
 import {
   ReactFlow,
@@ -53,7 +53,7 @@ const TITLE_SIZES: Record<number, string> = {
 };
 
 function WbsNodeCard({ data, selected }: NodeProps<WbsFlowNode>) {
-  const { node, level = 0, onActivate, onToggle, isCollapsed = false, hiddenCount = 0 } = data;
+  const { node, level = 0, onActivate, onToggle, isCollapsed = false, hiddenCount = 0, onMeasure } = data;
   const isRoot = level === 0;
   const color = isRoot
     ? ROOT_COLOR
@@ -62,6 +62,16 @@ function WbsNodeCard({ data, selected }: NodeProps<WbsFlowNode>) {
       : level === 2
         ? (node.priority && PRIORITY_COLORS[node.priority]) || NEUTRAL_COLOR
         : SUB_COLOR;
+
+  // Ukur tinggi DOM aktual (title wrap, baris code, child-count) per render — feed ke
+  // layout supaya alokasi Y berbasis bounding box; estimator hanya fallback pass pertama.
+  const cardRef = useRef<HTMLDivElement>(null);
+  useLayoutEffect(() => {
+    const el = cardRef.current;
+    // padding/border/style identik antarrender — hanya konten yang menambah tinggi:
+    // ukur ulang saat konten/status berubah, bukan tiap render (hindari churn).
+    if (el && onMeasure) onMeasure(node.id, Math.max(0, el.offsetHeight));
+  }, [node.id, node.title, node.code, node.children.length, isCollapsed, onMeasure]);
 
   // A1: keyboard activation — RF v12 hanya memanggil onNodeClick dari mouse/selection.
   const handleKeyDown = (e: import("react").KeyboardEvent<HTMLDivElement>) => {
@@ -73,6 +83,7 @@ function WbsNodeCard({ data, selected }: NodeProps<WbsFlowNode>) {
 
   return (
     <div
+      ref={cardRef}
       role="button"
       tabIndex={0}
       onKeyDown={handleKeyDown}
@@ -154,6 +165,17 @@ export function WbsCanvas({ content, prdMode, language, onSelect }: WbsCanvasPro
   // State lokal — reset otomatis saat tab WBS ditutup/dibuka ulang (tidak persist).
   // Default: pohon UTUH ter-expand (kosong) — pola referensi; user bisa collapse manual.
   const [collapsed, setCollapsed] = useState<Set<string>>(new Set());
+  // Tinggi DOM aktual per node (dilaporkan WbsNodeCard). Pass pertama memakai estimator;
+  // setelah render, tinggi nyata menggantikannya → layout ulang berbasis bounding box.
+  const [nodeHeights, setNodeHeights] = useState<Record<string, number>>({});
+
+  const handleMeasure = useCallback((id: string, height: number) => {
+    setNodeHeights((prev) => {
+      // Hindari infinite loop: abaikan bila nilai tidak berubah (bulatkan 0.5px).
+      if (Math.abs((prev[id] ?? 0) - height) < 0.5) return prev;
+      return { ...prev, [id]: height };
+    });
+  }, []);
 
   const handleSelect = useCallback(
     (node: WbsNode) => {
@@ -173,9 +195,9 @@ export function WbsCanvas({ content, prdMode, language, onSelect }: WbsCanvasPro
   }, []);
 
   const { nodes, edges } = useMemo(() => {
-    const { nodes: n, edges: e } = layout(tree, handleSelect, toggleCollapse, collapsed);
+    const { nodes: n, edges: e } = layout(tree, handleSelect, toggleCollapse, collapsed, nodeHeights, handleMeasure);
     return { nodes: n, edges: e };
-  }, [tree, handleSelect, toggleCollapse, collapsed]);
+  }, [tree, handleSelect, toggleCollapse, collapsed, nodeHeights, handleMeasure]);
 
   const onNodeClick = useCallback(
     (_: import("react").MouseEvent, node: WbsFlowNode) => handleSelect(node.data.node),

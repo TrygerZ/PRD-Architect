@@ -2,8 +2,8 @@
 // Fixture hier: 4 modul, 9 fitur, 21 sub-fitur (34 node non-root) — hasil redesign-1 "berantakan",
 // target: pohon mengalir rapi kiri→kanan seperti WBS_Design.png.
 import { describe, it, expect } from "vitest";
-import { extractWbs, flattenWbs } from "../utils/wbs";
-import { layout, H_STEP, Y_UNIT } from "./wbsLayout";
+import { extractWbs, flattenWbs, type WbsNode, type WbsTree } from "../utils/wbs";
+import { layout, H_STEP, Y_UNIT, GAP, estimateNodeHeight } from "./wbsLayout";
 
 function fixture(): string {
   const module = (title: string, feats: [string, number][]): string =>
@@ -69,21 +69,24 @@ describe("wbsLayout — kolom selaras & band rata", () => {
     }
   });
 
-  it("root ter-center vertikal: y = (modul pertama + modul terakhir)/2", () => {
+  it("root ter-center: pusat card root = midpoint bbox gabungan modul (estimator)", () => {
     const root = nodes.find((n) => n.data.level === 0)!;
     const mods = nodes
       .filter((n) => n.data.level === 1)
-      .map((n) => n.position.y)
-      .sort((a, b) => a - b);
+      .sort((a, b) => a.position.y - b.position.y);
     expect(mods).toHaveLength(4);
-    expect(root.position.y).toBe((mods[0] + mods[mods.length - 1]) / 2);
+    // Fixture: modul identik → tinggi seragam = h1. Bottom modul terakhir = top + h1.
+    const h1 = estimateNodeHeight(mods[0].data.node, 1);
+    const rootH = estimateNodeHeight(root.data.node, 0);
+    const expected = (mods[0].position.y + (mods[mods.length - 1].position.y + h1)) / 2 - rootH / 2;
+    expect(root.position.y).toBeCloseTo(expected, 6);
   });
 
   it("band antar modul rata — modul besar (7 leaf) vs kecil (4 leaf) tetap berjarak rapi", () => {
     const mods = nodes
       .filter((n) => n.data.level === 1)
       .sort((a, b) => a.position.y - b.position.y);
-    // Modul Gamma (4 leaf) mengikuti Modul Alpha (7 leaf) → batas band kontigu, gap = 1 unit.
+    // Modul Gamma (4 leaf) mengikuti Modul Alpha (7 leaf) → batas band kontigu, gap ≥ 1 unit.
     expect(mods[0].position.x).toBe(H_STEP);
     for (let i = 1; i < mods.length; i++) {
       expect(mods[i].position.y - mods[i - 1].position.y).toBeGreaterThanOrEqual(Y_UNIT);
@@ -124,11 +127,87 @@ describe("wbsLayout — kolom selaras & band rata", () => {
     }
   });
 
-  it("collapsed state (awal buka tab) ringkas: root + 4 modul saja", () => {
+  it("collapsed state (awal buka tab) ringkas: root + 4 modul, seragam & ≥ Y_UNIT", () => {
     const c = new Set(nodes.filter((n) => n.data.level === 1).map((n) => n.id));
     const { nodes: cn } = layout(tree, () => {}, () => {}, c);
     expect(cn).toHaveLength(5);
-    const ys = cn.map((n) => n.position.y);
-    expect(Math.max(...ys) - Math.min(...ys)).toBe(3 * Y_UNIT); // 4 modul, 3 interval
+    const mods = cn
+      .filter((n) => n.data.level === 1)
+      .sort((a, b) => a.position.y - b.position.y);
+    expect(mods).toHaveLength(4);
+    // Card collapsed tidak punya baris child-count → pitch = h_collapsed + GAP.
+    const interval = mods[1].position.y - mods[0].position.y;
+    expect(interval).toBeGreaterThanOrEqual(Y_UNIT);
+    for (let i = 2; i < mods.length; i++) {
+      expect(mods[i].position.y - mods[i - 1].position.y).toBeCloseTo(interval, 6);
+    }
+    const root = cn.find((n) => n.data.level === 0)!;
+    // Pusat root = midpoint bbox gabungan modul (h_collapsed diturunkan dari output).
+    const rc = root.position.y + estimateNodeHeight(root.data.node, 0) / 2;
+    const expected = (mods[0].position.y + mods[mods.length - 1].position.y + (interval - GAP)) / 2;
+    expect(rc).toBeCloseTo(expected, 6);
+  });
+});
+
+describe("wbsLayout — bounding box sedepth tidak overlap & parent ter-center (title panjang)", () => {
+  const makeNode = (id: string, type: WbsNode["type"], title: string, children: WbsNode[] = []): WbsNode => ({
+    id,
+    type,
+    title,
+    detail: "",
+    children,
+  });
+  // Synthetic tree: 4 modul berjudul sangat panjang (wrap multi-baris) + sub-fitur panjang.
+  const LONG = "Modul dengan judul yang sangat panjang sekali sehingga title card nya wrap menjadi tiga baris penuh didalam kolom";
+  const LONG_SUB = "Fitur yang juga memiliki judul sangat panjang sehingga ikut wrap menjadi dua atau tiga baris sekaligus";
+  const tree: WbsTree = {
+    root: makeNode("root", "root", "Produk utama dengan nama yang sangat panjang juga untuk diuji", [
+      makeNode("m1", "feature", `${LONG} pertama`, [makeNode("m1-s1", "subfeature", LONG_SUB), makeNode("m1-s2", "subfeature", LONG_SUB)]),
+      makeNode("m2", "feature", `${LONG} kedua`, [makeNode("m2-s1", "subfeature", LONG_SUB)]),
+      makeNode("m3", "feature", `${LONG} ketiga`, [makeNode("m3-s1", "subfeature", LONG_SUB), makeNode("m3-s2", "subfeature", LONG_SUB), makeNode("m3-s3", "subfeature", LONG_SUB)]),
+      makeNode("m4", "feature", `${LONG} keempat`, [makeNode("m4-s1", "subfeature", LONG_SUB)]),
+    ]),
+    source: "markdown",
+    warnings: [],
+  };
+  const { nodes } = layout(tree, () => {}, () => {}, new Set());
+
+  it("bounding box node sedepth tidak overlap — jarak ≥ GAP", () => {
+    for (let d = 0; d <= 2; d++) {
+      const boxes = nodes
+        .filter((n) => n.data.level === d)
+        .map((n) => ({ top: n.position.y, h: estimateNodeHeight(n.data.node, d) }))
+        .sort((a, b) => a.top - b.top);
+      if (boxes.length < 2) continue; // depth 0: hanya root
+      for (let i = 1; i < boxes.length; i++) {
+        const gap = boxes[i].top - (boxes[i - 1].top + boxes[i - 1].h);
+        expect(gap).toBeGreaterThanOrEqual(GAP - 1e-6);
+      }
+    }
+  });
+
+  it("parent ter-center: pusat parent = midpoint bbox gabungan anak (top anak pertama … bottom anak terakhir)", () => {
+    const byId = new Map(nodes.map((n) => [n.id, n]));
+    for (const n of nodes) {
+      if (n.data.node.children.length === 0) continue;
+      const kids = n.data.node.children.map((c) => byId.get(c.id)!); // urutan pohon = urutan Y
+      const first = kids[0];
+      const last = kids[kids.length - 1];
+      const parentH = estimateNodeHeight(n.data.node, n.data.level);
+      const lastH = estimateNodeHeight(last.data.node, last.data.level);
+      const center = n.position.y + parentH / 2;
+      const expected = (first.position.y + (last.position.y + lastH)) / 2;
+      // Tanpa clamp (bbox anak ≥ tinggi card parent): pusat tepat di midpoint bbox anak.
+      // Dengan clamp (card parent terlalu tinggi): parent didorong ke atas → pusat ≥ midpoint.
+      const childBboxH = last.position.y + lastH - first.position.y;
+      if (parentH <= childBboxH) {
+        expect(Math.abs(center - expected)).toBeLessThan(1e-6);
+      } else {
+        expect(center + 1e-6).toBeGreaterThanOrEqual(expected);
+      }
+      // Card parent harus menjembatani anak-anaknya (overlap vertikal dgn bbox anak).
+      expect(n.position.y).toBeLessThan(last.position.y + lastH);
+      expect(n.position.y + parentH).toBeGreaterThan(first.position.y);
+    }
   });
 });
