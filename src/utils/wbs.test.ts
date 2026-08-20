@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { extractWbs, flattenWbs } from "./wbs";
+import { extractWbs, flattenWbs, parseBulletTree } from "./wbs";
 
 describe("extractWbs", () => {
   it("business mode: MoSCoW col-based table (en) → features with priority, Non-Goals table skipped", () => {
@@ -542,5 +542,78 @@ Q.`;
     expect(feat.title).toBe("User-Registration!");
     expect(feat.priority).toBe("Must-have");
     expect(feat.detail).toContain("Signup");
+  });
+});
+
+describe("parseBulletTree", () => {
+  it("parses nested 3-level bullet tree, bold label → title", () => {
+    const prd = `
+- **Customer Account**
+  - User Registration
+    - Email verification
+    - OTP resend
+  - Profile Management
+    - Edit profile
+- **Commerce**
+  - Payment Processing
+`;
+    const tree = parseBulletTree(prd);
+    expect(tree).toHaveLength(2);
+    expect(tree.map((m) => m.title)).toEqual(["Customer Account", "Commerce"]);
+    expect(tree[0].children.map((f) => f.title)).toEqual(["User Registration", "Profile Management"]);
+    const reg = tree[0].children[0];
+    expect(reg.children.map((s) => s.title)).toEqual(["Email verification", "OTP resend"]);
+    expect(tree[1].children[0].title).toBe("Payment Processing");
+    // raw line tersimpan (trimmed) untuk extractWbs (detail subtree)
+    expect(reg.raw).toBe("- User Registration");
+    expect(reg.children[0].raw).toBe("- Email verification");
+  });
+
+  it("tolerates varying indentation (2/4 spaces)", () => {
+    const prd = `
+- **Modul A**
+    - Feat A
+        - Sub A
+  - Feat B
+`;
+    const tree = parseBulletTree(prd);
+    expect(tree).toHaveLength(1);
+    expect(tree[0].title).toBe("Modul A");
+    expect(tree[0].children.map((f) => f.title)).toEqual(["Feat A", "Feat B"]);
+    expect(tree[0].children[0].children.map((s) => s.title)).toEqual(["Sub A"]);
+  });
+
+  it("leading indent of all bullets is normalized away (min-offset)", () => {
+    const prd = `
+    - **X**
+        - X1
+    - **Y**
+`;
+    const tree = parseBulletTree(prd);
+    expect(tree.map((m) => m.title)).toEqual(["X", "Y"]);
+    expect(tree[0].children[0].title).toBe("X1");
+  });
+
+  it("ignores non-bullet lines and empty trailing content", () => {
+    const prd = `Intro paragraph, not a bullet.
+- **Module A**
+  - Feat A
+Some prose between bullets.
+- Module B
+no bullet here`;
+    const tree = parseBulletTree(prd);
+    expect(tree.map((m) => m.title)).toEqual(["Module A", "Module B"]);
+    expect(tree[0].children[0].title).toBe("Feat A");
+  });
+
+  it("bold with colon separator strips trailing colon from title", () => {
+    const tree = parseBulletTree("- **Login:** do auth\n- **Register:** signup");
+    expect(tree.map((m) => m.title)).toEqual(["Login", "Register"]);
+  });
+
+  it("non-string / empty / bullet-less input → empty array, never throws", () => {
+    expect(parseBulletTree("")).toEqual([]);
+    expect(parseBulletTree("plain text only")).toEqual([]);
+    expect(parseBulletTree(null as unknown as string)).toEqual([]);
   });
 });

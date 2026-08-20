@@ -161,9 +161,20 @@ function normalizeTitle(t: string): string {
   return t.toLowerCase().replace(/[^a-z0-9]+/g, "");
 }
 
-function breakdownBullets(block: string[]): Bullet[] {
-  const out: Bullet[] = [];
-  for (const line of block) {
+// Pohon bullet generik — reusable untuk render detail node & section WBS.
+export interface WbsBulletItem {
+  title: string;
+  depth: number;
+  /** Baris markdown mentah — dipakai extractWbs untuk mengisi detail subtree. */
+  raw: string;
+  children: WbsBulletItem[];
+}
+
+export function parseBulletTree(text: string): WbsBulletItem[] {
+  // Tolerant — NEVER throws.
+  if (!text || typeof text !== "string") return [];
+  const bullets: Bullet[] = [];
+  for (const line of text.split("\n")) {
     const m = line.match(BREAKDOWN_BULLET_RE);
     if (!m) continue; // abaikan baris non-bullet di dalam blok
     const indent = line.length - line.trimStart().length;
@@ -172,25 +183,30 @@ function breakdownBullets(block: string[]): Bullet[] {
     const bm = rest.match(BREAKDOWN_STRONG_RE);
     const title = bm ? bm[1].trim().replace(/[:：]\s*$/, "") : rest.replace(/\*\*/g, "").trim();
     if (!title) continue;
-    out.push({ depth: Math.round(indent / 2), title, raw: line.trim() });
+    bullets.push({ depth: Math.round(indent / 2), title, raw: line.trim() });
   }
-  if (out.length === 0) return out;
-  const min = Math.min(...out.map((b) => b.depth));
-  for (const b of out) b.depth -= min;
-  return out;
+  if (bullets.length === 0) return [];
+  // depth normalization: min-offset → level teratas = 0
+  const min = Math.min(...bullets.map((b) => b.depth));
+  for (const b of bullets) b.depth -= min;
+  return buildBulletTree(bullets);
 }
 
-function buildBreakdownTree(bullets: Bullet[]): ParsedFeature[] {
-  const roots: ParsedFeature[] = [];
-  const stack: { depth: number; node: ParsedFeature }[] = [];
+function buildBulletTree(bullets: Bullet[]): WbsBulletItem[] {
+  const roots: WbsBulletItem[] = [];
+  const stack: { depth: number; node: WbsBulletItem }[] = [];
   for (const b of bullets) {
-    const node: ParsedFeature = { title: b.title, detail: b.raw, children: [] };
+    const node: WbsBulletItem = { title: b.title, depth: b.depth, raw: b.raw, children: [] };
     while (stack.length > 0 && stack[stack.length - 1].depth >= b.depth) stack.pop();
     if (stack.length === 0) roots.push(node);
     else stack[stack.length - 1].node.children.push(node);
     stack.push({ depth: b.depth, node });
   }
   return roots;
+}
+
+function bulletToFeature(b: WbsBulletItem): ParsedFeature {
+  return { title: b.title, detail: b.raw, children: b.children.map(bulletToFeature) };
 }
 
 // detail per node = gabungan raw baris-baris bullet di subtree-nya (snippet, cap DETAIL_LIMIT)
@@ -214,7 +230,7 @@ function parseBreakdown(content: string): ParsedFeature[] | null {
       if (m && m[1].length <= level) break;
       block.push(lines[i]);
     }
-    const roots = buildBreakdownTree(breakdownBullets(block));
+    const roots = parseBulletTree(block.join("\n")).map(bulletToFeature);
     if (roots.length === 0) return null;
     fillSubtreeDetails(roots);
     return roots;

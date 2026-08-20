@@ -3,7 +3,8 @@ import { motion } from "motion/react";
 import ReactMarkdown from "react-markdown";
 import remarkGfm from "remark-gfm";
 import { X, Box } from "lucide-react";
-import type { WbsNode } from "../utils/wbs";
+import type { WbsNode, WbsBulletItem } from "../utils/wbs";
+import { parseBulletTree } from "../utils/wbs";
 
 const PRIORITY_STYLES: Record<string, { badge: string; dot: string }> = {
   "Must-have": { badge: "bg-emerald-500/10 text-emerald-400 border-emerald-500/30", dot: "bg-emerald-400" },
@@ -11,6 +12,90 @@ const PRIORITY_STYLES: Record<string, { badge: string; dot: string }> = {
   "Could-have": { badge: "bg-amber-500/10 text-amber-400 border-amber-500/30", dot: "bg-amber-400" },
   "Won't-have": { badge: "bg-slate-500/10 text-slate-400 border-slate-500/30", dot: "bg-slate-400" },
 };
+
+// ---------------------------------------------------------------------------
+// Detail content splitter — tabel / bullet / teks biasa per blok baris.
+// - Baris `|...|` (dengan separator GFM) → dibiarkan ke ReactMarkdown → tabel rapi.
+// - Baris bullet → parseBulletTree → pohon terstruktur (tidak lagi teks acak).
+// - Sisanya → markdown paragraf apa adanya.
+// ---------------------------------------------------------------------------
+
+type DetailBlock =
+  | { kind: "table" | "text"; md: string }
+  | { kind: "bullets"; items: WbsBulletItem[] };
+
+const TABLE_LINE_RE = /^\s*\|/;
+const BULLET_LINE_RE = /^\s*[-*•]\s+/;
+// GFM membutuhkan baris separator (`|---|`) agar baris pipa jadi tabel.
+const TABLE_SEP_RE = /^\s*\|?\s*:?-{2,}:?\s*\|(\s*:?-{2,}:?\s*\|)*\s*$/;
+
+// Di-export untuk unit test blok-blok detail.
+export function splitDetailBlocks(detail: string): DetailBlock[] {
+  if (!detail) return [];
+  const blocks: DetailBlock[] = [];
+  let buf: string[] = [];
+  let kind: "table" | "bullet" | "text" | null = null;
+  const flush = () => {
+    if (buf.length === 0) return;
+    if (kind === "table") {
+      // Tanpa separator → bukan tabel di markdown; render sebagai teks biasa.
+      if (buf.some((l) => TABLE_SEP_RE.test(l))) blocks.push({ kind: "table", md: buf.join("\n") });
+      else blocks.push({ kind: "text", md: buf.join("\n") });
+    } else if (kind === "bullet") {
+      const items = parseBulletTree(buf.join("\n"));
+      if (items.length > 0) blocks.push({ kind: "bullets", items });
+      else blocks.push({ kind: "text", md: buf.join("\n") });
+    } else {
+      blocks.push({ kind: "text", md: buf.join("\n") });
+    }
+    buf = [];
+  };
+  for (const line of detail.split("\n")) {
+    const t = line.trim();
+    const next = !t
+      ? null
+      : TABLE_LINE_RE.test(t)
+        ? "table"
+        : BULLET_LINE_RE.test(t)
+          ? "bullet"
+          : "text";
+    if (next !== kind) flush();
+    kind = next;
+    if (t) buf.push(line);
+  }
+  flush();
+  return blocks;
+}
+
+// Render pohon bullet sebagai struktur teratur: level 1 = grup tebal + chip
+// tipe, level 2+ = baris chip + judul, indent bergeser per level.
+// Pakai div (bukan ul/li) agar tidak kena styling prose; role untuk a11y.
+function BulletTree({ items, depth = 0, nodeType }: { items: WbsBulletItem[]; depth?: number; nodeType: WbsNode["type"] }) {
+  return (
+    <div role="list" className={depth === 0 ? "space-y-1.5" : "mt-1 space-y-1"} style={depth > 0 ? { marginLeft: 16 } : undefined}>
+      {items.map((item, i) => (
+        <div key={i} role="listitem">
+          {depth === 0 ? (
+            <div className="flex items-center gap-2 py-1.5 border-b border-[var(--color-border)]/70">
+              <span className="text-[13px] font-semibold text-[var(--color-text-primary)] leading-snug">{item.title}</span>
+              <span className="text-[10px] font-mono uppercase tracking-wide text-[var(--color-text-muted)] px-1.5 py-0.5 rounded-md bg-[var(--color-surface-elevated)] border border-[var(--color-border)] shrink-0">
+                {nodeType}
+              </span>
+            </div>
+          ) : (
+            <div className="flex items-center gap-2 rounded-md px-2 py-1.5 border border-[var(--color-border)]/50 bg-[var(--color-surface-elevated)]/30">
+              <span className="text-[10px] font-mono text-[var(--color-interactive)] shrink-0" aria-hidden="true">
+                {"·".repeat(Math.min(depth, 3))}
+              </span>
+              <span className="text-[13px] text-[var(--color-text-secondary)] leading-snug">{item.title}</span>
+            </div>
+          )}
+          {item.children.length > 0 && <BulletTree items={item.children} depth={depth + 1} nodeType={nodeType} />}
+        </div>
+      ))}
+    </div>
+  );
+}
 
 interface DetailPanelProps {
   node: WbsNode;
@@ -29,12 +114,31 @@ export function DetailPanel({ node, language, onClose }: DetailPanelProps) {
 
   const priorityStyle = node.priority ? PRIORITY_STYLES[node.priority] : undefined;
 
+  const blocks = useMemo(() => splitDetailBlocks(node.detail), [node.detail]);
+
   const markdownComponents = useMemo(
     () => ({
       a: ({ href, children, ...props }: React.AnchorHTMLAttributes<HTMLAnchorElement>) => (
         <a href={href} target="_blank" rel="noreferrer noopener" {...props}>
           {children}
         </a>
+      ),
+      table: ({ node: _n, ...props }: React.HTMLAttributes<HTMLTableElement> & { node?: unknown }) => (
+        <div className="w-full overflow-x-auto my-5 rounded-lg border border-[var(--color-border)] bg-[var(--color-surface-elevated)]/40 print:border-gray-300 print:bg-transparent">
+          <table className="w-full text-[13px] text-left border-collapse" {...props} />
+        </div>
+      ),
+      thead: ({ node: _n, ...props }: React.HTMLAttributes<HTMLTableSectionElement> & { node?: unknown }) => (
+        <thead className="bg-[var(--color-surface-elevated)] text-[var(--color-text-primary)] border-b border-[var(--color-border)] print:bg-gray-100 print:text-black" {...props} />
+      ),
+      th: ({ node: _n, ...props }: React.ThHTMLAttributes<HTMLTableCellElement> & { node?: unknown }) => (
+        <th className="px-4 py-2.5 font-semibold whitespace-nowrap text-[12px] text-[var(--color-text-primary)]" {...props} />
+      ),
+      tbody: ({ node: _n, ...props }: React.HTMLAttributes<HTMLTableSectionElement> & { node?: unknown }) => (
+        <tbody className="divide-y divide-[var(--color-border)] print:divide-gray-200" {...props} />
+      ),
+      td: ({ node: _n, ...props }: React.TdHTMLAttributes<HTMLTableCellElement> & { node?: unknown }) => (
+        <td className="px-4 py-2.5 align-top leading-relaxed text-[var(--color-text-secondary)] print:text-black min-w-[120px] text-[13px]" {...props} />
       ),
       pre: ({ children }: { children?: React.ReactNode }) => (
         <pre className="p-3 overflow-x-auto rounded-lg border border-[var(--color-border)] bg-[var(--color-surface-elevated)] text-[12px] font-mono text-[var(--color-text-primary)]">
@@ -122,9 +226,25 @@ export function DetailPanel({ node, language, onClose }: DetailPanelProps) {
               prose-blockquote:border-l-2 prose-blockquote:border-[var(--color-interactive)] prose-blockquote:pl-4 prose-blockquote:text-[var(--color-text-muted)]
             "
           >
-            <ReactMarkdown remarkPlugins={[remarkGfm]} components={markdownComponents}>
-              {node.detail || (language === "en" ? "_No detail available._" : "_Tidak ada detail._")}
-            </ReactMarkdown>
+            {blocks.length === 0 ? (
+              <ReactMarkdown remarkPlugins={[remarkGfm]} components={markdownComponents}>
+                {node.detail || (language === "en" ? "_No detail available._" : "_Tidak ada detail._")}
+              </ReactMarkdown>
+            ) : (
+              <div className="space-y-3">
+                {blocks.map((b, i) =>
+                  b.kind === "bullets" ? (
+                    <BulletTree key={i} items={b.items} nodeType={node.type} />
+                  ) : (
+                    <div key={i}>
+                      <ReactMarkdown remarkPlugins={[remarkGfm]} components={markdownComponents}>
+                        {b.md}
+                      </ReactMarkdown>
+                    </div>
+                  ),
+                )}
+              </div>
+            )}
           </div>
 
           {node.children.length > 0 && (
