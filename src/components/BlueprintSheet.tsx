@@ -14,6 +14,14 @@ import { formatDate } from "../utils/format";
 import { SheetSection } from "./BlueprintSection";
 import { getSections, type Section } from "../utils/sections";
 import { estimateTokens, formatTokenCount } from "../utils/tokens";
+import { parseBulletTree } from "../utils/wbs";
+import {
+  WBS_SECTION_RE,
+  splitWbsSection,
+  wbsRows,
+  wbsTableRows,
+  wbsTailNote,
+} from "../utils/wbsTable";
 
 interface BlueprintSheetProps {
   content: string; // active version content
@@ -27,6 +35,66 @@ interface BlueprintSheetProps {
   language: "id" | "en";
   onConvertMode?: (mode: PRDMode) => void;
   onCompareVersions?: () => void;
+}
+
+// Print view (#prd-print-only): section WBS dirender sebagai tabel HTML pola
+// sama dengan live view — deteksi via splitWbsSection + WBS_SECTION_RE.
+// CSS print di printTemplate.ts sudah styling table/th/td, jadi tabel polos
+// tanpa class. Fallback aman: tanpa bullet → markdown biasa (konten tak hilang).
+function PrintOnlyContent({ content, language }: { content: string; language: "id" | "en" }) {
+  const sections = useMemo(() => getSections(content), [content]);
+  const headers = language === "en" ? ["Module", "Feature", "Sub-feature"] : ["Modul", "Fitur", "Sub-fitur"];
+  return (
+    <>
+      {sections.map((section, idx) => {
+        const key = `print-${idx}`;
+        const wbs = splitWbsSection(section.content);
+        if (!(WBS_SECTION_RE.test(section.heading) || wbs !== null)) {
+          return (
+            <ReactMarkdown key={key} remarkPlugins={[remarkGfm]}>
+              {section.heading + "\n\n" + section.content}
+            </ReactMarkdown>
+          );
+        }
+        const heading = wbs ? wbs.heading : section.heading;
+        const after = wbs ? wbs.after : section.content;
+        const items = parseBulletTree(after);
+        const rows = wbsTableRows(wbsRows(items));
+        const tailNote = wbsTailNote(after);
+        return (
+          <div key={key}>
+            {wbs && wbs.before.trim() ? <ReactMarkdown remarkPlugins={[remarkGfm]}>{wbs.before}</ReactMarkdown> : null}
+            <ReactMarkdown remarkPlugins={[remarkGfm]}>{heading}</ReactMarkdown>
+            {items.length === 0 ? (
+              <ReactMarkdown remarkPlugins={[remarkGfm]}>{after}</ReactMarkdown>
+            ) : (
+              <>
+                <table>
+                  <thead>
+                    <tr>
+                      {headers.map((h) => (
+                        <th key={h}>{h}</th>
+                      ))}
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {rows.map((r, i) => (
+                      <tr key={i}>
+                        {r.module !== null && <td rowSpan={r.moduleSpan ?? 1}>{r.module}</td>}
+                        {r.feature !== null && <td rowSpan={r.featureSpan ?? 1}>{r.feature}</td>}
+                        <td>{r.sub}</td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+                {tailNote ? <ReactMarkdown remarkPlugins={[remarkGfm]}>{tailNote}</ReactMarkdown> : null}
+              </>
+            )}
+          </div>
+        );
+      })}
+    </>
+  );
 }
 
 export const BlueprintSheet = memo(function BlueprintSheet({
@@ -124,7 +192,7 @@ export const BlueprintSheet = memo(function BlueprintSheet({
     <div className="w-full mx-auto relative z-10 print:block print:w-full print:max-w-full print:bg-white print:text-black">
       {/* Hidden container for full PRD print export */}
       <div id="prd-print-only" style={{ display: "none" }}>
-        <ReactMarkdown remarkPlugins={[remarkGfm]}>{content}</ReactMarkdown>
+        <PrintOnlyContent content={content} language={language} />
       </div>
 
       {/* Floating Action Button for Feedback */}

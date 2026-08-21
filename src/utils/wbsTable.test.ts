@@ -1,7 +1,6 @@
-// @vitest-environment jsdom
 import { describe, it, expect } from "vitest";
-import { parseBulletTree } from "../utils/wbs";
-import { wbsRows, wbsTableRows } from "./BlueprintSection";
+import { parseBulletTree } from "./wbs";
+import { wbsRows, wbsTableRows } from "./wbsTable";
 
 describe("wbsRows", () => {
   it("module → feature → sub (multi sub): satu baris per sub-fitur", () => {
@@ -108,5 +107,25 @@ describe("wbsTableRows", () => {
 
   it("empty input → []", () => {
     expect(wbsTableRows([])).toEqual([]);
+  });
+
+  it("konten PRD dengan heading '### Feature Breakdown (WBS)' + bullets nested → span benar", () => {
+    // Simulasi blok setelah heading WBS (hasil collectWbsBlock di utils/export).
+    const block = `
+- **Auth**
+  - Login
+    - Email/password
+    - OAuth Google
+  - Logout
+- **Billing**
+  - Invoice
+`;
+    const rows = wbsTableRows(wbsRows(parseBulletTree(block)));
+    expect(rows).toEqual([
+      { module: "Auth", moduleSpan: 3, feature: "Login", featureSpan: 2, sub: "Email/password" },
+      { module: null, feature: null, sub: "OAuth Google" },
+      { module: null, feature: "Logout", featureSpan: 1, sub: "" },
+      { module: "Billing", moduleSpan: 1, feature: "Invoice", featureSpan: 1, sub: "" },
+    ]);
   });
 });

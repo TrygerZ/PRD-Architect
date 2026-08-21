@@ -4,6 +4,8 @@
 import DOMPurify from "dompurify";
 import { getSections, type Section } from "./sections";
 import { sanitizeMermaid } from "./mermaid";
+import { parseBulletTree } from "./wbs";
+import { WBS_SECTION_RE, wbsRows, wbsTableRows, wbsTailNote } from "./wbsTable";
 
 // Ambil token bahasa pertama dari info-string fenced code block.
 // AI sering menulis fence seperti "```mermaid journey", "```mermaid gantt",
@@ -180,6 +182,27 @@ function parseTableRow(line: string): string[] {
 
 function isTableSeparator(line: string): boolean {
   return /^\s*\|?[\s:-]+\|[\s:|-]*$/.test(line) && line.includes("-");
+}
+
+// --- WBS section (render sebagai tabel ber-rowSpan di PDF/DOCX) --------------
+
+// Kumpulkan blok baris di bawah heading WBS sampai heading level ≤ level-nya
+// atau EOF — pola sama dengan parseBreakdown di utils/wbs.ts.
+function collectWbsBlock(lines: string[], startIdx: number, level: number): { endIdx: number; block: string } {
+  const block: string[] = [];
+  let i = startIdx;
+  while (i < lines.length) {
+    const m = lines[i].match(/^(#{1,6})\s+/);
+    if (m && m[1].length <= level) break;
+    block.push(lines[i]);
+    i++;
+  }
+  return { endIdx: i, block: block.join("\n") };
+}
+
+// Header kolom tabel WBS mengikuti bahasa dokumen.
+function wbsHeaders(language: "id" | "en"): string[] {
+  return language === "en" ? ["Module", "Feature", "Sub-feature"] : ["Modul", "Fitur", "Sub-fitur"];
 }
 
 // --- Mermaid → PNG helpers ---------------------------------------------------
@@ -398,7 +421,7 @@ async function svgToPng(svg: string): Promise<PngResult> {
 
 // --- DOCX --------------------------------------------------------------------
 
-export async function exportDocx(content: string, productType: string): Promise<void> {
+export async function exportDocx(content: string, productType: string, language: "id" | "en" = "id"): Promise<void> {
   const charts = extractMermaidCharts(content);
   const chartImageMap = new Map<string, PngResult | null>();
   if (charts.length > 0) {
@@ -551,6 +574,47 @@ export async function exportDocx(content: string, productType: string): Promise<
             spacing: { before: 200, after: 100 },
           }),
         );
+
+        // Section WBS: bullet di bawah heading ini dirender sebagai tabel
+        // ber-rowSpan (Modul/Fitur/Sub-fitur), bukan bullet bersarang.
+        if (headingMatch[1].length <= 4 && WBS_SECTION_RE.test(headingMatch[2])) {
+          const { endIdx, block } = collectWbsBlock(lines, i + 1, headingMatch[1].length);
+          i = endIdx - 1; // loop akan i++ lagi; fallback (tanpa bullet) → baris diproses normal
+          const items = parseBulletTree(block);
+          if (items.length > 0) {
+            const makeCell = (text: string, bold: boolean, rowSpan?: number) =>
+              new TableCell({
+                children: [new Paragraph({ children: [new TextRun({ text, bold, size: 20 })] })],
+                ...(rowSpan && rowSpan > 1 ? { rowSpan } : {}),
+              });
+
+            const docRows = [
+              new TableRow({ children: wbsHeaders(language).map((h) => makeCell(h, true)), tableHeader: true }),
+              ...wbsTableRows(wbsRows(items)).map((r) => {
+                const cells: InstanceType<typeof TableCell>[] = [];
+                if (r.module !== null) cells.push(makeCell(r.module, true, r.moduleSpan));
+                if (r.feature !== null) cells.push(makeCell(r.feature, false, r.featureSpan));
+                cells.push(makeCell(r.sub, false));
+                return new TableRow({ children: cells });
+              }),
+            ];
+
+            children.push(new Table({ rows: docRows, width: { size: 100, type: WidthType.PERCENTAGE } }));
+            children.push(new Paragraph({ text: "" }));
+
+            // Tail note (prosa setelah blok bullet) — tidak boleh hilang.
+            for (const tl of wbsTailNote(block).split("\n")) {
+              if (!tl.trim()) continue;
+              children.push(
+                new Paragraph({
+                  children: [new TextRun({ text: stripInline(tl), size: 22 })],
+                  spacing: { after: 80 },
+                }),
+              );
+            }
+            continue;
+          }
+        }
         continue;
       }
 
@@ -622,7 +686,7 @@ export async function exportDocx(content: string, productType: string): Promise<
 
 // --- PDF (client-side via jsPDF + autoTable) --------------------------------
 
-export async function exportPdf(content: string, productType: string): Promise<void> {
+export async function exportPdf(content: string, productType: string, language: "id" | "en" = "id"): Promise<void> {
   const charts = extractMermaidCharts(content);
   const chartImageMap = new Map<string, PngResult | null>();
   if (charts.length > 0) {
@@ -866,6 +930,53 @@ export async function exportPdf(content: string, productType: string): Promise<v
           y = ruleAt + 8;
         } else {
           y = Math.max(y, yBefore + headLineH) + 4;
+        }
+
+        // Section WBS: bullet di bawah heading ini dirender sebagai autoTable
+        // ber-rowSpan (Modul/Fitur/Sub-fitur), bukan bullet bersarang.
+        if (depth <= 4 && WBS_SECTION_RE.test(headingMatch[2])) {
+          const { endIdx, block } = collectWbsBlock(lines, i + 1, depth);
+          i = endIdx - 1; // loop akan i++ lagi; fallback (tanpa bullet) → baris diproses normal
+          const items = parseBulletTree(block);
+          if (items.length > 0) {
+            // Sel dengan rowSpan: baris lanjutan grup menghilangkan sel yang
+            // sudah tertutup rowSpan (didukung native oleh jspdf-autotable).
+            type PdfCell = string | { content: string; rowSpan: number };
+            const body = wbsTableRows(wbsRows(items)).map((r): PdfCell[] => {
+              const cells: PdfCell[] = [];
+              if (r.module !== null) cells.push({ content: normalizePdfText(r.module), rowSpan: r.moduleSpan ?? 1 });
+              if (r.feature !== null) cells.push({ content: normalizePdfText(r.feature), rowSpan: r.featureSpan ?? 1 });
+              cells.push(normalizePdfText(r.sub));
+              return cells;
+            });
+
+            autoTable(doc, {
+              head: [wbsHeaders(language).map(normalizePdfText)],
+              body,
+              startY: y,
+              margin: { left: margin, right: margin },
+              theme: "grid",
+              styles: { fontSize: 9, cellPadding: 4, textColor: [40, 40, 40], overflow: "linebreak", valign: "middle" },
+              headStyles: {
+                fillColor: [235, 235, 235],
+                textColor: [17, 17, 17],
+                fontStyle: "bold",
+                halign: "left",
+              },
+              alternateRowStyles: { fillColor: [248, 248, 248] },
+            });
+
+            const lastAutoTable = (doc as unknown as { lastAutoTable?: { finalY: number } }).lastAutoTable;
+            y = (lastAutoTable?.finalY ?? y) + 12;
+
+            // Tail note (prosa setelah blok bullet) — tidak boleh hilang.
+            for (const tl of wbsTailNote(block).split("\n")) {
+              if (!tl.trim()) continue;
+              writeRichText(tl, 11);
+              y += 4;
+            }
+            continue;
+          }
         }
         continue;
       }

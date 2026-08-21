@@ -213,7 +213,7 @@ export default function App() {
     if (!prdContent) return;
     try {
       const { exportDocx } = await import("./utils/export");
-      await exportDocx(prdContent, productType);
+      await exportDocx(prdContent, productType, language);
     } catch (e) {
       console.error("DOCX export failed:", e);
       showToast(language === "en" ? "Failed to export DOCX." : "Gagal mengekspor DOCX.");
@@ -224,7 +224,7 @@ export default function App() {
     if (!prdContent) return;
     try {
       const { exportPdf } = await import("./utils/export");
-      await exportPdf(prdContent, productType);
+      await exportPdf(prdContent, productType, language);
     } catch (e) {
       console.error("PDF export failed:", e);
       showToast(language === "en" ? "Failed to export PDF." : "Gagal mengekspor PDF.");
