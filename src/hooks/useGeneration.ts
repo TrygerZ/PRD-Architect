@@ -2,6 +2,7 @@ import { useState, useRef, useCallback, useEffect } from "react";
 import { generatePRD } from "../services/aiService";
 import { ProductType, PRDVersion, UploadedFile, AIProvider, PRDMode } from "../types";
 import { getSections } from "../utils/sections";
+import { normalizeBrTags } from "../utils/format";
 
 // Task 2.3 — Ekstrak logika generasi (executeGeneration / handleGenerate /
 // handleAppend / handleRevise / handleConvertMode) dari App.tsx agar App
@@ -135,6 +136,10 @@ export function useGeneration({
           },
           customEndpoint,
         );
+        // Titik ingestion tunggal: normalisasi <br> sisa AI sekali di sini,
+        // tepat setelah stream selesai disimpan — semua konsumen (website,
+        // DetailPanel, export PDF/DOCX/print) membaca versi yang sudah bersih.
+        setVersions((prev) => prev.map((v) => (v.id === newVersionId ? { ...v, content: normalizeBrTags(v.content) } : v)));
         onSuccess?.();
       } catch (err: unknown) {
         if (err instanceof Error && (err.name === "AbortError" || err.message === "This operation was aborted")) {

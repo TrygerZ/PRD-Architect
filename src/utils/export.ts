@@ -4,6 +4,7 @@
 import DOMPurify from "dompurify";
 import { getSections, type Section } from "./sections";
 import { sanitizeMermaid } from "./mermaid";
+import { normalizeBrTags } from "./format";
 import { parseBulletTree } from "./wbs";
 import { WBS_SECTION_RE, wbsRows, wbsTableRows, wbsTailNote } from "./wbsTable";
 
@@ -103,14 +104,14 @@ function normalizePdfText(s: string): string {
 // Segment teks dengan gaya inline (dipakai renderer PDF rich-text).
 // Mendukung: **bold**, *italic*, `code`, [link](url). Urutan pengecekan
 // ** sebelum * penting agar tidak salah-token.
-interface InlineSeg {
+export interface InlineSeg {
   text: string;
   bold?: boolean;
   italic?: boolean;
   code?: boolean;
 }
 
-function parseInline(text: string): InlineSeg[] {
+export function parseInline(text: string): InlineSeg[] {
   const segs: InlineSeg[] = [];
   const push = (t: string, s: Partial<InlineSeg> = {}) => {
     if (t) segs.push({ text: t, ...s });
@@ -166,22 +167,190 @@ function parseInline(text: string): InlineSeg[] {
   return segs;
 }
 
+// Spesifikasi run DOCX hasil parse inline — dipisah dari TextRun agar bisa
+// dites di environment node tanpa mengimpor lib docx secara statis.
+export interface RunSpec {
+  text: string;
+  bold?: boolean;
+  italic?: boolean;
+  code?: boolean;
+}
+
+export function inlineRunSpecs(text: string, baseBold = false): RunSpec[] {
+  return parseInline(normalizeBrTags(text)).map((seg) => ({
+    text: seg.text,
+    ...(baseBold || seg.bold ? { bold: true } : {}),
+    ...(seg.italic ? { italic: true } : {}),
+    ...(seg.code ? { code: true } : {}),
+  }));
+}
+
 interface ParsedTable {
   header: string[];
   rows: string[][];
 }
 
-function parseTableRow(line: string): string[] {
+// Sel tabel dipertahankan MENTAH (marker ** * ` [link](url) tetap ada) agar
+// jalur PDF/DOCX bisa mem-parse gaya inline per sel. <br> dari data lama
+// dinormalisasi di titik parse ini (defense-in-depth di samping ingestion).
+export function parseTableRow(line: string): string[] {
   return line
     .trim()
     .replace(/^\|/, "")
     .replace(/\|$/, "")
     .split("|")
-    .map((c) => stripInline(c.trim()));
+    .map((c) => normalizeBrTags(c.trim()));
 }
 
 function isTableSeparator(line: string): boolean {
   return /^\s*\|?[\s:-]+\|[\s:|-]*$/.test(line) && line.includes("-");
+}
+
+// Thematic break Markdown (--- / *** / ___) plus underline setext `===` yang
+// sering bocor dari AI sebagai baris literal di tengah dokumen.
+// CommonMark: 3+ karakter yang sama (- * _), boleh spasi di antara, tak ada
+// karakter lain. Setext `===` juga ditangani.
+export function isThematicBreak(line: string): boolean {
+  const t = line.trim();
+  // Hapus spasi internal lalu cek 3+ karakter identik
+  const collapsed = t.replace(/ /g, "");
+  return /^(-{3,}|\*{3,}|_{3,}|={3,})$/.test(collapsed);
+}
+
+// Baris separator GFM (`| --- | :---: |`) yang muncul DI TENGAH body tabel —
+// itu bukan data dan tidak boleh digambar sebagai sel.
+export function isGfmSeparatorRow(line: string): boolean {
+  const t = line.trim();
+  return t.startsWith("|") && /^[\s|:\-]+$/.test(t);
+}
+
+/**
+ * Kumpulkan baris body tabel mulai dari startIdx sampai baris non-tabel.
+ * - Baris separator GFM di tengah body di-skip (tidak jadi sel literal).
+ * - Thematic break standalone DI ANTARA dua baris `|...|` dikonsumsi agar
+ *   tabel tidak terpotong (yang mempromosikan baris berikut jadi header palsu).
+ *   Bila baris berikutnya bukan `|`, break — caller memperlakukannya sebagai HR.
+ */
+export function collectTableBodyRows(lines: string[], startIdx: number): { rows: string[][]; endIdx: number } {
+  const rows: string[][] = [];
+  let i = startIdx;
+  while (i < lines.length) {
+    const t = lines[i].trim();
+    if (!t.startsWith("|")) {
+      if (isThematicBreak(t) && lines[i + 1]?.trim().startsWith("|")) {
+        i++;
+        continue;
+      }
+      break;
+    }
+    if (isGfmSeparatorRow(t)) {
+      i++;
+      continue;
+    }
+    rows.push(parseTableRow(lines[i]));
+    i++;
+  }
+  return { rows, endIdx: i };
+}
+
+// Pemilihan font jsPDF untuk satu segmen inline — dipakai bersama oleh
+// pengukuran layout & penggambaran agar keduanya identik.
+function fontStyleFor(seg: InlineSeg, baseBold: boolean, baseItalic: boolean): [string, string] {
+  const bold = baseBold || !!seg.bold;
+  const italic = baseItalic || !!seg.italic;
+  return [
+    seg.code ? "courier" : "helvetica",
+    bold && italic ? "bolditalic" : bold ? "bold" : italic ? "italic" : "normal",
+  ];
+}
+
+interface LayoutToken {
+  text: string;
+  seg: InlineSeg;
+  space: boolean;
+}
+
+/**
+ * Layout word-wrap rich-text — SATU-SATUNYA sumber kebenaran untuk hitungan
+ * baris, dipakai baik saat menggambar (writeRichText) maupun saat reservasi
+ * tinggi sel (didParseCell), sehingga ukur dan gambar tak mungkin divergen.
+ *
+ * Logika wrap identik dgn penggambaran manual lama: spasi awal baris dibuang,
+ * kata turun baris bila meluber, spasi yang jatuh di ujung baris terbuang.
+ * `breakLongWords` (mode sel): kata lebih lebar dari kolom dipecah per
+ * karakter — menyamai perilaku overflow:"linebreak" autoTable.
+ *
+ * `measure` di-inject (bukan fontSize) agar testable tanpa jsPDF: test bisa
+ * memakai pengukur palsu deterministik. Mengembalikan [] utk teks kosong.
+ */
+export function layoutInline(
+  segs: InlineSeg[],
+  availWidth: number,
+  measure: (text: string, seg: InlineSeg) => number,
+  breakLongWords = false,
+): LayoutToken[][] {
+  const tokens: LayoutToken[] = [];
+  for (const seg of segs) {
+    for (const part of seg.text.split(/(\s+)/)) {
+      if (part === "") continue;
+      tokens.push({ text: part, seg, space: /^\s+$/.test(part) });
+    }
+  }
+
+  const lines: LayoutToken[][] = [];
+  let line: LayoutToken[] = [];
+  let x = 0;
+  let hasContent = false;
+  const newLine = () => {
+    lines.push(line);
+    line = [];
+    x = 0;
+    hasContent = false;
+  };
+
+  for (const tok of tokens) {
+    const w = measure(tok.text, tok.seg);
+    if (tok.space) {
+      if (!hasContent) continue; // buang spasi di awal baris
+      if (x + w > availWidth) newLine(); // spasi di ujung baris terbuang
+      else {
+        line.push(tok);
+        x += w;
+      }
+      continue;
+    }
+    if (hasContent && x + w > availWidth) newLine();
+    if (breakLongWords && w > availWidth) {
+      let chunk = "";
+      for (const ch of tok.text) {
+        if (chunk !== "" && x + measure(chunk + ch, tok.seg) > availWidth) {
+          line.push({ text: chunk, seg: tok.seg, space: false });
+          newLine();
+          chunk = ch;
+        } else {
+          chunk += ch;
+        }
+      }
+      if (chunk !== "") {
+        line.push({ text: chunk, seg: tok.seg, space: false });
+        x += measure(chunk, tok.seg);
+        hasContent = true;
+      }
+      continue;
+    }
+    line.push(tok);
+    x += w;
+    hasContent = true;
+  }
+  if (line.length > 0) lines.push(line);
+  return lines;
+}
+
+// Tinggi sel rich-text: pad vertikal + nLines × lineHeight (1.4×).
+// Kontrak bersama reservasi (didParseCell) & baseline penggambaran
+// (fontSize*1.05 utk baris pertama, lalu step 1.4×) — jangan diubah sendiri-sendiri.
+export function richCellHeight(nLines: number, fontSize: number, padVertical: number): number {
+  return padVertical + nLines * fontSize * 1.4;
 }
 
 // --- WBS section (render sebagai tabel ber-rowSpan di PDF/DOCX) --------------
@@ -544,9 +713,23 @@ export async function exportDocx(content: string, productType: string, language:
         }
         i--;
 
+        // Sel DOCX mempertahankan gaya inline (**bold**, *italic*, `code`)
+        // via array TextRun — setara pola heading rich-text di bawah.
+        const makeRuns = (text: string, baseBold: boolean) =>
+          inlineRunSpecs(text, baseBold).map(
+            (spec) =>
+              new TextRun({
+                text: spec.text,
+                ...(spec.bold ? { bold: true } : {}),
+                ...(spec.italic ? { italics: true } : {}),
+                ...(spec.code ? { font: "Consolas" } : {}),
+                size: 20,
+              }),
+          );
+
         const makeCell = (text: string, bold: boolean) =>
           new TableCell({
-            children: [new Paragraph({ children: [new TextRun({ text, bold, size: 20 })] })],
+            children: [new Paragraph({ children: makeRuns(text, bold) })],
           });
 
         const docRows = [
@@ -732,75 +915,63 @@ export async function exportPdf(content: string, productType: string, language: 
     }
   };
 
+  // Pengukur netral (base style normal) untuk kalkulasi tinggi sel di didParseCell.
+  const measureSeg = (text: string, seg: InlineSeg): number => {
+    const [family, style] = fontStyleFor(seg, false, false);
+    doc.setFont(family, style);
+    return doc.getTextWidth(normalizePdfText(text));
+  };
+
   // Renderer teks rich (bold/italic/code inline) dengan word-wrap manual &
   // hanging indent. jsPDF splitTextToSize tidak mendukung font campuran per
   // token, jadi kita bungkus per-kata sambil melacak gaya tiap token.
   const writeRichText = (
-    text: string,
+    textOrSegs: string | InlineSeg[],
     fontSize: number,
-    opts: { bold?: boolean; italic?: boolean; indent?: number; hangingIndent?: number } = {},
+    opts: {
+      bold?: boolean;
+      italic?: boolean;
+      indent?: number;
+      hangingIndent?: number;
+      // Bila diisi, gambar dibatasi ke kotak ini (dipakai untuk sel tabel
+      // autoTable) dan page-break logic dilewati — autoTable yang atur baris.
+      bounds?: { left: number; right: number };
+    } = {},
   ) => {
     const baseBold = opts.bold ?? false;
     const baseItalic = opts.italic ?? false;
     const firstIndent = opts.indent ?? 0;
     const hangIndent = opts.hangingIndent ?? firstIndent;
     const lineHeight = fontSize * 1.4;
-    const rightEdge = margin + maxWidth;
+    const inCell = !!opts.bounds;
+    const leftEdge = opts.bounds ? opts.bounds.left : margin + firstIndent;
+    const rightEdge = opts.bounds ? opts.bounds.right : margin + maxWidth;
     doc.setFontSize(fontSize);
 
-    const setFontFor = (seg: InlineSeg) => {
-      const bold = baseBold || !!seg.bold;
-      const italic = baseItalic || !!seg.italic;
-      const style = bold && italic ? "bolditalic" : bold ? "bold" : italic ? "italic" : "normal";
-      doc.setFont(seg.code ? "courier" : "helvetica", style);
+    // Ukur & gambar lewat layout bersama → hitungan baris di sini PASTI sama
+    // dengan yang dipakai reservasi tinggi sel di didParseCell.
+    const measure = (text: string, seg: InlineSeg): number => {
+      const [family, style] = fontStyleFor(seg, baseBold, baseItalic);
+      doc.setFont(family, style);
+      return doc.getTextWidth(normalizePdfText(text));
     };
+    const segs = Array.isArray(textOrSegs) ? textOrSegs : parseInline(textOrSegs);
+    const lines = layoutInline(segs, rightEdge - leftEdge, measure, inCell);
+    if (lines.length === 0) return;
 
-    // Tokenisasi per segmen → kata & spasi (spasi dipertahankan).
-    // Normalisasi tiap token ke ASCII saat dirender (bukan saat parseInline,
-    // agar marker markdown ** * ` [ sudah terkonsumsi dan tak tertukar dgn
-    // hasil normalisasi mis. • → '*').
-    const tokens: { text: string; seg: InlineSeg; space: boolean }[] = [];
-    for (const seg of parseInline(text)) {
-      for (const part of seg.text.split(/(\s+)/)) {
-        if (part === "") continue;
-        tokens.push({ text: part, seg, space: /^\s+$/.test(part) });
+    if (!inCell) ensureSpace(lineHeight);
+    for (let li = 0; li < lines.length; li++) {
+      let x = opts.bounds ? opts.bounds.left : margin + (li === 0 ? firstIndent : hangIndent);
+      for (const tok of lines[li]) {
+        const [family, style] = fontStyleFor(tok.seg, baseBold, baseItalic);
+        doc.setFont(family, style);
+        const renderText = normalizePdfText(tok.text);
+        doc.text(renderText, x, y);
+        x += doc.getTextWidth(renderText);
       }
-    }
-
-    let x = margin + firstIndent;
-    let hasContent = false;
-    const newLine = () => {
       y += lineHeight;
-      x = margin + hangIndent;
-      hasContent = false;
-      ensureSpace(lineHeight);
-    };
-
-    ensureSpace(lineHeight);
-    for (const tok of tokens) {
-      setFontFor(tok.seg);
-      const renderText = normalizePdfText(tok.text);
-      const w = doc.getTextWidth(renderText);
-      if (tok.space) {
-        if (!hasContent) continue; // buang spasi di awal baris
-        if (x + w > rightEdge) {
-          newLine();
-        } else {
-          doc.text(renderText, x, y);
-          x += w;
-        }
-        continue;
-      }
-      // kata: bungkus bila tidak muat di sisa baris
-      if (hasContent && x + w > rightEdge) {
-        newLine();
-        setFontFor(tok.seg);
-      }
-      doc.text(renderText, x, y);
-      x += w;
-      hasContent = true;
+      if (!inCell && li < lines.length - 1) ensureSpace(lineHeight);
     }
-    if (hasContent) y += lineHeight;
   };
 
   const drawHorizontalRule = () => {
@@ -815,10 +986,25 @@ export async function exportPdf(content: string, productType: string, language: 
 
   const lines = content.split("\n");
 
+  // Skip YAML frontmatter (`---` di awal dokumen sampai penutup `---`)
+  let startIdx = 0;
+  if (lines[0]?.trim() === "---") {
+    startIdx = 1;
+    while (startIdx < lines.length && lines[startIdx].trim() !== "---") {
+      startIdx++;
+    }
+    startIdx++; // lewati penutup ---
+  }
+
   await withLightMermaid(async () => {
-    for (let i = 0; i < lines.length; i++) {
+    for (let i = startIdx; i < lines.length; i++) {
       const line = lines[i];
-      const trimmed = line.trim();
+      // Strip tag HTML mentah (<br>, <div>, <span> dll) — AI kadang menyisipkan
+      // tag HTML di teks paragraf; di PDF harus jadi spasi / dihilangkan.
+      const trimmed = line
+        .replace(/<br\s*\/?>/gi, " ")
+        .replace(/<\/?[a-z][a-z0-9]*\b[^>]*>/gi, "")
+        .trim();
 
       // Code fence — deteksi mermaid vs lain
       if (trimmed.startsWith("```")) {
@@ -866,18 +1052,24 @@ export async function exportPdf(content: string, productType: string, language: 
       // Tabel — render native via autoTable
       if (trimmed.startsWith("|") && i + 1 < lines.length && isTableSeparator(lines[i + 1])) {
         const header = parseTableRow(line);
-        const bodyRows: string[][] = [];
-        i += 2;
-        while (i < lines.length && lines[i].trim().startsWith("|")) {
-          bodyRows.push(parseTableRow(lines[i]));
-          i++;
-        }
-        i--;
+        // Collector membuang separator GFM nyasar & menelan `---` di antara
+        // baris tabel — lihat collectTableBodyRows.
+        const { rows: bodyRows, endIdx } = collectTableBodyRows(lines, i + 2);
+        i = endIdx - 1;
 
         // Normalisasi sel ke ASCII — autoTable merender via jsPDF juga, sehingga
         // char non-ASCII (•, —, box-drawing) sama rusaknya bila tak dinormalisasi.
-        const head = [header.map(normalizePdfText)];
-        const body = bodyRows.map((r) => r.map(normalizePdfText));
+        // Marker inline di-strip HANYA untuk kalkulasi layout autoTable (tinggi
+        // baris/wrap); teks yang digambar manual di didDrawCell memakai token
+        // hasil parseInline dari teks mentah, sehingga glyph terlihat identik.
+        const head = [header.map((c) => normalizePdfText(stripInline(c)))];
+        const body = bodyRows.map((r) => r.map((c) => normalizePdfText(stripInline(c))));
+
+        // Segmen rich-text per sel (body), di-parse sekali dari teks mentah.
+        const richSegs = bodyRows.map((r) => r.map((c) => parseInline(c)));
+        interface RichCell {
+          richSegs?: InlineSeg[];
+        }
 
         autoTable(doc, {
           head,
@@ -893,6 +1085,60 @@ export async function exportPdf(content: string, productType: string, language: 
             halign: "left",
           },
           alternateRowStyles: { fillColor: [248, 248, 248] },
+          didParseCell(data) {
+            if (data.section !== "body") return;
+            const segs = richSegs[data.row.index]?.[data.column.index];
+            if (!segs) return;
+            (data.cell as unknown as RichCell).richSegs = segs;
+            // cell.width belum diset saat didParseCell (autoTable assign di
+            // applyColSpans setelah calculateWidths). Estimasi konservatif
+            // lebar kolom: 85% equal-split → lebih sempit → lebih banyak wrap
+            // → minCellHeight lebih tinggi → aman.
+            const estColWidth = (maxWidth / header.length) * 0.85;
+            const padH = data.cell.padding("left") + data.cell.padding("right");
+            const avail = Math.max(20, estColWidth - padH);
+            doc.setFontSize(9);
+            const laid = layoutInline(segs, avail, measureSeg, true);
+            const padV = data.cell.padding("top") + data.cell.padding("bottom");
+            // Pakai minCellHeight (dihormati getContentHeight) — bukan
+            // cell.height yang ditimpa applyRowSpans.
+            // Pakai lineHeight kita (1.4×), bukan default autoTable (1.15×).
+            data.cell.styles.minCellHeight = richCellHeight(Math.max(1, laid.length), 9, padV);
+          },
+          willDrawCell(data) {
+            if ((data.cell as unknown as RichCell).richSegs) {
+              data.cell.text = [];
+              // Rekalkulasi tinggi dgn lebar FINAL (sudah diketahui di sini).
+              // Jika kolom aktual lebih sempit dari estimasi, teks wrap lebih
+              // banyak → perlu tinggi lebih. Update langsung karena
+              // applyRowSpans sudah selesai.
+              const segs = (data.cell as unknown as RichCell).richSegs!;
+              const padH = data.cell.padding("left") + data.cell.padding("right");
+              const avail = data.cell.width - padH;
+              doc.setFontSize(9);
+              const laid = layoutInline(segs, avail, measureSeg, true);
+              const padV = data.cell.padding("top") + data.cell.padding("bottom");
+              const neededH = richCellHeight(Math.max(1, laid.length), 9, padV);
+              if (neededH > data.cell.height) {
+                data.cell.height = neededH;
+                data.row.height = Math.max(data.row.height, neededH);
+              }
+            }
+          },
+          didDrawCell(data) {
+            const segs = (data.cell as unknown as RichCell).richSegs;
+            if (!segs || segs.length === 0) return;
+            const padTop = data.cell.padding("top");
+            const yRestore = y;
+            y = data.cell.y + padTop + 9 * 1.05; // baseline baris pertama
+            writeRichText(segs, 9, {
+              bounds: {
+                left: data.cell.x + data.cell.padding("left"),
+                right: data.cell.x + data.cell.width - data.cell.padding("right"),
+              },
+            });
+            y = yRestore;
+          },
         });
 
         // finalY dilacak oleh autoTable di doc.lastAutoTable
@@ -901,9 +1147,9 @@ export async function exportPdf(content: string, productType: string, language: 
         continue;
       }
 
-      // Horizontal rule (--- / *** / ___) — gambar garis tipis, bukan teks dash.
+      // Horizontal rule (--- / *** / ___ / ===) — gambar garis tipis, bukan teks dash.
       // PRD memakai "---" sebagai pemisah antar user story / edge case.
-      if (/^(---|\*\*\*|___)\s*$/.test(trimmed)) {
+      if (isThematicBreak(trimmed)) {
         drawHorizontalRule();
         continue;
       }

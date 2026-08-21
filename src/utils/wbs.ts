@@ -487,7 +487,7 @@ export function extractWbs(content: string, prdMode?: PRDMode): WbsTree {
     // Strategy 1: MoSCoW table — sumber priority/code/detail untuk breakdown,
     // atau fallback fitur flat bila tidak ada breakdown.
     const moscow: ParsedFeature[] = [];
-    const moscowChapter = findChapter(sections, /moscow|feature scope/i);
+    const moscowChapter = findChapter(sections, /moscow|feature\s+scope|prioritas|priority/i);
     if (moscowChapter) {
       for (const block of tableBlocks(moscowChapter.content)) {
         moscow.push(...parseMoscowTable(block));

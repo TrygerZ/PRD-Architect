@@ -45,7 +45,7 @@ CHAPTER CONSTRAINTS:
 - Ch 1: Include a Stakeholder Analysis table mapping key stakeholders, their roles, interests, influence level (High/Medium/Low), and engagement strategy.
 - Ch 2: Provide exactly 5 specific problems, a concrete Competitor analysis (min 3 real/hypothetical competitors), and an estimated TAM/SAM/SOM breakdown. Start with a formal Problem Statement (one sentence: "[Target user] needs [need] because [insight]."). Also include an Assumptions & Constraints table with columns: Assumption, Impact if Wrong, Validation Plan — covering technology assumptions, business assumptions, and user behavior assumptions.
 - Ch 3: Group features clearly by Must-have, Should-have, Could-have, Won't-have (MoSCoW). After MoSCoW, add a "Non-Goals / Out of Scope" subsection explicitly listing what is intentionally NOT being built in this phase, with a brief rationale for each.
-- Ch 4: Use a structured table format with columns: ID, Persona, User Story, Priority (Must/Should/Could), Acceptance Criteria (in Given/When/Then format), Effort Estimate. Create EXACTLY 3 personas, each with 2 stories (6 total). Add a markdown separator (---) between stories. Include an Epic hierarchy overview before the stories.
+- Ch 4: Use a structured table format with columns: ID, Persona, User Story, Priority (Must/Should/Could), Acceptance Criteria (in Given/When/Then format), Effort Estimate. Create EXACTLY 3 personas, each with 2 stories (6 total). Separate stories only with ordinary table rows — do NOT insert any separator line (---, ***, ___) inside the table. Include an Epic hierarchy overview before the stories. In Acceptance Criteria cells, separate Given/When/Then clauses with spaces or punctuation (e.g. "Given X, When Y, then Z") — STRICTLY FORBIDDEN: any HTML tags including <br> in any table cell; output pure Markdown only.
 - Ch 5: Include a User Journey diagram using Mermaid journey syntax (\`\`\`mermaid journey) mapping the user's complete flow from discovery to retention, highlighting pain points and opportunities.
 - Ch 6: Include an API Design Table (Endpoint, Method, Description, Request, Response). Minimum 5 endpoints.
 - Ch 7: Provide exact numbers (e.g. "99.99% Uptime", "< 200ms Latency"). Classify NFRs into clear sub-categories: Performance, Scalability, Security, Usability, Availability. For each, include the Measurement Method and Target Value in a table.
@@ -148,8 +148,8 @@ ${extraPrompt ? '\nAdditional Context from User:\n' + extraPrompt : ''}`;
 export function getRevisionPrompt(language: string, prdMode: PRDMode = 'business') {
   const simpleGuard = prdMode === 'simple'
     ? (language === 'id'
-      ? '\n10. INI ADALAH SIMPLE PRD (6 chapter). JANGAN mengubah struktur 6 chapter. JANGAN menambahkan analisis pasar, TAM/SAM/SOM, diagram Mermaid, GTM strategy, technical architecture detail, atau compliance — ini BUKAN Business/Technical PRD.'
-      : '\n10. THIS IS A SIMPLE PRD (6 chapters). Do NOT change the 6-chapter structure. Do NOT add market analysis, TAM/SAM/SOM, Mermaid diagrams, GTM strategy, technical architecture details, or compliance — this is NOT a Business/Technical PRD.')
+      ? '\n11. INI ADALAH SIMPLE PRD (6 chapter). JANGAN mengubah struktur 6 chapter. JANGAN menambahkan analisis pasar, TAM/SAM/SOM, diagram Mermaid, GTM strategy, technical architecture detail, atau compliance — ini BUKAN Business/Technical PRD.'
+      : '\n11. THIS IS A SIMPLE PRD (6 chapters). Do NOT change the 6-chapter structure. Do NOT add market analysis, TAM/SAM/SOM, Mermaid diagrams, GTM strategy, technical architecture details, or compliance — this is NOT a Business/Technical PRD.')
     : '';
 
   if (language === 'id') {
@@ -164,7 +164,8 @@ INSTRUKSI KRITIS:
 6. Output murni Markdown — tanpa pembukaan, tanpa catatan, tanpa penjelasan
 7. JANGAN menambahkan bagian baru kecuali diminta secara eksplisit
 8. JANGAN menghapus konten yang ada kecuali feedback secara spesifik meminta
-9. Output Anda akan MENGGANTIKAN seluruh dokumen yang ada, jadi Anda HARUS menyertakan SEMUANYA${simpleGuard}`;
+9. Output Anda akan MENGGANTIKAN seluruh dokumen yang ada, jadi Anda HARUS menyertakan SEMUANYA
+10. Heading chapter yang sudah ada (baris \`## ...\`) TIDAK BOLEH di-rename, di-demote, atau dihapus saat revisi — hanya isi/kontennya yang boleh diubah${simpleGuard}`;
   }
   return `You are an editor revising an existing Product Requirements Document.
 
@@ -177,7 +178,8 @@ CRITICAL INSTRUCTIONS:
 6. Output pure Markdown — no preamble, no notes, no explanations
 7. Do NOT add new sections unless explicitly requested
 8. Do NOT remove existing content unless feedback specifically says to
-9. Your output will REPLACE the entire existing document, so you MUST include EVERYTHING${simpleGuard}`;
+9. Your output will REPLACE the entire existing document, so you MUST include EVERYTHING
+10. Existing chapter headings (\`## ...\` lines) must NEVER be renamed, demoted, or removed during revision — only their content may change${simpleGuard}`;
 }
 
 export function getAppendPrompt(language: string, prdMode: PRDMode = 'business') {
