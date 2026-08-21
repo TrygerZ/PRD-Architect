@@ -614,7 +614,25 @@ export async function exportDocx(content: string, productType: string, language:
     WidthType,
     ImageRun,
     AlignmentType,
+    VerticalAlign,
+    TableLayoutType,
+    ShadingType,
+    BorderStyle,
   } = docx;
+
+  // --- DOCX breathing space — padding sel yang nyaman (twips = 1/20 pt)
+  // 80 = 4pt vertikal, 120 = 6pt horizontal. Jauh lebih lega dari default docx
+  // yang rapat, tapi tetap hemat kertas.
+  const DOCX_CELL_MARGINS = { top: 80, bottom: 80, left: 120, right: 120 };
+  const DOCX_HEADER_SHADING = { type: ShadingType.SOLID, fill: "F2F2F2", color: "auto" } as const;
+  const DOCX_TABLE_BORDERS = {
+    top: { style: BorderStyle.SINGLE, size: 4, color: "BFBFBF" },
+    bottom: { style: BorderStyle.SINGLE, size: 4, color: "BFBFBF" },
+    left: { style: BorderStyle.SINGLE, size: 4, color: "BFBFBF" },
+    right: { style: BorderStyle.SINGLE, size: 4, color: "BFBFBF" },
+    insideHorizontal: { style: BorderStyle.SINGLE, size: 4, color: "BFBFBF" },
+    insideVertical: { style: BorderStyle.SINGLE, size: 4, color: "BFBFBF" },
+  };
 
   type DocChild = InstanceType<typeof Paragraph> | InstanceType<typeof Table>;
   const children: DocChild[] = [];
@@ -715,6 +733,8 @@ export async function exportDocx(content: string, productType: string, language:
 
         // Sel DOCX mempertahankan gaya inline (**bold**, *italic*, `code`)
         // via array TextRun — setara pola heading rich-text di bawah.
+        // Paragraph diberi spacing kecil + cell diberi margins & verticalAlign
+        // agar tidak mepet; header diberi shading agar distinct.
         const makeRuns = (text: string, baseBold: boolean) =>
           inlineRunSpecs(text, baseBold).map(
             (spec) =>
@@ -729,7 +749,16 @@ export async function exportDocx(content: string, productType: string, language:
 
         const makeCell = (text: string, bold: boolean) =>
           new TableCell({
-            children: [new Paragraph({ children: makeRuns(text, bold) })],
+            children: [
+              new Paragraph({
+                children: makeRuns(text, bold),
+                spacing: { before: 20, after: 20 },
+                alignment: AlignmentType.LEFT,
+              }),
+            ],
+            verticalAlign: VerticalAlign.CENTER,
+            margins: DOCX_CELL_MARGINS,
+            shading: bold ? DOCX_HEADER_SHADING : undefined,
           });
 
         const docRows = [
@@ -742,7 +771,14 @@ export async function exportDocx(content: string, productType: string, language:
           ),
         ];
 
-        children.push(new Table({ rows: docRows, width: { size: 100, type: WidthType.PERCENTAGE } }));
+        children.push(
+          new Table({
+            rows: docRows,
+            width: { size: 100, type: WidthType.PERCENTAGE },
+            layout: TableLayoutType.FIXED,
+            borders: DOCX_TABLE_BORDERS,
+          }),
+        );
         children.push(new Paragraph({ text: "" }));
         continue;
       }
@@ -765,24 +801,43 @@ export async function exportDocx(content: string, productType: string, language:
           i = endIdx - 1; // loop akan i++ lagi; fallback (tanpa bullet) → baris diproses normal
           const items = parseBulletTree(block);
           if (items.length > 0) {
-            const makeCell = (text: string, bold: boolean, rowSpan?: number) =>
+            const makeWbsCell = (text: string, bold: boolean, rowSpan?: number, isHeader = false) =>
               new TableCell({
-                children: [new Paragraph({ children: [new TextRun({ text, bold, size: 20 })] })],
+                children: [
+                  new Paragraph({
+                    children: [new TextRun({ text, bold, size: 20 })],
+                    spacing: { before: 20, after: 20 },
+                    alignment: AlignmentType.LEFT,
+                  }),
+                ],
+                verticalAlign: VerticalAlign.CENTER,
+                margins: DOCX_CELL_MARGINS,
+                shading: isHeader ? DOCX_HEADER_SHADING : undefined,
                 ...(rowSpan && rowSpan > 1 ? { rowSpan } : {}),
               });
 
             const docRows = [
-              new TableRow({ children: wbsHeaders(language).map((h) => makeCell(h, true)), tableHeader: true }),
+              new TableRow({
+                children: wbsHeaders(language).map((h) => makeWbsCell(h, true, undefined, true)),
+                tableHeader: true,
+              }),
               ...wbsTableRows(wbsRows(items)).map((r) => {
                 const cells: InstanceType<typeof TableCell>[] = [];
-                if (r.module !== null) cells.push(makeCell(r.module, true, r.moduleSpan));
-                if (r.feature !== null) cells.push(makeCell(r.feature, false, r.featureSpan));
-                cells.push(makeCell(r.sub, false));
+                if (r.module !== null) cells.push(makeWbsCell(r.module, true, r.moduleSpan));
+                if (r.feature !== null) cells.push(makeWbsCell(r.feature, false, r.featureSpan));
+                cells.push(makeWbsCell(r.sub, false));
                 return new TableRow({ children: cells });
               }),
             ];
 
-            children.push(new Table({ rows: docRows, width: { size: 100, type: WidthType.PERCENTAGE } }));
+            children.push(
+              new Table({
+                rows: docRows,
+                width: { size: 100, type: WidthType.PERCENTAGE },
+                layout: TableLayoutType.FIXED,
+                borders: DOCX_TABLE_BORDERS,
+              }),
+            );
             children.push(new Paragraph({ text: "" }));
 
             // Tail note (prosa setelah blok bullet) — tidak boleh hilang.
@@ -1077,7 +1132,16 @@ export async function exportPdf(content: string, productType: string, language: 
           startY: y,
           margin: { left: margin, right: margin },
           theme: "grid",
-          styles: { fontSize: 9, cellPadding: 4, textColor: [40, 40, 40], overflow: "linebreak" },
+          // Padding vertikal 3pt + horizontal 4pt → lega tapi tidak boros.
+          // Sebelumnya 4pt semua sisi (padV 8pt) bikin sel 1-baris 20.6pt;
+          // sekarang 6pt vertikal → 18.6pt, hemat ~2pt per baris.
+          styles: {
+            fontSize: 9,
+            cellPadding: { top: 3, right: 4, bottom: 3, left: 4 },
+            textColor: [40, 40, 40],
+            overflow: "linebreak",
+            valign: "top",
+          },
           headStyles: {
             fillColor: [235, 235, 235],
             textColor: [17, 17, 17],
@@ -1090,38 +1154,70 @@ export async function exportPdf(content: string, productType: string, language: 
             const segs = richSegs[data.row.index]?.[data.column.index];
             if (!segs) return;
             (data.cell as unknown as RichCell).richSegs = segs;
-            // cell.width belum diset saat didParseCell (autoTable assign di
-            // applyColSpans setelah calculateWidths). Estimasi konservatif
-            // lebar kolom: 85% equal-split → lebih sempit → lebih banyak wrap
-            // → minCellHeight lebih tinggi → aman.
-            const estColWidth = (maxWidth / header.length) * 0.85;
-            const padH = data.cell.padding("left") + data.cell.padding("right");
-            const avail = Math.max(20, estColWidth - padH);
-            doc.setFontSize(9);
-            const laid = layoutInline(segs, avail, measureSeg, true);
+            // Jangan over-reserve: pasang baseline minimal (1 baris) saja.
+            // Estimasi 0.85*equalSplit sebelumnya bikin avail terlalu sempit
+            // → nLines kebanyakan → minCellHeight kelewat tinggi (boros).
+            // Tinggi final yang PAS akan dihitung di willDrawCell dengan
+            // lebar kolom FINAL yang akurat.
             const padV = data.cell.padding("top") + data.cell.padding("bottom");
-            // Pakai minCellHeight (dihormati getContentHeight) — bukan
-            // cell.height yang ditimpa applyRowSpans.
-            // Pakai lineHeight kita (1.4×), bukan default autoTable (1.15×).
-            data.cell.styles.minCellHeight = richCellHeight(Math.max(1, laid.length), 9, padV);
+            data.cell.styles.minCellHeight = richCellHeight(1, 9, padV);
           },
           willDrawCell(data) {
-            if ((data.cell as unknown as RichCell).richSegs) {
-              data.cell.text = [];
-              // Rekalkulasi tinggi dgn lebar FINAL (sudah diketahui di sini).
-              // Jika kolom aktual lebih sempit dari estimasi, teks wrap lebih
-              // banyak → perlu tinggi lebih. Update langsung karena
-              // applyRowSpans sudah selesai.
-              const segs = (data.cell as unknown as RichCell).richSegs!;
+            const rich = (data.cell as unknown as RichCell).richSegs;
+            if (!rich) return;
+            // Hapus teks default autoTable — kita gambar rich manual di didDrawCell
+            data.cell.text = [];
+
+            // Hitung tinggi PAS berdasar lebar FINAL. Untuk baris yang
+            // sama, semua sel harus seragam → hitung maxNeeded satu kali
+            // di sel pertama (index 0) agar cell pertama pun sudah pakai
+            // tinggi final sebelum rect digambar.
+            if (data.column.index === 0) {
+              let maxNeeded = 0;
+              for (const col of data.table.columns) {
+                const cell = data.row.cells[col.index] as unknown as RichCell & { width: number; height: number; padding: (n: string) => number };
+                const segs = (cell as unknown as RichCell).richSegs;
+                if (segs && segs.length > 0) {
+                  const padH = (cell as unknown as { padding: (s: string) => number }).padding("left") + (cell as unknown as { padding: (s: string) => number }).padding("right");
+                  const avail = Math.max(20, (cell as unknown as { width: number }).width - padH);
+                  doc.setFontSize(9);
+                  const laid = layoutInline(segs, avail, measureSeg, true);
+                  const padV = (cell as unknown as { padding: (s: string) => number }).padding("top") + (cell as unknown as { padding: (s: string) => number }).padding("bottom");
+                  const needed = richCellHeight(Math.max(1, laid.length), 9, padV);
+                  if (needed > maxNeeded) maxNeeded = needed;
+                } else {
+                  // Sel tanpa rich (kosong) — pakai tinggi autoTable sebagai fallback
+                  const h = (cell as unknown as { height: number }).height;
+                  if (h > maxNeeded) maxNeeded = h;
+                }
+              }
+              if (maxNeeded > 0) {
+                data.row.height = maxNeeded;
+                for (const col of data.table.columns) {
+                  const c = data.row.cells[col.index] as unknown as { height: number };
+                  if (c) c.height = maxNeeded;
+                }
+              }
+            } else {
+              // Sel berikutnya: sinkronkan tinggi sel ke row.height
+              // (sudah di-set oleh sel pertama). Jika sel ini ternyata
+              // butuh lebih tinggi dari max yang dihitung di sel pertama
+              // (edge: text sangat panjang di kolom tengah), grow lagi.
               const padH = data.cell.padding("left") + data.cell.padding("right");
-              const avail = data.cell.width - padH;
+              const avail = Math.max(20, data.cell.width - padH);
               doc.setFontSize(9);
-              const laid = layoutInline(segs, avail, measureSeg, true);
+              const laid = layoutInline(rich, avail, measureSeg, true);
               const padV = data.cell.padding("top") + data.cell.padding("bottom");
               const neededH = richCellHeight(Math.max(1, laid.length), 9, padV);
-              if (neededH > data.cell.height) {
-                data.cell.height = neededH;
-                data.row.height = Math.max(data.row.height, neededH);
+              if (neededH > data.row.height) {
+                const newH = neededH;
+                data.row.height = newH;
+                for (const col of data.table.columns) {
+                  const c = data.row.cells[col.index] as unknown as { height: number };
+                  if (c) c.height = newH;
+                }
+              } else if (data.row.height > data.cell.height) {
+                data.cell.height = data.row.height;
               }
             }
           },
@@ -1202,7 +1298,14 @@ export async function exportPdf(content: string, productType: string, language: 
               startY: y,
               margin: { left: margin, right: margin },
               theme: "grid",
-              styles: { fontSize: 9, cellPadding: 4, textColor: [40, 40, 40], overflow: "linebreak", valign: "middle" },
+              // Samakan breathing dengan tabel regular: vertikal 3pt, horizontal 4pt
+              styles: {
+                fontSize: 9,
+                cellPadding: { top: 3, right: 4, bottom: 3, left: 4 },
+                textColor: [40, 40, 40],
+                overflow: "linebreak",
+                valign: "middle",
+              },
               headStyles: {
                 fillColor: [235, 235, 235],
                 textColor: [17, 17, 17],
