@@ -13,6 +13,8 @@ import cookieParser from "cookie-parser";
 
 import { log } from "./server/log";
 import { t, getIndustrySpecificPrompt, getSystemPrompt, getRevisionPrompt, getAppendPrompt } from "./server/prompts";
+import { composeCustomSystemPrompt, validateCustomChapterIds, getCustomGuard } from "./server/blockPrompts";
+import { getChapterBlock } from "./shared/chapterBlocks";
 import { activeParses, acquireParseSlot, releaseParseSlot, extractTextFromFile } from "./server/fileExtraction";
 import { registerAuthRoutes } from "./server/auth";
 
@@ -335,6 +337,18 @@ app.post("/api/upload-files", uploadLimiter, (req, res) => {
 
 registerAuthRoutes(app);
 app.post("/api/generate-prd", async (req, res) => {
+  // Custom chapter validation before SSE headers to allow 400 JSON response
+  const language: "id" | "en" = (req.body?.language === 'en' || req.body?.language === 'id') ? req.body.language : 'id';
+  const rawCustomIds = (req.body as Record<string, unknown>)?.customChapterIds;
+  let customIds: string[] | null = null;
+  if (rawCustomIds !== undefined) {
+    const validation = validateCustomChapterIds(rawCustomIds);
+    if (!validation.ok) {
+      return res.status(400).json({ error: validation.reason });
+    }
+    customIds = validation.ids;
+  }
+
   res.setHeader("Content-Type", "text/event-stream");
   res.setHeader("Cache-Control", "no-cache");
   res.setHeader("Connection", "keep-alive");
@@ -346,8 +360,6 @@ app.post("/api/generate-prd", async (req, res) => {
   let idleTimedOut = false;
   // Wave 3 — Task 3.7: Hoist flushTimeout for defensive cleanup in finally block
   let flushTimeout: ReturnType<typeof setTimeout> | null = null;
-  // Ekstrak language di luar try agar accessible di catch block (BUG L5)
-  const language: "id" | "en" = (req.body?.language === 'en' || req.body?.language === 'id') ? req.body.language : 'id';
   try {
     const { prompt, provider: rawProvider = 'deepseek', model = 'deepseek-v4-flash', customEndpoint, productType, uploadedFiles, mode = 'initial', prdMode: rawPrdMode = 'business' } = req.body;
     // Wave 7 — Track A: Narrow types from req.body (TS-04 to TS-07)
@@ -425,16 +437,21 @@ app.post("/api/generate-prd", async (req, res) => {
     fileContext = injectionGuard + '\n<document_source name="uploaded_files">\n' + fileContext + '\n</document_source>';
     finalUserPrompt = prompt + fileContext;
     // --- FORCED EXECUTION DIRECTIVE (SOLUSI BASA-BASI) ---
-    // Berlaku secara universal untuk Business maupun Technical
     if (mode === 'initial') {
-      const firstHeading = prdMode === 'business' 
-        ? "## 1. Executive Summary" 
-        : prdMode === 'simple'
-          ? "## 1. Problem Statement"
-          : "## 1. Project Technical Overview";
+      let firstHeading: string;
+      if (customIds) {
+        const firstBlock = getChapterBlock(customIds[0])!;
+        firstHeading = `## 1. ${language === 'en' ? firstBlock.titleEn : firstBlock.titleId}`;
+      } else {
+        firstHeading = prdMode === 'business'
+          ? "## 1. Executive Summary"
+          : prdMode === 'simple'
+            ? "## 1. Problem Statement"
+            : "## 1. Project Technical Overview";
+      }
       const forcedDirectiveEn = `\n\nCRITICAL REMINDER: Do NOT give me an outline, plan, or introduction. You MUST generate the ENTIRE comprehensive document right now. Start your response immediately with "${firstHeading}" and NOTHING ELSE. Output the full raw Markdown.`;
       const forcedDirectiveId = `\n\nPENGINGAT KRITIS: JANGAN berikan saya outline, rencana, atau kata pengantar. Anda HARUS menghasilkan KESELURUHAN dokumen secara utuh sekarang juga. Mulai respons Anda langsung dengan "${firstHeading}" dan TANPA BASA-BASI APA PUN. Output harus berupa Markdown murni.`;
-      
+
       finalUserPrompt += language === 'en' ? forcedDirectiveEn : forcedDirectiveId;
     }
 
@@ -472,17 +489,30 @@ app.post("/api/generate-prd", async (req, res) => {
     }
 
     let modeInstructions = '';
-    if (mode === 'revision') {
-      modeInstructions = getRevisionPrompt(language, prdMode);
-    } else if (mode === 'append') {
-      modeInstructions = getAppendPrompt(language, prdMode);
+    if (customIds) {
+      if (mode === 'revision') {
+        modeInstructions = getCustomGuard(customIds, language, 'revision');
+      } else if (mode === 'append') {
+        modeInstructions = getCustomGuard(customIds, language, 'append');
+      }
+    } else {
+      if (mode === 'revision') {
+        modeInstructions = getRevisionPrompt(language, prdMode);
+      } else if (mode === 'append') {
+        modeInstructions = getAppendPrompt(language, prdMode);
+      }
     }
 
     // Dapatkan prompt spesifik industri (E-Commerce, SaaS, Fintech, dll.)
     const industryPrompt = getIndustrySpecificPrompt(productType);
 
-    let finalPrompt;
-    if (mode === 'initial') {
+    let finalPrompt: string;
+    if (customIds) {
+      const customSystem = composeCustomSystemPrompt(customIds, language);
+      // Prepend industry context if present
+      const withIndustry = industryPrompt ? customSystem + '\n' + industryPrompt : customSystem;
+      finalPrompt = mode === 'initial' ? withIndustry : withIndustry + '\n\n' + modeInstructions;
+    } else if (mode === 'initial') {
       finalPrompt = getSystemPrompt(language, industryPrompt, productType, prdMode);
     } else {
       // Gabungkan: full system prompt + mode instructions di akhir

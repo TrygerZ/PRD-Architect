@@ -28,3 +28,18 @@ export interface SSEChunk {
   reasoning?: string;
   error?: string;
 }
+
+// Generate PRD request payload (shared between FE & BE).
+// customChapterIds is optional; when absent legacy modes apply unchanged.
+export interface GeneratePRDRequest {
+  prompt: string;
+  language?: "en" | "id";
+  provider?: AIProvider;
+  model?: string;
+  customEndpoint?: string;
+  productType?: string;
+  uploadedFiles?: UploadedFile[];
+  mode?: "initial" | "revision" | "append";
+  prdMode?: PRDMode;
+  customChapterIds?: string[];
+}

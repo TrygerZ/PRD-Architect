@@ -170,7 +170,8 @@ export const BlueprintSheet = memo(function BlueprintSheet({
   const totalSections = sections.length;
   const isComplete = content.length > 0 && !isGenerating;
   const showProgress = content.length > 0;
-  const expectedSections = { simple: 6, business: 12, technical: 9 }[activeVersion?.prdMode ?? "business"] ?? 12;
+  const customLen = activeVersion?.customChapterIds?.length ?? 0;
+  const expectedSections = customLen > 0 ? customLen : ({ simple: 6, business: 12, technical: 9 }[activeVersion?.prdMode ?? "business"] ?? 12);
   const progress = isComplete
     ? 100
     : (isGenerating && content.length > 0

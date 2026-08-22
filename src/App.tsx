@@ -4,6 +4,7 @@ import { WelcomeScreen } from "./components/WelcomeScreen";
 import { ChatInput } from "./components/ChatInput";
 import { BlueprintSheet } from "./components/BlueprintSheet";
 import { ProductType, UploadedFile, AIProvider, PRDMode } from "../shared/types";
+import { getChapterBlock, MAX_CUSTOM_BLOCKS } from "../shared/chapterBlocks";
 import type { PRDVersion } from "./types";
 import DOMPurify from "dompurify";
 import { ArrowUp, X } from "lucide-react";
@@ -62,6 +63,35 @@ export default function App() {
   const [prdMode, setPrdMode] = useState<PRDMode>("business");
   const [view, setView] = useState<"document" | "wbs">("document");
 
+  // Custom PRD builder — lifted from WelcomeScreen/CustomPrdBuilder to App (single source of truth)
+  const STORAGE_KEY_TAB = "PRD_BUILDER_TAB";
+  const STORAGE_KEY_BLOCKS = "PRD_CUSTOM_BLOCKS";
+  const getInitialTab = (): "standard" | "custom" => {
+    const raw = safeGetLocalStorage(STORAGE_KEY_TAB, "");
+    return raw === "custom" ? "custom" : "standard";
+  };
+  const loadInitialIds = (): string[] => {
+    const raw = safeGetLocalStorage(STORAGE_KEY_BLOCKS, "");
+    if (!raw) return [];
+    try {
+      const parsed = JSON.parse(raw) as unknown;
+      if (!Array.isArray(parsed)) return [];
+      const seen = new Set<string>();
+      const out: string[] = [];
+      for (const v of parsed) {
+        if (typeof v !== "string" || seen.has(v) || !getChapterBlock(v)) continue;
+        seen.add(v);
+        out.push(v);
+        if (out.length >= MAX_CUSTOM_BLOCKS) break;
+      }
+      return out;
+    } catch {
+      return [];
+    }
+  };
+  const [builderTab, setBuilderTab] = useState<"standard" | "custom">(() => getInitialTab());
+  const [customChapterIds, setCustomChapterIds] = useState<string[]>(() => loadInitialIds());
+
   const chatContainerRef = useRef<HTMLDivElement>(null);
   const languageRef = useRef(language);
   const prdModeRef = useRef(prdMode);
@@ -70,6 +100,8 @@ export default function App() {
   // saat handleAppend / handleRevise dipanggil setelah pergantian versi cepat
   const activeVersionRef = useRef<PRDVersion | undefined>(versions.find((v) => v.id === activeVersionId));
   const commentsRef = useRef(comments);
+  const builderTabRef = useRef<"standard" | "custom">(builderTab);
+  const customChapterIdsRef = useRef<string[]>(customChapterIds);
 
   // Task 2.3 — Logika generasi dipindah ke hook useGeneration.
   const {
@@ -98,6 +130,8 @@ export default function App() {
     setComments,
     setPrdMode,
     setProductType,
+    builderTabRef,
+    customChapterIdsRef,
   });
 
   const handleNewPRD = useCallback(() => {
@@ -181,13 +215,20 @@ export default function App() {
   // P6 — popstate guard continued
   // ...
 
+  // Persist builder tab
+  useEffect(() => {
+    safeSetLocalStorage(STORAGE_KEY_TAB, builderTab);
+  }, [builderTab]);
+
   // Selalu sinkronkan ref dengan activeVersion terbaru (untuk handleAppend/handleRevise)
   useEffect(() => {
     activeVersionRef.current = activeVersion;
     commentsRef.current = comments;
     languageRef.current = language;
     prdModeRef.current = prdMode;
-  }, [activeVersion, comments, language, prdMode]);
+    builderTabRef.current = builderTab;
+    customChapterIdsRef.current = customChapterIds;
+  }, [activeVersion, comments, language, prdMode, builderTab, customChapterIds]);
   const prdContent = activeVersion?.content || "";
   const hasMessage = !!activeVersionId || versions.length > 0;
   const userPrompt = activeVersion?.prompt || "";
@@ -417,6 +458,10 @@ export default function App() {
                 onQuickPrompt={handleQuickPrompt} 
                 prdMode={prdMode}
                 onChangeMode={setPrdMode}
+                builderTab={builderTab}
+                onChangeBuilderTab={setBuilderTab}
+                selectedIds={customChapterIds}
+                onChangeSelectedIds={setCustomChapterIds}
               />
             ) : (
               <div className="max-w-[800px] mx-auto space-y-6 pt-8 pb-8">

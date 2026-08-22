@@ -18,6 +18,7 @@ export interface PRDVersion {
   userDisplayPrompt?: string;
   prdMode?: PRDMode;
   reasoning?: string;
+  customChapterIds?: string[];
 }
 
 // WBS (Work Breakdown Structure) — produced by src/utils/wbs.ts from PRD markdown.

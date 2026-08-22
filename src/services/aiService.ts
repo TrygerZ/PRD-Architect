@@ -1,5 +1,7 @@
 import { UploadedFile, AIProvider } from "../types";
 
+class NonRetryableError extends Error {}
+
 interface SSEChunk {
   text?: string;
   reasoning?: string;
@@ -23,10 +25,12 @@ export const generatePRD = async (
   signal: AbortSignal | undefined,
   onChunk: (chunk: { text?: string; reasoning?: string }) => void,
   customEndpoint?: string,
+  customChapterIds?: string[],
 ) => {
   let lastError: Error | null = null;
 
   for (let attempt = 0; attempt <= MAX_RETRIES; attempt++) {
+    let streamEstablished = false;
     try {
       const response = await fetch("/api/generate-prd", {
         method: "POST",
@@ -43,6 +47,7 @@ export const generatePRD = async (
           uploadedFiles,
           mode,
           prdMode,
+          ...(customChapterIds && customChapterIds.length > 0 ? { customChapterIds } : {}),
         }),
         signal,
       });
@@ -53,7 +58,7 @@ export const generatePRD = async (
 
         // Don't retry client errors (4xx)
         if (response.status >= 400 && response.status < 500) {
-          throw error;
+          throw new NonRetryableError(error.message);
         }
 
         // Retry server errors (5xx)
@@ -73,6 +78,8 @@ export const generatePRD = async (
       if (!reader) {
         throw new Error("ReadableStream not supported.");
       }
+
+      streamEstablished = true;
 
       let buffer = "";
       let batchedChunk = "";
@@ -132,7 +139,7 @@ export const generatePRD = async (
                 }
 
                 if (data.error) {
-                  throw new Error(data.error);
+                  throw new NonRetryableError(data.error);
                 }
 
                 if (data.text || data.reasoning) {
@@ -181,8 +188,18 @@ export const generatePRD = async (
     } catch (err) {
       lastError = err instanceof Error ? err : new Error(String(err));
 
+      // Don't retry non-retryable errors (e.g. 4xx client errors, explicit stream error events)
+      if (lastError instanceof NonRetryableError) {
+        throw lastError;
+      }
+
       // Don't retry abort errors
       if (lastError.name === 'AbortError') {
+        throw lastError;
+      }
+
+      // Don't retry errors occurring after stream establishment (e.g. stream errors, SSE data.error)
+      if (streamEstablished) {
         throw lastError;
       }
 

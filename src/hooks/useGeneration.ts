@@ -20,12 +20,15 @@ interface UseGenerationArgs {
   prdModeRef: React.MutableRefObject<PRDMode>;
   commentsRef: React.MutableRefObject<Record<string, string>>;
   activeVersionRef: React.MutableRefObject<PRDVersion | undefined>;
-  // Setters dari useVersion.
+  // Setter dari useVersion.
   setVersions: React.Dispatch<React.SetStateAction<PRDVersion[]>>;
   setActiveVersionId: React.Dispatch<React.SetStateAction<string | null>>;
   setComments: (value: Record<string, string>) => void;
   setPrdMode?: React.Dispatch<React.SetStateAction<PRDMode>>;
   setProductType?: React.Dispatch<React.SetStateAction<ProductType>>;
+  // Custom PRD builder refs (lifted to App)
+  builderTabRef?: React.MutableRefObject<"standard" | "custom">;
+  customChapterIdsRef?: React.MutableRefObject<string[]>;
 }
 
 export function useGeneration({
@@ -43,6 +46,8 @@ export function useGeneration({
   setComments,
   setPrdMode,
   setProductType,
+  builderTabRef,
+  customChapterIdsRef,
 }: UseGenerationArgs) {
   const [isGenerating, setIsGenerating] = useState(false);
   const [isConnecting, setIsConnecting] = useState(false);
@@ -72,6 +77,7 @@ export function useGeneration({
       productType: ProductType,
       prdMode: PRDMode,
       onSuccess?: () => void,
+      customChapterIds?: string[],
     ) => {
       // CRIT-05 fix — Guard: reject duplicate calls BEFORE any state changes.
       if (isGeneratingRef.current) {
@@ -97,6 +103,7 @@ export function useGeneration({
         productType,
         referencedFilesCount: uploadedFiles.length,
         prdMode,
+        ...(customChapterIds && customChapterIds.length > 0 ? { customChapterIds: [...customChapterIds] } : {}),
       };
 
       setVersions((prev) => [...prev, newVersion]);
@@ -135,6 +142,7 @@ export function useGeneration({
             );
           },
           customEndpoint,
+          customChapterIds,
         );
         // Titik ingestion tunggal: normalisasi <br> sisa AI sekali di sini,
         // tepat setelah stream selesai disimpan — semua konsumen (website,
@@ -169,9 +177,13 @@ export function useGeneration({
   const handleGenerate = useCallback(
     async (prompt: string, type: ProductType = "Unknown") => {
       setProductType?.(type);
-      await executeGeneration(prompt, prompt, "initial", type, prdModeRef.current);
+      const customIds =
+        builderTabRef?.current === "custom" && customChapterIdsRef?.current && customChapterIdsRef.current.length > 0
+          ? customChapterIdsRef.current
+          : undefined;
+      await executeGeneration(prompt, prompt, "initial", type, prdModeRef.current, undefined, customIds);
     },
-    [executeGeneration, prdModeRef, setProductType],
+    [executeGeneration, prdModeRef, setProductType, builderTabRef, customChapterIdsRef],
   );
 
   const handleAppend = useCallback(
@@ -181,7 +193,11 @@ export function useGeneration({
       if (!currentActive) {
         setProductType?.("Unknown");
         setComments({});
-        await executeGeneration(newPrompt, newPrompt, "initial", "Unknown", prdModeRef.current);
+        const customIds =
+          builderTabRef?.current === "custom" && customChapterIdsRef?.current && customChapterIdsRef.current.length > 0
+            ? customChapterIdsRef.current
+            : undefined;
+        await executeGeneration(newPrompt, newPrompt, "initial", "Unknown", prdModeRef.current, undefined, customIds);
         return;
       }
 
@@ -190,15 +206,18 @@ export function useGeneration({
           ? `I have an existing PRD. Please ADD the following to it:\n\n### EXISTING PRD:\n${currentActive.content}\n\n### ADDITIONAL REQUEST:\n${newPrompt}`
           : `Saya punya PRD yang sudah ada. Tolong TAMBAHKAN berikut:\n\n### PRD SAAT INI:\n${currentActive.content}\n\n### PERMINTAAN TAMBAHAN:\n${newPrompt}`;
 
+      const customIds = currentActive.customChapterIds?.length ? currentActive.customChapterIds : undefined;
       await executeGeneration(
         appendPrompt,
         newPrompt,
         "append",
         currentActive.productType,
         currentActive.prdMode || "business",
+        undefined,
+        customIds,
       );
     },
-    [executeGeneration, activeVersionRef, languageRef, prdModeRef, setComments, setProductType],
+    [executeGeneration, activeVersionRef, languageRef, prdModeRef, setComments, setProductType, builderTabRef, customChapterIdsRef],
   );
 
   const handleRevise = useCallback(async () => {
@@ -232,6 +251,7 @@ export function useGeneration({
         ? `\nApply ONLY the revisions listed above. Keep ALL other sections exactly as they are — do not rewrite them.`
         : `\nTerapkan HANYA revisi yang disebutkan di atas. Biarkan SEMUA bagian lainnya persis seperti aslinya — jangan menulis ulang.`;
 
+    const customIds = currentActive.customChapterIds?.length ? currentActive.customChapterIds : undefined;
     await executeGeneration(
       revisionPrompt,
       lang === "en" ? "Revising PRD based on comments..." : "Merevisi PRD berdasarkan komentar...",
@@ -239,6 +259,7 @@ export function useGeneration({
       currentActive.productType,
       currentActive.prdMode || "business",
       () => setComments({}),
+      customIds,
     );
   }, [executeGeneration, activeVersionRef, commentsRef, languageRef, setComments]);
 
@@ -262,6 +283,7 @@ export function useGeneration({
           : `Konversi PRD berikut menjadi PRD mode ${MODE_LABEL[targetMode].id}. Pertahankan ide produk inti, ruang lingkup, dan detail penting, tetapi susun ulang dan tulis ulang agar sepenuhnya sesuai format target.\n\n### PRD SAAT INI:\n${currentActive.content}`;
 
       setPrdMode?.(targetMode);
+      // Converting from custom to standard: produce legacy version without customChapterIds
       await executeGeneration(
         convertPrompt,
         lang === "en" ? `Convert to ${label} mode` : `Konversi ke mode ${label}`,

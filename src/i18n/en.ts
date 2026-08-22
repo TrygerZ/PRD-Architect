@@ -31,6 +31,22 @@ export const en = {
     canvas: "WBS Canvas",
     canvasLabel: "View Work Breakdown Structure canvas",
   },
+  builder: {
+    tabStandard: "Standard",
+    tabCustom: "Custom",
+    tabLabel: "PRD builder mode",
+    libraryTitle: "Available Blocks",
+    selectedTitle: "Selected Chapters",
+    productGroup: "Product & Business",
+    technicalGroup: "Technical",
+    limitHint: "Maximum 15 blocks reached — remove a block to add another.",
+    libraryHint: "Click a card to add it. Drag to reorder or move between panels.",
+    canvasHint: "Click a card to remove it. Drag to reorder. Number = final chapter order.",
+    emptyTitle: "No chapters yet",
+    emptyDesc: "Pick blocks from the left. You can reorder them by dragging.",
+    dropHint: "Drop to add here",
+    reset: "Reset",
+  },
 };
 
 export type Dict = typeof en;

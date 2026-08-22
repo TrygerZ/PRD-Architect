@@ -39,14 +39,21 @@ export function ApiKeyModal({
   useEffect(() => {
     if (isOpen) {
       const storedProv = safeGetLocalStorage("PRD_AI_PROVIDER") as AIProvider;
+      const validProviders = Object.keys(MODELS_BY_PROVIDER) as AIProvider[];
+      const resolvedProvider = storedProv && validProviders.includes(storedProv) ? storedProv : initialProvider;
+
       const storedModel = safeGetLocalStorage("PRD_AI_MODEL");
+      const validModels = MODELS_BY_PROVIDER[resolvedProvider] ?? [];
+      const resolvedModel = storedModel && (resolvedProvider === "nine_router" || validModels.includes(storedModel))
+        ? storedModel
+        : (PROVIDER_MODELS[resolvedProvider]?.defaultModel ?? initialModel);
+
       const storedEndpoint = safeGetLocalStorage("PRD_CUSTOM_ENDPOINT") || "";
+
       setApiKey("");
-      if (storedProv) setProvider(storedProv);
-      else setProvider(initialProvider);
-      if (storedModel) setModel(storedModel);
-      else setModel(initialModel);
-      setEndpoint(storedEndpoint || initialEndpoint || PROVIDER_MODELS[storedProv || initialProvider]?.endpoint || "");
+      setProvider(resolvedProvider);
+      setModel(resolvedModel);
+      setEndpoint(storedEndpoint || initialEndpoint || PROVIDER_MODELS[resolvedProvider]?.endpoint || "");
       setSaved(false);
 
       // Auto focus modal container on open
@@ -248,7 +255,7 @@ export function ApiKeyModal({
                       className="w-full bg-[var(--color-surface-elevated)] border border-[var(--color-border)] p-2.5 rounded-xl text-[var(--color-text-primary)] font-mono text-[13px] focus:border-[var(--color-interactive)] focus:outline-none transition-colors placeholder:text-[var(--color-text-muted)]"
                     />
                     <div className="flex flex-wrap gap-1.5 pt-1">
-                      {MODELS.nine_router.map((m) => (
+                      {(MODELS.nine_router ?? []).map((m) => (
                         <button
                           key={m}
                           type="button"
@@ -272,7 +279,7 @@ export function ApiKeyModal({
                       onChange={(e) => setModel(e.target.value)}
                       className="w-full bg-[var(--color-surface-elevated)] border border-[var(--color-border)] p-2.5 rounded-xl text-[var(--color-text-primary)] text-[13px] focus:border-[var(--color-interactive)] focus:outline-none transition-colors appearance-none pr-10 cursor-pointer"
                     >
-                      {MODELS[provider].map((m) => (
+                      {(MODELS[provider] ?? []).map((m) => (
                         <option key={m} value={m} className="bg-[var(--color-surface-elevated)]">
                           {m}
                         </option>
