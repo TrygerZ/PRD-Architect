@@ -171,7 +171,7 @@ export function useGeneration({
         }
       }
     },
-    [customApiKey, provider, model, uploadedFiles, setVersions, setActiveVersionId, setComments],
+    [customApiKey, provider, model, customEndpoint, uploadedFiles, setVersions, setActiveVersionId, setComments],
   );
 
   const handleGenerate = useCallback(

@@ -1,5 +1,5 @@
 import { describe, it, expect, beforeEach, vi, afterEach } from "vitest";
-import { safeGetLocalStorage, safeSetLocalStorage } from "./storage";
+import { safeGetLocalStorage, safeSetLocalStorage, serializeDraft, parseDraft } from "./storage";
 
 describe("safe localStorage wrappers", () => {
   beforeEach(() => {
@@ -59,5 +59,27 @@ describe("safe localStorage wrappers", () => {
       },
     });
     expect(() => safeSetLocalStorage("k", "v")).not.toThrow();
+  });
+});
+
+describe("draft TTL codec", () => {
+  const TTL = 24 * 60 * 60 * 1000;
+
+  it("roundtrips within TTL", () => {
+    const raw = serializeDraft("halo", 1000);
+    expect(parseDraft(raw, TTL, 1000 + TTL - 1)).toBe("halo");
+  });
+
+  it("drops draft past TTL", () => {
+    const raw = serializeDraft("halo", 1000);
+    expect(parseDraft(raw, TTL, 1000 + TTL + 1)).toBe("");
+  });
+
+  it("treats legacy plain string as valid draft (no TTL)", () => {
+    expect(parseDraft("draft lama polos", TTL, 9e15)).toBe("draft lama polos");
+  });
+
+  it("empty raw → empty", () => {
+    expect(parseDraft("", TTL)).toBe("");
   });
 });

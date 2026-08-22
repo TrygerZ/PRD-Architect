@@ -133,13 +133,24 @@ export async function extractTextFromFile(filePath: string, mimeType: string, or
         await workbook.xlsx.readFile(filePath);
       }
 
+      // Cegah akumulasi text tak terbatas (decompression bomb) sebelum truncate akhir.
+      // eachRow callback tak bisa `break`, jadi pakai flag + guard early-return.
+      let extractionLimitHit = false;
       workbook.worksheets.forEach(worksheet => {
+        if (extractionLimitHit) return; // Hentikan iterasi worksheet berikutnya
         text += `\n--- Sheet: ${worksheet.name} ---\n`;
         worksheet.eachRow((row) => {
+          if (extractionLimitHit || text.length > MAX_EXTRACTED_CHARS) {
+            extractionLimitHit = true;
+            return; // Skip append setelah melewati batas
+          }
           const rowValues = Array.isArray(row.values) ? row.values.slice(1) : [];
           text += rowValues.map(v => sanitizeCellForAI(v)).join(',') + '\n';
         });
       });
+      if (extractionLimitHit) {
+        log('WARN', `Extracted text from ${originalName} exceeds limit: ${text.length} chars (max ${MAX_EXTRACTED_CHARS})`);
+      }
     } else if (mimeType.startsWith('image/')) {
       text = `[IMAGE: ${originalName}]`;
     } else {

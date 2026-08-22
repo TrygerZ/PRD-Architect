@@ -2,7 +2,7 @@ import { useState, useCallback, useRef, useEffect } from "react";
 import { PRDVersion } from "../types";
 import { saveState, loadState, clearState } from "../utils/persistence";
 
-export function useVersion() {
+export function useVersion(onSaveError?: (reason: "quota" | "error") => void) {
   const [versions, setVersions] = useState<PRDVersion[]>([]);
   const [activeVersionId, setActiveVersionId] = useState<string | null>(null);
 
@@ -13,6 +13,11 @@ export function useVersion() {
   // restored: true setelah upaya restore selesai, agar autosave tidak menimpa
   // state tersimpan dengan state awal kosong sebelum data dimuat.
   const restoredRef = useRef(false);
+
+  // D-01c — callback via ref agar autosave effect tak perlu re-run saat berubah.
+  // Keep onSaveError in a ref so the autosave effect deps stay stable.
+  const onSaveErrorRef = useRef(onSaveError);
+  onSaveErrorRef.current = onSaveError;
 
   useEffect(() => {
     let cancelled = false;
@@ -29,32 +34,42 @@ export function useVersion() {
     };
   }, []);
 
-  // Autosave (debounce 800ms) saat versions/comments/activeVersion berubah
+  // Autosave (debounce 800ms) saat versions/comments/activeVersion berubah.
+  // Catatan durabilitas: saveState bersifat async (IndexedDB), jadi save pada
+  // unload bersifat best-effort. visibilitychange (hidden) dipakai untuk memicu
+  // save lebih awal sebelum tab benar-benar ditutup.
+  // Durability note: idb saveState is async, so unload save is best-effort;
+  // visibilitychange(hidden) triggers an earlier, more reliable save.
   useEffect(() => {
     if (!restoredRef.current) return;
-    const t = setTimeout(() => {
-      saveState({
+    const doSave = async () => {
+      const res = await saveState({
         versions,
         commentsByVersion,
         activeVersionId,
         savedAt: Date.now(),
       });
+      if (!res.ok) onSaveErrorRef.current?.(res.reason);
+    };
+
+    const t = setTimeout(() => {
+      void doSave();
     }, 800);
 
     const handleBeforeUnload = () => {
-      saveState({
-        versions,
-        commentsByVersion,
-        activeVersionId,
-        savedAt: Date.now(),
-      });
+      void doSave();
+    };
+    const handleVisibility = () => {
+      if (document.visibilityState === "hidden") void doSave();
     };
 
     window.addEventListener("beforeunload", handleBeforeUnload);
+    document.addEventListener("visibilitychange", handleVisibility);
 
     return () => {
       clearTimeout(t);
       window.removeEventListener("beforeunload", handleBeforeUnload);
+      document.removeEventListener("visibilitychange", handleVisibility);
     };
   }, [versions, commentsByVersion, activeVersionId]);
 

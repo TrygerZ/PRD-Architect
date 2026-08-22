@@ -54,7 +54,9 @@ export function VersionDiff({
     let added = 0;
     let removed = 0;
     for (const c of changes) {
-      const count = c.count ?? c.value.split("\n").length;
+      // c.value biasanya diakhiri "\n"; buang satu trailing newline agar tak
+      // over-count +1 per hunk. value "" → 0, "a\n" → 1, "a\nb" → 2.
+      const count = c.count ?? (c.value === "" ? 0 : (c.value.endsWith("\n") ? c.value.slice(0, -1) : c.value).split("\n").length);
       if (c.added) added += count;
       else if (c.removed) removed += count;
     }

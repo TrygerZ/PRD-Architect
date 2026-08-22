@@ -194,10 +194,12 @@ export const MermaidRenderer = memo(function MermaidRenderer({ chart, isGenerati
           diagram
         </span>
       </div>
-      <div
-        className="p-4 flex justify-center overflow-x-auto [&>svg]:max-w-full [&>svg]:h-auto"
-        dangerouslySetInnerHTML={svg ? { __html: svg } : undefined}
-      />
+      {svg && (
+        <div
+          className="p-4 flex justify-center overflow-x-auto [&>svg]:max-w-full [&>svg]:h-auto"
+          dangerouslySetInnerHTML={{ __html: svg }}
+        />
+      )}
     </div>
   );
 });

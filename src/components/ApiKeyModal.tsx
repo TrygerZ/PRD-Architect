@@ -320,7 +320,7 @@ export function ApiKeyModal({
                   <p className="text-[11.5px] text-[var(--color-text-secondary)] leading-relaxed">
                     {language === "en"
                       ? "Custom key will be securely saved in httpOnly cookie and never exposed to browser scripts."
-                      : "Key disimpan di cookie httpOnly terenkripsi dan tidak bisa diakses oleh skrip browser."}
+                      : "Key disimpan aman di cookie httpOnly (tidak disimpan di localStorage dan tidak bisa diakses oleh skrip browser)."}
                   </p>
                 </div>
               </div>

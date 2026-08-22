@@ -55,7 +55,16 @@ export default function App() {
     handleNewPRD: versionNewPRD,
     handleSwitchVersion: versionSwitchVersion,
     handleCommentChange: versionCommentChange,
-  } = useVersion();
+  } = useVersion((reason) => {
+    // D-01c — surface kegagalan autosave (mis. quota IndexedDB) ke UI.
+    if (reason === "quota") {
+      showToast(
+        language === "en"
+          ? "Storage full — older versions may not be saved."
+          : "Penyimpanan penuh — versi lama mungkin tidak tersimpan.",
+      );
+    }
+  });
 
   const [sidebarOpen, setSidebarOpen] = useState(false);
   const [isDiffOpen, setIsDiffOpen] = useState(false);

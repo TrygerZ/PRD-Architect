@@ -24,3 +24,25 @@ export function safeSetLocalStorage(key: string, value: string, onError?: (error
     // Still silent fail by default, but caller can now handle it
   }
 }
+
+/**
+ * TTL-aware draft codec — stored as JSON `{ v, t }` (t = save timestamp ms).
+ * Backward-compat: nilai lama berupa string polos diperlakukan sebagai draft
+ * valid (tanpa TTL). Draft codec — disimpan sebagai JSON `{ v, t }`.
+ */
+export function serializeDraft(value: string, now: number = Date.now()): string {
+  return JSON.stringify({ v: value, t: now });
+}
+
+export function parseDraft(raw: string, ttlMs: number, now: number = Date.now()): string {
+  if (!raw) return "";
+  try {
+    const obj = JSON.parse(raw) as { v?: unknown; t?: unknown };
+    if (obj && typeof obj.v === "string" && typeof obj.t === "number") {
+      return now - obj.t > ttlMs ? "" : obj.v;
+    }
+  } catch {
+    // Nilai lama string polos (bukan JSON) — valid tanpa TTL.
+  }
+  return raw;
+}

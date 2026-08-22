@@ -2,9 +2,10 @@ import { useState, useRef, useEffect } from "react";
 import { Send, Paperclip, Loader2, Pause, CornerDownLeft } from "lucide-react";
 import { getQuickPrompts } from "../utils/quickPrompts";
 import { estimateTokens, formatTokenCount } from "../utils/tokens";
-import { safeGetLocalStorage, safeSetLocalStorage } from "../utils/storage";
+import { safeGetLocalStorage, safeSetLocalStorage, serializeDraft, parseDraft } from "../utils/storage";
 
 const DRAFT_KEY = "PRD_DRAFT";
+const DRAFT_TTL_MS = 24 * 60 * 60 * 1000; // 24 jam
 
 interface ChatInputProps {
   onSend: (text: string) => void;
@@ -29,7 +30,7 @@ export function ChatInput({
   showQuickPrompts = false,
   fileContextChars = 0,
 }: ChatInputProps) {
-  const [prompt, setPrompt] = useState(() => initialPrompt || safeGetLocalStorage(DRAFT_KEY));
+  const [prompt, setPrompt] = useState(() => initialPrompt || parseDraft(safeGetLocalStorage(DRAFT_KEY), DRAFT_TTL_MS));
   const textareaRef = useRef<HTMLTextAreaElement>(null);
 
   const estimatedTokens = estimateTokens(prompt) + Math.ceil(fileContextChars / 4);
@@ -43,7 +44,7 @@ export function ChatInput({
   useEffect(() => {
     const t = setTimeout(() => {
       if (prompt.trim()) {
-        safeSetLocalStorage(DRAFT_KEY, prompt);
+        safeSetLocalStorage(DRAFT_KEY, serializeDraft(prompt));
       } else {
         safeSetLocalStorage(DRAFT_KEY, "");
       }

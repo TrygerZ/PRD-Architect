@@ -2,6 +2,8 @@ import express from "express";
 import path from "path";
 import fs from "fs";
 import os from "os";
+import net from "net";
+import dns from "dns";
 import dotenv from "dotenv";
 
 import multer from "multer";
@@ -81,6 +83,57 @@ const safeErrorMessages: Record<number, { en: string; id: string }> = {
 const app = express();
 const PORT = parseInt(process.env.PORT || "3000", 10);
 
+// SSRF guard — tolak custom endpoint yang menunjuk ke alamat privat/loopback/metadata.
+// Cek IP literal via range; untuk nama domain, resolve DNS dan tolak bila ADA hasil privat
+// (mitigasi DNS rebinding sederhana). Stdlib saja (net + dns), tanpa dependency baru.
+function isPrivateAddress(ip: string): boolean {
+  const type = net.isIP(ip);
+  if (type === 4) {
+    const parts = ip.split('.').map(Number);
+    const [a, b] = parts;
+    if (a === 0) return true;                          // 0.0.0.0/8
+    if (a === 127) return true;                        // 127.0.0.0/8 loopback
+    if (a === 10) return true;                         // 10.0.0.0/8
+    if (a === 172 && b >= 16 && b <= 31) return true;  // 172.16.0.0/12
+    if (a === 192 && b === 168) return true;           // 192.168.0.0/16
+    if (a === 169 && b === 254) return true;           // 169.254.0.0/16 link-local + metadata
+    return false;
+  }
+  if (type === 6) {
+    const lower = ip.toLowerCase();
+    if (lower === '::1' || lower === '::') return true;       // loopback / unspecified
+    if (lower.startsWith('fe8') || lower.startsWith('fe9') ||
+        lower.startsWith('fea') || lower.startsWith('feb')) return true; // fe80::/10 link-local
+    if (lower.startsWith('fc') || lower.startsWith('fd')) return true;   // fc00::/7 unique-local
+    // IPv4-mapped (::ffff:a.b.c.d)
+    const v4 = lower.match(/::ffff:(\d+\.\d+\.\d+\.\d+)$/);
+    if (v4) return isPrivateAddress(v4[1]);
+    return false;
+  }
+  return false;
+}
+
+async function assertPublicEndpoint(urlStr: string): Promise<boolean> {
+  let hostname: string;
+  try {
+    hostname = new URL(urlStr).hostname;
+  } catch {
+    return false;
+  }
+  const h = hostname.toLowerCase();
+  if (h === 'localhost' || h.endsWith('.localhost')) return false;
+  // IP literal — cek langsung
+  if (net.isIP(h)) return !isPrivateAddress(h);
+  // Nama domain — resolve, tolak bila ada hasil di range privat
+  try {
+    const results = await dns.promises.lookup(h, { all: true });
+    if (results.length === 0) return false;
+    return !results.some(r => isPrivateAddress(r.address));
+  } catch {
+    return false; // resolve gagal → jangan izinkan
+  }
+}
+
 // Trust proxy — memastikan rate limiting bekerja di belakang reverse proxy
 app.set('trust proxy', 1);
 
@@ -113,13 +166,12 @@ app.use(helmet({
       imgSrc: ["'self'", "data:", "https:", "blob:"],
       connectSrc: [
         "'self'",
-        "ws://localhost:*",
-        "http://localhost:*",
+        // localhost ws/http hanya untuk Vite HMR di dev — dikeluarkan di production
+        ...(process.env.NODE_ENV !== 'production' ? ["ws://localhost:*", "http://localhost:*"] : []),
         "https://api.deepseek.com",
         "https://generativelanguage.googleapis.com",
         "https://opencode.ai",
         "https://api.9router.com",
-        "https:",
       ],
       fontSrc: ["'self'"],
       objectSrc: ["'none'"],
@@ -314,10 +366,11 @@ app.post("/api/upload-files", uploadLimiter, (req, res) => {
 
       res.json(uploadedResults);
     } catch (error: unknown) {
-      const message = error instanceof Error ? error.message : String(error);
+      // Jangan bocorkan error.message internal ke client — log detail server-side,
+      // kirim pesan generik dua bahasa.
       log('ERROR', "Upload error:", error);
       res.status(500).json({
-        error: message || (language === 'en' ? "Failed to process files" : "Gagal memproses file")
+        error: language === 'en' ? "Failed to process files" : "Gagal memproses file"
       });
     } finally {
       // Ensure all temp files are cleaned up even if an error occurs mid-processing
@@ -461,24 +514,36 @@ app.post("/api/generate-prd", async (req, res) => {
     let endpoint = providerConfig.endpoint;
 
     // Support custom endpoint URL (khususnya untuk 9router / custom proxy)
+    // FIX 1 (SSRF): validasi host — tolak alamat privat/loopback/metadata (blok DNS rebinding sederhana).
+    let usingCustomEndpoint = false;
     if (provider === "nine_router" && typeof customEndpoint === "string" && customEndpoint.trim()) {
       const trimmed = customEndpoint.trim();
+      let parsedOk = false;
       try {
         const parsed = new URL(trimmed);
-        if (parsed.protocol === "http:" || parsed.protocol === "https:") {
-          endpoint = trimmed;
-        }
+        parsedOk = parsed.protocol === "http:" || parsed.protocol === "https:";
       } catch {
-        // Abaikan jika invalid URL, fallback ke default endpoint
+        parsedOk = false;
+      }
+      if (parsedOk && await assertPublicEndpoint(trimmed)) {
+        endpoint = trimmed;
+        usingCustomEndpoint = trimmed !== providerConfig.endpoint;
+      } else {
+        // Tolak: fallback ke default endpoint + log WARN (invalid URL, non-http, atau alamat privat)
+        log('WARN', `Rejected custom endpoint (SSRF guard), falling back to default: ${trimmed}`);
       }
     }
 
     const modelName = model || providerConfig.defaultModel;
 
     // Server-side API key resolution — prioritas: cookie > .env
+    // FIX 2: server key (.env) tetap boleh jadi fallback untuk provider builtin
+    // (deepseek/gemini/opencode) agar deploy owner-hosted jalan. TAPI untuk custom
+    // endpoint (nine_router + customEndpoint) HANYA pakai cookieKey milik user —
+    // JANGAN pernah forward server .env key ke endpoint pihak ketiga (FIX 1: cegah exfil key).
     const serverKey = process.env[apiKeyEnvName];
     const cookieKey = req.cookies?.prd_session;
-    const apiKey = cookieKey || serverKey;
+    const apiKey = usingCustomEndpoint ? cookieKey : (cookieKey || serverKey);
 
     if (!apiKey) {
       if (!res.writableEnded) {
@@ -710,10 +775,15 @@ app.post("/api/generate-prd", async (req, res) => {
     // Flush residual buffer content (BUG B5)
     if (buffer.trim()) {
       try {
-        const data = JSON.parse(buffer.trim());
-        const contentText = data.choices?.[0]?.delta?.content || data.candidates?.[0]?.content?.parts?.[0]?.text || "";
-        if (contentText) {
-          await writeChunk(`data: ${JSON.stringify({ text: contentText })}\n\n`);
+        // Strip prefix `data: ` agar konsisten dengan client (aiService.ts)
+        const trimmed = buffer.trim();
+        const dataStr = trimmed.startsWith('data: ') ? trimmed.slice(6) : trimmed;
+        if (dataStr !== '[DONE]') {
+          const data = JSON.parse(dataStr);
+          const contentText = data.choices?.[0]?.delta?.content || data.candidates?.[0]?.content?.parts?.[0]?.text || "";
+          if (contentText) {
+            await writeChunk(`data: ${JSON.stringify({ text: contentText })}\n\n`);
+          }
         }
       } catch {
         // Partial/incomplete — silently ignore

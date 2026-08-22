@@ -724,12 +724,11 @@ export async function exportDocx(content: string, productType: string, language:
       // Tabel — render sebagai Table native docx
       if (trimmed.startsWith("|") && i + 1 < lines.length && isTableSeparator(lines[i + 1])) {
         const table: ParsedTable = { header: parseTableRow(line), rows: [] };
-        i += 2;
-        while (i < lines.length && lines[i].trim().startsWith("|")) {
-          table.rows.push(parseTableRow(lines[i]));
-          i++;
-        }
-        i--;
+        // Samakan dgn path PDF: collector membuang separator GFM nyasar &
+        // menelan thematic-break di tengah tabel — lihat collectTableBodyRows.
+        const { rows: bodyRows, endIdx } = collectTableBodyRows(lines, i + 2);
+        table.rows = bodyRows;
+        i = endIdx - 1;
 
         // Sel DOCX mempertahankan gaya inline (**bold**, *italic*, `code`)
         // via array TextRun — setara pola heading rich-text di bawah.
