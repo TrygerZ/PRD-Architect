@@ -39,7 +39,7 @@ export const Sidebar = memo(function Sidebar({
           transition-transform duration-200 ease-out flex flex-col
           ${isOpen
             ? "fixed lg:relative translate-x-0 lg:translate-x-0 z-[60] lg:z-auto w-[270px] sm:w-[300px]"
-            : "fixed lg:relative -translate-x-full lg:translate-x-0 lg:w-[270px] lg:min-w-[270px] w-[270px] sm:w-[300px]"
+            : "fixed -translate-x-full lg:hidden w-[270px] sm:w-[300px]"
           }
         `}
       >

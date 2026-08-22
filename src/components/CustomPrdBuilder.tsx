@@ -1,13 +1,15 @@
 import { useEffect, useMemo, useCallback, useRef, useState } from "react";
 import {
   DndContext,
-  closestCenter,
   PointerSensor,
   KeyboardSensor,
   useSensor,
   useSensors,
   DragOverlay,
   useDroppable,
+  pointerWithin,
+  rectIntersection,
+  type CollisionDetection,
   type DragStartEvent,
   type DragEndEvent,
   type DragOverEvent,
@@ -20,7 +22,7 @@ import {
   arrayMove,
 } from "@dnd-kit/sortable";
 import { CSS } from "@dnd-kit/utilities";
-import { restrictToWindowEdges } from "@dnd-kit/modifiers";
+import { restrictToWindowEdges, snapCenterToCursor } from "@dnd-kit/modifiers";
 import { motion, AnimatePresence } from "motion/react";
 import {
   FileText,
@@ -117,11 +119,13 @@ function LibraryCard({
   lang,
   disabled,
   onAdd,
+  lastDragEndRef,
 }: {
   block: ChapterBlock;
   lang: "en" | "id";
   disabled: boolean;
   onAdd: () => void;
+  lastDragEndRef: React.MutableRefObject<number>;
 }) {
   const { attributes, listeners, setNodeRef, transform, transition, isDragging } = useSortable({
     id: `lib-${block.id}`,
@@ -142,26 +146,27 @@ function LibraryCard({
     <div
       ref={setNodeRef}
       style={style}
-      className={`group relative flex flex-col gap-1.5 rounded-xl border bg-[var(--color-surface)] p-3 text-left transition-colors ${
+      {...(!disabled ? listeners : {})}
+      {...attributes}
+      role="button"
+      tabIndex={disabled ? -1 : 0}
+      aria-label={lang === "en" ? `Add ${title}` : `Tambah ${title}`}
+      aria-disabled={disabled}
+      onClick={() => {
+        if (disabled) return;
+        if (Date.now() - lastDragEndRef.current < 250) return;
+        onAdd();
+      }}
+      className={`group relative flex flex-col gap-1.5 rounded-xl border bg-[var(--color-surface)] p-3 text-left transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--color-interactive)] ${
         disabled
           ? "border-[var(--color-border)] cursor-not-allowed"
-          : "border-[var(--color-border)] hover:border-[var(--color-border-hover)] hover:bg-[var(--color-surface-elevated)] cursor-pointer focus-within:ring-2 focus-within:ring-[var(--color-interactive)]"
+          : "border-[var(--color-border)] hover:border-[var(--color-border-hover)] hover:bg-[var(--color-surface-elevated)] cursor-grab active:cursor-grabbing"
       }`}
     >
-      <button
-        type="button"
-        onClick={onAdd}
-        disabled={disabled}
-        aria-label={lang === "en" ? `Add ${title}` : `Tambah ${title}`}
-        className="absolute inset-0 rounded-xl focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--color-interactive)] disabled:cursor-not-allowed"
-      />
       <div className="pointer-events-none relative z-10 flex items-start justify-between gap-2">
         <span
-          {...(!disabled ? listeners : {})}
-          {...attributes}
-          className={`pointer-events-auto relative z-10 flex h-7 w-7 items-center justify-center rounded-lg border bg-[var(--color-surface-elevated)] text-[var(--color-text-secondary)] ${disabled ? "cursor-not-allowed" : "cursor-grab active:cursor-grabbing group-hover:text-[var(--color-text-primary)]"}`}
+          className="pointer-events-none relative z-10 flex h-7 w-7 items-center justify-center rounded-lg border bg-[var(--color-surface-elevated)] text-[var(--color-text-secondary)] group-hover:text-[var(--color-text-primary)]"
           aria-hidden="true"
-          onClick={(e) => e.stopPropagation()}
         >
           <BlockIcon name={block.icon} size={13} />
         </span>
@@ -182,7 +187,7 @@ function LibraryCard({
         {desc}
       </span>
       {!disabled && (
-        <span className="pointer-events-none absolute bottom-2 right-2 text-[var(--color-text-muted)] opacity-0 group-hover:opacity-100 transition-opacity">
+        <span className="pointer-events-none absolute bottom-2 right-2 text-[var(--color-text-muted)] opacity-40 group-hover:opacity-100 transition-opacity">
           <GripVertical size={12} strokeWidth={1.5} />
         </span>
       )}
@@ -423,6 +428,11 @@ export function CustomPrdBuilder({ language, selectedIds, onChangeSelectedIds }:
     return getChapterBlock(parsed.blockId);
   }, [activeId]);
 
+  const collisionDetection = useCallback<CollisionDetection>((args) => {
+    const pointerCollisions = pointerWithin(args);
+    return pointerCollisions.length > 0 ? pointerCollisions : rectIntersection(args);
+  }, []);
+
   const counterText = `${selectedIds.length}/${MAX_CUSTOM_BLOCKS}`;
 
   return (
@@ -472,7 +482,7 @@ export function CustomPrdBuilder({ language, selectedIds, onChangeSelectedIds }:
 
       <DndContext
         sensors={sensors}
-        collisionDetection={closestCenter}
+        collisionDetection={collisionDetection}
         onDragStart={handleDragStart}
         onDragOver={handleDragOver}
         onDragEnd={handleDragEnd}
@@ -518,6 +528,7 @@ export function CustomPrdBuilder({ language, selectedIds, onChangeSelectedIds }:
                         lang={language}
                         disabled={isFull}
                         onAdd={() => addBlock(block.id)}
+                        lastDragEndRef={lastDragEndRef}
                       />
                     ))}
                     {libraryGroups.product.length === 0 && (
@@ -544,6 +555,7 @@ export function CustomPrdBuilder({ language, selectedIds, onChangeSelectedIds }:
                         lang={language}
                         disabled={isFull}
                         onAdd={() => addBlock(block.id)}
+                        lastDragEndRef={lastDragEndRef}
                       />
                     ))}
                     {libraryGroups.technical.length === 0 && (
@@ -630,7 +642,7 @@ export function CustomPrdBuilder({ language, selectedIds, onChangeSelectedIds }:
           </DroppablePanel>
         </div>
 
-        <DragOverlay dropAnimation={{ duration: 180, easing: "cubic-bezier(0.16,1,0.3,1)" }}>
+        <DragOverlay modifiers={[snapCenterToCursor]} dropAnimation={{ duration: 180, easing: "cubic-bezier(0.16,1,0.3,1)" }}>
           {activeBlock ? <OverlayCard block={activeBlock} lang={language} /> : null}
         </DragOverlay>
       </DndContext>
