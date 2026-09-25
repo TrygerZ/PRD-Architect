@@ -944,6 +944,15 @@ async function startServer() {
       res.send(html);
     };
 
+    // Cegah eksposur server bundle dan file source map (*.map) via express.static
+    app.use((req, res, next) => {
+      const p = req.path.toLowerCase();
+      if (p === '/server.js' || p.endsWith('.map')) {
+        return res.status(404).send('Not Found');
+      }
+      next();
+    });
+
     app.get('/index.html', renderSpa);
     app.use(express.static(distPath, { index: false }));
     app.get('*', renderSpa);
