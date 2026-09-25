@@ -412,7 +412,7 @@ ${chapterList}`;
       const block = getChapterBlock(id)!;
       const title = isEn ? block.titleEn : block.titleId;
       const instruction = getBlockInstructions(id, language)!;
-      return `## ${idx + 1}. ${title}\n${instruction}`;
+      return `Chapter ${idx + 1} — ${title}:\n${instruction}`;
     })
     .join("\n\n");
 
@@ -433,7 +433,7 @@ ${chapterList}`;
     ? `FINAL DIRECTIVE: Generate ALL ${n} chapters in the exact order listed above. Do NOT add, remove, or reorder chapters. Each chapter heading must appear verbatim as specified.`
     : `FINAL DIRECTIVE: Hasilkan SEMUA ${n} chapter dalam urutan persis seperti di atas. JANGAN menambah, mengurangi, atau mengubah urutan chapter. Setiap heading chapter harus muncul verbatim sesuai spesifikasi.`;
 
-  return `${preamble}\n\nCHAPTER CONSTRAINTS:\n${blocksSection}\n\n${languageRequirement}\n${mermaidRules}\n${closingDirective}`;
+  return `${preamble}\n\nPER-CHAPTER CONSTRAINTS (apply each list below to its matching numbered chapter above; do NOT emit these as headings):\n${blocksSection}\n\n${languageRequirement}\n${mermaidRules}\n${closingDirective}`;
 }
 
 /**
@@ -453,11 +453,11 @@ export function getCustomGuard(
   const chapterList = titles.map((t, i) => `## ${i + 1}. ${t}`).join(", ");
   if (mode === "revision") {
     return language === "en"
-      ? `\n11. THIS IS A CUSTOM PRD (${n} chapters). Do NOT change the ${n}-chapter structure. Do NOT add or remove chapters — you MUST preserve EXACTLY these ${n} chapters in exact order: ${chapterList}. Only the content within chapters may change.`
-      : `\n11. INI ADALAH CUSTOM PRD (${n} chapter). JANGAN mengubah struktur ${n} chapter. JANGAN menambah atau menghapus chapter — Anda HARUS mempertahankan TEPAT ${n} chapter dalam urutan persis: ${chapterList}. Hanya isi di dalam chapter yang boleh diubah.`;
+      ? `CUSTOM STRUCTURE LOCK (REVISION): THIS IS A CUSTOM PRD (${n} chapters). Do NOT change the ${n}-chapter structure. Do NOT add or remove chapters — you MUST preserve EXACTLY these ${n} chapters in exact order: ${chapterList}. Only the content within chapters may change.`
+      : `CUSTOM STRUCTURE LOCK (REVISION): INI ADALAH CUSTOM PRD (${n} chapter). JANGAN mengubah struktur ${n} chapter. JANGAN menambah atau menghapus chapter — Anda HARUS mempertahankan TEPAT ${n} chapter dalam urutan persis: ${chapterList}. Hanya isi di dalam chapter yang boleh diubah.`;
   }
   // append
   return language === "en"
-    ? `\n8. THIS IS A CUSTOM PRD (${n} chapters). Do NOT change the ${n}-chapter structure. New content must be inserted into the existing ${n} chapters — do NOT create an extra chapter. Preserve exactly: ${chapterList}.`
-    : `\n8. INI ADALAH CUSTOM PRD (${n} chapter). JANGAN mengubah struktur ${n} chapter. Konten baru harus disisipkan ke dalam ${n} chapter yang ada — jangan membuat chapter tambahan. Pertahankan persis: ${chapterList}.`;
+    ? `CUSTOM STRUCTURE LOCK (APPEND): THIS IS A CUSTOM PRD (${n} chapters). Do NOT change the ${n}-chapter structure. New content must be inserted into the existing ${n} chapters — do NOT create an extra chapter. Preserve exactly: ${chapterList}.`
+    : `CUSTOM STRUCTURE LOCK (APPEND): INI ADALAH CUSTOM PRD (${n} chapter). JANGAN mengubah struktur ${n} chapter. Konten baru harus disisipkan ke dalam ${n} chapter yang ada — jangan membuat chapter tambahan. Pertahankan persis: ${chapterList}.`;
 }

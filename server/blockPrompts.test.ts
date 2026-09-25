@@ -96,6 +96,27 @@ describe("composeCustomSystemPrompt", () => {
     expect(idx3).toBeGreaterThan(idx2);
   });
 
+  it("emits EXACTLY ONE H2 heading per chapter (no duplicate table-of-contents headings)", () => {
+    // Regression: the preamble chapter list and the per-chapter constraints section
+    // must NOT both emit `## N. Title`, otherwise the model sees two competing
+    // skeletons and produces a renumbered / mismatched PRD. See bug: custom PRD "ngaco".
+    const ids = ["overview", "feature-scope", "risks", "timeline"];
+    for (const lang of ["en", "id"] as const) {
+      const prompt = composeCustomSystemPrompt(ids, lang);
+      const h2 = prompt.match(/^## \d+\./gm) || [];
+      // Exactly one H2 heading per selected chapter, no more.
+      expect(h2.length, `${lang} H2 count`).toBe(ids.length);
+      // Each numbered heading must be unique.
+      const nums = h2.map((l) => l.match(/^## (\d+)\./)![1]);
+      expect(new Set(nums).size).toBe(ids.length);
+    }
+  });
+
+  it("constraints reference chapters without emitting extra H2 headings", () => {
+    const prompt = composeCustomSystemPrompt(["overview", "risks"], "en");
+    expect(prompt).toContain("Chapter 1 — Executive Summary & Value Proposition:");
+    expect(prompt).toContain("Chapter 2 — Risk Register & Mitigation:");
+  });
   it("contains WBS H3 when feature-scope selected", () => {
     const prompt = composeCustomSystemPrompt(["feature-scope", "overview"], "en");
     expect(prompt).toContain("### Feature Breakdown (WBS)");
@@ -211,15 +232,32 @@ describe("validateCustomChapterIds", () => {
 // getCustomGuard
 // ---------------------------------------------------------------------------
 describe("getCustomGuard", () => {
-  it("revision guard mentions chapter count and preserves structure", () => {
-    const guard = getCustomGuard(["overview", "timeline"], "en", "revision");
-    expect(guard).toContain("2 chapters");
-    expect(guard).toContain("Do NOT add or remove");
+  it("revision guard mentions chapter count and preserves structure without orphan numbers", () => {
+    const guardEn = getCustomGuard(["overview", "timeline"], "en", "revision");
+    expect(guardEn).toMatch(/^CUSTOM STRUCTURE LOCK \(REVISION\):/);
+    expect(guardEn).toContain("2 chapters");
+    expect(guardEn).toContain("Do NOT add or remove");
+    expect(guardEn).not.toMatch(/^\s*\d+\./);
+
+    const guardId = getCustomGuard(["overview", "timeline"], "id", "revision");
+    expect(guardId).toMatch(/^CUSTOM STRUCTURE LOCK \(REVISION\):/);
+    expect(guardId).toContain("2 chapter");
+    expect(guardId).toContain("JANGAN menambah atau menghapus");
+    expect(guardId).not.toMatch(/^\s*\d+\./);
   });
 
-  it("append guard mentions chapter count", () => {
-    const guard = getCustomGuard(["overview", "nfr", "risks"], "id", "append");
-    expect(guard).toContain("3 chapter");
+  it("append guard mentions chapter count and forbids extra chapters without orphan numbers", () => {
+    const guardEn = getCustomGuard(["overview", "nfr", "risks"], "en", "append");
+    expect(guardEn).toMatch(/^CUSTOM STRUCTURE LOCK \(APPEND\):/);
+    expect(guardEn).toContain("3 chapters");
+    expect(guardEn).toContain("do NOT create an extra chapter");
+    expect(guardEn).not.toMatch(/^\s*\d+\./);
+
+    const guardId = getCustomGuard(["overview", "nfr", "risks"], "id", "append");
+    expect(guardId).toMatch(/^CUSTOM STRUCTURE LOCK \(APPEND\):/);
+    expect(guardId).toContain("3 chapter");
+    expect(guardId).toContain("jangan membuat chapter tambahan");
+    expect(guardId).not.toMatch(/^\s*\d+\./);
   });
 });
 
