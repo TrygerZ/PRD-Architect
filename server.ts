@@ -922,9 +922,30 @@ async function startServer() {
     app.use(vite.middlewares);
   } else {
     const distPath = path.join(process.cwd(), 'dist');
-    app.use(express.static(distPath));
-    app.get('*', (req, res) => {
-      res.sendFile(path.join(distPath, 'index.html'));
-    });
+    const indexPath = path.join(distPath, 'index.html');
+    let indexHtmlTemplate: string | null = null;
+    try {
+      indexHtmlTemplate = fs.readFileSync(indexPath, 'utf-8');
+    } catch (err) {
+      log('ERROR', `Failed to read ${indexPath}:`, err instanceof Error ? err.message : err);
+    }
+
+    const renderSpa = (_req: express.Request, res: express.Response) => {
+      if (!indexHtmlTemplate) {
+        log('ERROR', `Cannot serve SPA: index.html not found in ${distPath}`);
+        return res.status(500).send('Application bundle not found. Please build the frontend first.');
+      }
+      const nonce = (res.locals.nonce as string) || '';
+      const html = indexHtmlTemplate.replace(
+        /<script(?![^>]*\bnonce=)([^>]*)>/gi,
+        (_match, attrs) => `<script nonce="${nonce}"${attrs}>`,
+      );
+      res.setHeader('Content-Type', 'text/html; charset=utf-8');
+      res.send(html);
+    };
+
+    app.get('/index.html', renderSpa);
+    app.use(express.static(distPath, { index: false }));
+    app.get('*', renderSpa);
   }
 }
