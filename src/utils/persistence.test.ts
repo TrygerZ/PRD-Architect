@@ -1,5 +1,12 @@
-import { describe, it, expect } from "vitest";
-import { capState, capVersions, isValidVersion, MAX_PERSISTED_VERSIONS } from "./persistence";
+import { describe, it, expect, vi } from "vitest";
+import {
+  capState,
+  capVersions,
+  createSyncChannel,
+  isValidVersion,
+  MAX_PERSISTED_VERSIONS,
+  SYNC_CHANNEL_NAME,
+} from "./persistence";
 import type { PersistedState } from "./persistence";
 import type { PRDVersion } from "../types";
 
@@ -120,3 +127,35 @@ describe("capState", () => {
     expect(out.commentsByVersion).toEqual({ "1": { s: "keep" } });
   });
 });
+
+describe("createSyncChannel", () => {
+  it("returns null when BroadcastChannel is undefined", () => {
+    const original = (globalThis as unknown as { BroadcastChannel?: unknown }).BroadcastChannel;
+    delete (globalThis as unknown as { BroadcastChannel?: unknown }).BroadcastChannel;
+    try {
+      const channel = createSyncChannel();
+      expect(channel).toBeNull();
+    } finally {
+      (globalThis as unknown as { BroadcastChannel?: unknown }).BroadcastChannel = original;
+    }
+  });
+
+  it("returns instance of BroadcastChannel with SYNC_CHANNEL_NAME when supported", () => {
+    class MockBC {
+      name: string;
+      constructor(name: string) {
+        this.name = name;
+      }
+    }
+    const original = (globalThis as unknown as { BroadcastChannel?: unknown }).BroadcastChannel;
+    (globalThis as unknown as { BroadcastChannel: typeof MockBC }).BroadcastChannel = MockBC;
+    try {
+      const channel = createSyncChannel() as unknown as MockBC | null;
+      expect(channel).toBeInstanceOf(MockBC);
+      expect(channel?.name).toBe(SYNC_CHANNEL_NAME);
+    } finally {
+      (globalThis as unknown as { BroadcastChannel?: unknown }).BroadcastChannel = original;
+    }
+  });
+});
+

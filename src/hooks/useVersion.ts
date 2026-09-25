@@ -1,6 +1,6 @@
 import { useState, useCallback, useRef, useEffect } from "react";
 import { PRDVersion } from "../types";
-import { saveState, loadState, clearState } from "../utils/persistence";
+import { saveState, loadState, clearState, createSyncChannel, SyncMessage } from "../utils/persistence";
 
 export function useVersion(onSaveError?: (reason: "quota" | "error") => void) {
   const [versions, setVersions] = useState<PRDVersion[]>([]);
@@ -19,13 +19,115 @@ export function useVersion(onSaveError?: (reason: "quota" | "error") => void) {
   const onSaveErrorRef = useRef(onSaveError);
   onSaveErrorRef.current = onSaveError;
 
+  // D-02b — Tab ID unik per instance hook untuk mendeteksi & mengabaikan echo pesan sendiri.
+  // Unique tab ID per session to avoid self-echoes in BroadcastChannel.
+  const tabIdRef = useRef<string>(
+    typeof crypto !== "undefined" && crypto.randomUUID
+      ? crypto.randomUUID()
+      : Math.random().toString(36).slice(2) + Date.now().toString(36)
+  );
+
+  const channelRef = useRef<BroadcastChannel | null>(null);
+  const lastSavedAtRef = useRef<number>(0);
+  const lastSavedVersionsRef = useRef<PRDVersion[]>(versions);
+  const lastSavedCommentsRef = useRef<Record<string, Record<string, string>>>(commentsByVersion);
+  const lastSavedActiveIdRef = useRef<string | null>(activeVersionId);
+
+  // Keep latest state in refs for sync comparisons and callbacks
+  const versionsRef = useRef(versions);
+  versionsRef.current = versions;
+  const commentsByVersionRef = useRef(commentsByVersion);
+  commentsByVersionRef.current = commentsByVersion;
+  const activeVersionIdRef = useRef(activeVersionId);
+  activeVersionIdRef.current = activeVersionId;
+
+  // D-02b — Setup BroadcastChannel untuk sinkronisasi antar-tab.
+  // Listen for state changes in other tabs and refresh local state without looping.
+  useEffect(() => {
+    const channel = createSyncChannel();
+    if (!channel) return;
+    channelRef.current = channel;
+
+    const handleMessage = async (event: MessageEvent<SyncMessage>) => {
+      const data = event.data;
+      if (!data || typeof data !== "object") return;
+      if (data.senderId === tabIdRef.current) return;
+
+      if (data.type === "SAVED") {
+        if (typeof data.savedAt === "number" && data.savedAt <= lastSavedAtRef.current) {
+          return;
+        }
+
+        // Jangan timpa jika tab ini memiliki unpersisted edits lokal yang sedang menunggu save
+        const hasLocalEdits =
+          versionsRef.current !== lastSavedVersionsRef.current ||
+          commentsByVersionRef.current !== lastSavedCommentsRef.current ||
+          activeVersionIdRef.current !== lastSavedActiveIdRef.current;
+        if (hasLocalEdits) return;
+
+        const fresh = await loadState();
+        if (!fresh) return;
+        if (typeof fresh.savedAt === "number" && fresh.savedAt <= lastSavedAtRef.current) {
+          return;
+        }
+
+        lastSavedAtRef.current = fresh.savedAt;
+        const newVersions = fresh.versions ?? [];
+        const newComments = fresh.commentsByVersion ?? {};
+        const newActiveId = fresh.activeVersionId ?? null;
+
+        lastSavedVersionsRef.current = newVersions;
+        lastSavedCommentsRef.current = newComments;
+        lastSavedActiveIdRef.current = newActiveId;
+
+        setVersions(newVersions);
+        setCommentsByVersion(newComments);
+        setActiveVersionId(newActiveId);
+      } else if (data.type === "CLEARED") {
+        if (typeof data.savedAt === "number" && data.savedAt <= lastSavedAtRef.current) {
+          return;
+        }
+        lastSavedAtRef.current = data.savedAt || Date.now();
+        const emptyVersions: PRDVersion[] = [];
+        const emptyComments: Record<string, Record<string, string>> = {};
+
+        lastSavedVersionsRef.current = emptyVersions;
+        lastSavedCommentsRef.current = emptyComments;
+        lastSavedActiveIdRef.current = null;
+
+        setVersions(emptyVersions);
+        setCommentsByVersion(emptyComments);
+        setActiveVersionId(null);
+      }
+    };
+
+    channel.onmessage = handleMessage;
+
+    return () => {
+      channelRef.current = null;
+      channel.close();
+    };
+  }, []);
+
   useEffect(() => {
     let cancelled = false;
     loadState().then((s) => {
       if (!cancelled && s) {
-        if (s.versions?.length) setVersions(s.versions);
-        if (s.commentsByVersion) setCommentsByVersion(s.commentsByVersion);
-        if (s.activeVersionId) setActiveVersionId(s.activeVersionId);
+        if (s.versions?.length) {
+          setVersions(s.versions);
+          lastSavedVersionsRef.current = s.versions;
+        }
+        if (s.commentsByVersion) {
+          setCommentsByVersion(s.commentsByVersion);
+          lastSavedCommentsRef.current = s.commentsByVersion;
+        }
+        if (s.activeVersionId) {
+          setActiveVersionId(s.activeVersionId);
+          lastSavedActiveIdRef.current = s.activeVersionId;
+        }
+        if (typeof s.savedAt === "number") {
+          lastSavedAtRef.current = s.savedAt;
+        }
       }
       restoredRef.current = true;
     });
@@ -42,14 +144,38 @@ export function useVersion(onSaveError?: (reason: "quota" | "error") => void) {
   // visibilitychange(hidden) triggers an earlier, more reliable save.
   useEffect(() => {
     if (!restoredRef.current) return;
+
+    // D-02b — Lewati save bila state saat ini identik dengan yang terakhir disimpan/disinkronkan.
+    // Mencegah redundant write & infinite loop antar-tab.
+    const isSameAsPersisted =
+      versions === lastSavedVersionsRef.current &&
+      commentsByVersion === lastSavedCommentsRef.current &&
+      activeVersionId === lastSavedActiveIdRef.current;
+    if (isSameAsPersisted) return;
+
     const doSave = async () => {
+      const now = Date.now();
+      lastSavedAtRef.current = now;
+      lastSavedVersionsRef.current = versions;
+      lastSavedCommentsRef.current = commentsByVersion;
+      lastSavedActiveIdRef.current = activeVersionId;
+
       const res = await saveState({
         versions,
         commentsByVersion,
         activeVersionId,
-        savedAt: Date.now(),
+        savedAt: now,
       });
-      if (!res.ok) onSaveErrorRef.current?.(res.reason);
+      if (!res.ok) {
+        onSaveErrorRef.current?.(res.reason);
+      } else {
+        // D-02b — Notifikasi tab lain setelah penyimpanan berhasil
+        channelRef.current?.postMessage({
+          type: "SAVED",
+          savedAt: now,
+          senderId: tabIdRef.current,
+        });
+      }
     };
 
     const t = setTimeout(() => {
@@ -73,11 +199,6 @@ export function useVersion(onSaveError?: (reason: "quota" | "error") => void) {
     };
   }, [versions, commentsByVersion, activeVersionId]);
 
-  // BUG-06 fix — Ref yang selalu sinkron dengan activeVersionId terbaru,
-  // sehingga setComments tidak perlu activeVersionId di dependency array.
-  const activeVersionIdRef = useRef(activeVersionId);
-  activeVersionIdRef.current = activeVersionId;
-
   const activeVersion = versions.find((v) => v.id === activeVersionId);
 
   // Derived: comments untuk versi yang aktif
@@ -98,11 +219,25 @@ export function useVersion(onSaveError?: (reason: "quota" | "error") => void) {
     if (isGenerating) {
       abortFn();
     }
+    const emptyVersions: PRDVersion[] = [];
+    const emptyComments: Record<string, Record<string, string>> = {};
+    const now = Date.now();
+    lastSavedVersionsRef.current = emptyVersions;
+    lastSavedCommentsRef.current = emptyComments;
+    lastSavedActiveIdRef.current = null;
+    lastSavedAtRef.current = now;
+
     setActiveVersionId(null);
-    setCommentsByVersion({});
-    setVersions([]);
+    setCommentsByVersion(emptyComments);
+    setVersions(emptyVersions);
     // Task 1.1 — Hapus riwayat tersimpan saat user memulai PRD baru
     clearState();
+    // D-02b — Beritahu tab lain bahwa state telah direset
+    channelRef.current?.postMessage({
+      type: "CLEARED",
+      savedAt: now,
+      senderId: tabIdRef.current,
+    });
   }, []);
 
   const handleSwitchVersion = useCallback((vid: string) => {

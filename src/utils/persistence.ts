@@ -4,6 +4,25 @@ import type { PRDVersion } from "../types";
 const KEY_STATE = "PRD_STATE_V1";
 const CURRENT_SCHEMA_VERSION = 1;
 
+// D-02b — Channel name & message type untuk sinkronisasi antar-tab via BroadcastChannel.
+// Cross-tab sync channel name and message contract.
+export const SYNC_CHANNEL_NAME = "PRD_TAB_SYNC";
+
+export interface SyncMessage {
+  type: "SAVED" | "CLEARED";
+  savedAt: number;
+  senderId: string;
+}
+
+export function createSyncChannel(): BroadcastChannel | null {
+  if (typeof BroadcastChannel === "undefined") return null;
+  try {
+    return new BroadcastChannel(SYNC_CHANNEL_NAME);
+  } catch {
+    return null;
+  }
+}
+
 // D-01b — Batasi jumlah versi yang dipersist agar tidak unbounded (quota).
 // Cap the number of persisted versions to avoid unbounded growth / quota.
 export const MAX_PERSISTED_VERSIONS = 50;
