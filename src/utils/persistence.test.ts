@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { capState, isValidVersion, MAX_PERSISTED_VERSIONS } from "./persistence";
+import { capState, capVersions, isValidVersion, MAX_PERSISTED_VERSIONS } from "./persistence";
 import type { PersistedState } from "./persistence";
 import type { PRDVersion } from "../types";
 
@@ -27,6 +27,65 @@ describe("isValidVersion", () => {
     expect(isValidVersion({ id: 1, content: "x", timestamp: 0 })).toBe(false);
     expect(isValidVersion({ id: "1", content: 2, timestamp: 0 })).toBe(false);
     expect(isValidVersion({ id: "1", content: "x" })).toBe(false);
+  });
+});
+
+describe("capVersions", () => {
+  it("returns all versions when array length < limit", () => {
+    const versions = [mkVersion("1"), mkVersion("2"), mkVersion("3")];
+    const out = capVersions(versions, "2", 5);
+    expect(out.map((v) => v.id)).toEqual(["1", "2", "3"]);
+  });
+
+  it("returns all versions when array length === limit", () => {
+    const versions = [mkVersion("1"), mkVersion("2"), mkVersion("3")];
+    const out = capVersions(versions, "1", 3);
+    expect(out.map((v) => v.id)).toEqual(["1", "2", "3"]);
+  });
+
+  it("trims oldest versions when array length > limit and active is null", () => {
+    const versions = [mkVersion("1"), mkVersion("2"), mkVersion("3"), mkVersion("4")];
+    const out = capVersions(versions, null, 2);
+    expect(out.map((v) => v.id)).toEqual(["3", "4"]);
+  });
+
+  it("retains active version when active is outside the window (older than window)", () => {
+    const versions = [mkVersion("1"), mkVersion("2"), mkVersion("3"), mkVersion("4")];
+    const out = capVersions(versions, "1", 2);
+    expect(out).toHaveLength(2);
+    expect(out.map((v) => v.id)).toEqual(["1", "4"]);
+  });
+
+  it("retains active version when active is inside the window", () => {
+    const versions = [mkVersion("1"), mkVersion("2"), mkVersion("3"), mkVersion("4")];
+    const out = capVersions(versions, "3", 2);
+    expect(out.map((v) => v.id)).toEqual(["3", "4"]);
+  });
+
+  it("trims normally when active version id does not exist in array", () => {
+    const versions = [mkVersion("1"), mkVersion("2"), mkVersion("3"), mkVersion("4")];
+    const out = capVersions(versions, "999", 2);
+    expect(out.map((v) => v.id)).toEqual(["3", "4"]);
+  });
+
+  it("filters out invalid versions before capping", () => {
+    const versions = [
+      mkVersion("1"),
+      { id: "invalid" } as unknown as PRDVersion,
+      mkVersion("2"),
+      mkVersion("3"),
+    ];
+    const out = capVersions(versions, "2", 2);
+    expect(out.map((v) => v.id)).toEqual(["2", "3"]);
+  });
+
+  it("uses MAX_PERSISTED_VERSIONS as default limit", () => {
+    const versions = Array.from({ length: MAX_PERSISTED_VERSIONS + 10 }, (_, i) =>
+      mkVersion(String(i + 1)),
+    );
+    const out = capVersions(versions, null);
+    expect(out).toHaveLength(MAX_PERSISTED_VERSIONS);
+    expect(out[0].id).toBe("11");
   });
 });
 

@@ -34,20 +34,35 @@ function isQuotaError(e: unknown): boolean {
   return typeof name === "string" && name.includes("Quota");
 }
 
+// D-01b / D-01d — Batasi array versi: ambil N versi terbaru + pastikan activeVersion
+// tetap termasuk. Fungsi murni agar dapat dipakai untuk in-memory & persistensi.
+// Keep the newest N versions, always include the active one. Pure helper for memory & persistence.
+export function capVersions(
+  versions: PRDVersion[],
+  activeVersionId: string | null,
+  limit = MAX_PERSISTED_VERSIONS,
+): PRDVersion[] {
+  if (limit <= 0) return [];
+  const valid = versions.filter(isValidVersion);
+  if (valid.length <= limit) return valid;
+
+  let kept = valid.slice(-limit);
+  if (
+    activeVersionId &&
+    valid.some((v) => v.id === activeVersionId) &&
+    !kept.some((v) => v.id === activeVersionId)
+  ) {
+    const active = valid.find((v) => v.id === activeVersionId)!;
+    kept = [active, ...kept.slice(1)];
+  }
+  return kept;
+}
+
 // D-01b / D-03 — Ambil N versi terbaru (slice ekor) + pastikan activeVersion
 // tetap termasuk, lalu buang komentar orphan. Fungsi murni agar mudah dites.
 // Keep the newest N versions, always include the active one, drop orphan comments.
 export function capState(state: PersistedState): PersistedState {
-  const valid = state.versions.filter(isValidVersion);
-  let kept = valid.slice(-MAX_PERSISTED_VERSIONS);
-  if (
-    state.activeVersionId &&
-    valid.some((v) => v.id === state.activeVersionId) &&
-    !kept.some((v) => v.id === state.activeVersionId)
-  ) {
-    const active = valid.find((v) => v.id === state.activeVersionId)!;
-    kept = [active, ...kept.slice(1)];
-  }
+  const kept = capVersions(state.versions, state.activeVersionId ?? null, MAX_PERSISTED_VERSIONS);
   const keptIds = new Set(kept.map((v) => v.id));
   const commentsByVersion: Record<string, Record<string, string>> = {};
   for (const [id, c] of Object.entries(state.commentsByVersion || {})) {

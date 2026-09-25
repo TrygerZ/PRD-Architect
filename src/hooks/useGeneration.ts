@@ -3,6 +3,7 @@ import { generatePRD } from "../services/aiService";
 import { ProductType, PRDVersion, UploadedFile, AIProvider, PRDMode } from "../types";
 import { getSections } from "../utils/sections";
 import { normalizeBrTags } from "../utils/format";
+import { capVersions } from "../utils/persistence";
 
 // Task 2.3 — Ekstrak logika generasi (executeGeneration / handleGenerate /
 // handleAppend / handleRevise / handleConvertMode) dari App.tsx agar App
@@ -106,7 +107,9 @@ export function useGeneration({
         ...(customChapterIds && customChapterIds.length > 0 ? { customChapterIds: [...customChapterIds] } : {}),
       };
 
-      setVersions((prev) => [...prev, newVersion]);
+      // D-01d — Batasi riwayat in-memory agar memori tidak membengkak pada sesi panjang.
+      // Cap in-memory versions so long sessions don't leak memory.
+      setVersions((prev) => capVersions([...prev, newVersion], newVersionId));
       setActiveVersionId(newVersionId);
       setComments({});
 
