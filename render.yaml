@@ -1,0 +1,38 @@
+services:
+  - type: web
+    name: prd-architect
+    runtime: node
+    plan: free
+    region: singapore
+    branch: main
+    autoDeploy: true
+    buildCommand: npm install --include=dev && npm run build
+    startCommand: npm start
+    healthCheckPath: /health
+    envVars:
+      - key: NODE_ENV
+        value: production
+      - key: NODE_VERSION
+        value: "22"
+
+      # ALLOWED_ORIGINS: Isi dengan URL Render kamu setelah deploy (misal: https://prd-architect.onrender.com).
+      # Wajib diisi di production agar CORS mengizinkan akses ke endpoint backend.
+      # User mengisi nilai ini via Render Dashboard Environment Settings setelah URL service diketahui.
+      - key: ALLOWED_ORIGINS
+        sync: false
+
+      # ALLOW_SERVER_KEY_FALLBACK: Baru, default false.
+      # Set ke 'true' HANYA jika Anda ingin self-host / instance privat yang memakai shared API key dari server.
+      # JANGAN aktifkan di instance publik karena pengguna umum dapat menghabiskan kuota API server tanpa memasukkan API key sendiri.
+      # - key: ALLOW_SERVER_KEY_FALLBACK
+      #   value: "false"
+
+      # API Keys (sync: false agar diisi manual via Render Dashboard, jangan pernah commit nilai secret ke repo)
+      - key: DEEPSEEK_API_KEY
+        sync: false
+      - key: GEMINI_API_KEY
+        sync: false
+      - key: OPENCODE_API_KEY
+        sync: false
+      - key: NINE_ROUTER_API_KEY
+        sync: false
