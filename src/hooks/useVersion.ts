@@ -136,12 +136,19 @@ export function useVersion(onSaveError?: (reason: "quota" | "error") => void) {
     };
   }, []);
 
-  // Autosave (debounce 800ms) saat versions/comments/activeVersion berubah.
-  // Catatan durabilitas: saveState bersifat async (IndexedDB), jadi save pada
-  // unload bersifat best-effort. visibilitychange (hidden) dipakai untuk memicu
-  // save lebih awal sebelum tab benar-benar ditutup.
-  // Durability note: idb saveState is async, so unload save is best-effort;
-  // visibilitychange(hidden) triggers an earlier, more reliable save.
+  // D-04 — Flush pending save on page lifecycle events (debounce 800ms + visibilitychange + pagehide + beforeunload).
+  // Catatan durabilitas:
+  // Operasi simpan ke IndexedDB (saveState) bersifat asynchronous. Pada proses terminasi tab/browser,
+  // tidak ada jaminan penuh (no hard SLA) bahwa I/O transaksi IndexedDB akan selesai sebelum proses browser
+  // dimatikan OS. Event `pagehide` (terutama pada iOS Safari / mobile Chrome saat tab di-background/swipe)
+  // dan `visibilitychange (hidden)` secara signifikan lebih dapat diandalkan daripada `beforeunload` untuk
+  // memicu flush lebih awal, namun tetap berstatus best-effort. Guard `isSaving` dan deduplikasi state
+  // mencegah penulisan ganda (double-save) saat event-event tersebut terpicu berurutan.
+  // Durability note:
+  // IndexedDB writes are asynchronous. There is no hard guarantee that the IDB transaction finishes before
+  // the OS/browser terminates the process. Combining `visibilitychange(hidden)` and `pagehide` (more reliable
+  // than `beforeunload` on modern mobile/Safari) provides best-effort early flushing, with an in-flight guard
+  // to prevent duplicate concurrent writes.
   useEffect(() => {
     if (!restoredRef.current) return;
 
@@ -153,32 +160,53 @@ export function useVersion(onSaveError?: (reason: "quota" | "error") => void) {
       activeVersionId === lastSavedActiveIdRef.current;
     if (isSameAsPersisted) return;
 
-    const doSave = async () => {
-      const now = Date.now();
-      lastSavedAtRef.current = now;
-      lastSavedVersionsRef.current = versions;
-      lastSavedCommentsRef.current = commentsByVersion;
-      lastSavedActiveIdRef.current = activeVersionId;
+    let isSaving = false;
+    let t: ReturnType<typeof setTimeout> | null = null;
 
-      const res = await saveState({
-        versions,
-        commentsByVersion,
-        activeVersionId,
-        savedAt: now,
-      });
-      if (!res.ok) {
-        onSaveErrorRef.current?.(res.reason);
-      } else {
-        // D-02b — Notifikasi tab lain setelah penyimpanan berhasil
-        channelRef.current?.postMessage({
-          type: "SAVED",
+    const doSave = async () => {
+      if (isSaving) return;
+      if (
+        versions === lastSavedVersionsRef.current &&
+        commentsByVersion === lastSavedCommentsRef.current &&
+        activeVersionId === lastSavedActiveIdRef.current
+      ) {
+        return;
+      }
+      isSaving = true;
+      if (t) {
+        clearTimeout(t);
+        t = null;
+      }
+
+      try {
+        const now = Date.now();
+        lastSavedAtRef.current = now;
+        lastSavedVersionsRef.current = versions;
+        lastSavedCommentsRef.current = commentsByVersion;
+        lastSavedActiveIdRef.current = activeVersionId;
+
+        const res = await saveState({
+          versions,
+          commentsByVersion,
+          activeVersionId,
           savedAt: now,
-          senderId: tabIdRef.current,
         });
+        if (!res.ok) {
+          onSaveErrorRef.current?.(res.reason);
+        } else {
+          // D-02b — Notifikasi tab lain setelah penyimpanan berhasil
+          channelRef.current?.postMessage({
+            type: "SAVED",
+            savedAt: now,
+            senderId: tabIdRef.current,
+          });
+        }
+      } finally {
+        isSaving = false;
       }
     };
 
-    const t = setTimeout(() => {
+    t = setTimeout(() => {
       void doSave();
     }, 800);
 
@@ -188,14 +216,19 @@ export function useVersion(onSaveError?: (reason: "quota" | "error") => void) {
     const handleVisibility = () => {
       if (document.visibilityState === "hidden") void doSave();
     };
+    const handlePageHide = () => {
+      void doSave();
+    };
 
     window.addEventListener("beforeunload", handleBeforeUnload);
     document.addEventListener("visibilitychange", handleVisibility);
+    window.addEventListener("pagehide", handlePageHide);
 
     return () => {
-      clearTimeout(t);
+      if (t) clearTimeout(t);
       window.removeEventListener("beforeunload", handleBeforeUnload);
       document.removeEventListener("visibilitychange", handleVisibility);
+      window.removeEventListener("pagehide", handlePageHide);
     };
   }, [versions, commentsByVersion, activeVersionId]);
 

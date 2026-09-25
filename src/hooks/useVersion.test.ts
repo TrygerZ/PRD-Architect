@@ -256,4 +256,91 @@ describe("useVersion - cross-tab sync", () => {
       root.unmount();
     });
   });
+
+  it("flushes pending save immediately on pagehide without waiting for 800ms debounce", async () => {
+    const saveStateSpy = vi.spyOn(persistence, "saveState").mockResolvedValue({ ok: true });
+
+    let latestHookResult!: ReturnType<typeof useVersion>;
+    function TestComp() {
+      latestHookResult = useVersion();
+      return null;
+    }
+
+    const root = createRoot(container);
+    await act(async () => {
+      root.render(React.createElement(TestComp));
+      await Promise.resolve();
+    });
+
+    saveStateSpy.mockClear();
+
+    // Trigger local state change
+    await act(async () => {
+      latestHookResult.handleSwitchVersion("version-flush-test");
+    });
+
+    // Save should NOT have executed yet (debounce is 800ms)
+    expect(saveStateSpy).not.toHaveBeenCalled();
+
+    // Dispatch pagehide event (e.g. user closes tab or navigates away)
+    await act(async () => {
+      window.dispatchEvent(new Event("pagehide"));
+      await Promise.resolve();
+    });
+
+    // Save should now have been flushed immediately
+    expect(saveStateSpy).toHaveBeenCalledTimes(1);
+
+    await act(async () => {
+      root.unmount();
+    });
+  });
+
+  it("does not double-save when visibilitychange and pagehide fire in quick succession", async () => {
+    const saveStateSpy = vi.spyOn(persistence, "saveState").mockResolvedValue({ ok: true });
+
+    let latestHookResult!: ReturnType<typeof useVersion>;
+    function TestComp() {
+      latestHookResult = useVersion();
+      return null;
+    }
+
+    const root = createRoot(container);
+    await act(async () => {
+      root.render(React.createElement(TestComp));
+      await Promise.resolve();
+    });
+
+    saveStateSpy.mockClear();
+
+    // Trigger local state change
+    await act(async () => {
+      latestHookResult.handleSwitchVersion("version-dedup-test");
+    });
+
+    // Simulate mobile browser backgrounding & navigation: visibilitychange -> pagehide -> beforeunload
+    await act(async () => {
+      Object.defineProperty(document, "visibilityState", {
+        configurable: true,
+        get: () => "hidden",
+      });
+      document.dispatchEvent(new Event("visibilitychange"));
+      window.dispatchEvent(new Event("pagehide"));
+      window.dispatchEvent(new Event("beforeunload"));
+      await Promise.resolve();
+    });
+
+    // Advance timers past debounce as well
+    await act(async () => {
+      vi.advanceTimersByTime(1000);
+      await Promise.resolve();
+    });
+
+    // Must be called only once, not 3 or 4 times
+    expect(saveStateSpy).toHaveBeenCalledTimes(1);
+
+    await act(async () => {
+      root.unmount();
+    });
+  });
 });
