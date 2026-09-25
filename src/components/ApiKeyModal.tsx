@@ -1,5 +1,5 @@
 import { useState, useEffect, useRef } from "react";
-import { Key, X, Check, AlertTriangle } from "lucide-react";
+import { Key, X, Check, AlertTriangle, Loader2, PlugZap, XCircle } from "lucide-react";
 import { motion, AnimatePresence } from "motion/react";
 
 import { AIProvider } from "../types";
@@ -30,6 +30,8 @@ export function ApiKeyModal({
   const [model, setModel] = useState<string>(initialModel);
   const [endpoint, setEndpoint] = useState<string>(initialEndpoint);
   const [saved, setSaved] = useState(false);
+  const [testState, setTestState] = useState<"idle" | "testing" | "success" | "error">("idle");
+  const [testMessage, setTestMessage] = useState("");
 
   const modalRef = useRef<HTMLDivElement>(null);
   const isBackdropMouseDown = useRef(false);
@@ -63,6 +65,12 @@ export function ApiKeyModal({
       });
     }
   }, [isOpen, initialProvider, initialModel, initialEndpoint]);
+
+  // Reset hasil test saat modal dibuka atau konfigurasi berubah
+  useEffect(() => {
+    setTestState("idle");
+    setTestMessage("");
+  }, [isOpen, provider, model, endpoint]);
 
   const handleKeyDown = (e: React.KeyboardEvent) => {
     if (e.key === 'Escape') {
@@ -104,7 +112,7 @@ export function ApiKeyModal({
     const finalEndpoint = isNineRouter ? (endpoint.trim() || PROVIDER_MODELS.nine_router.endpoint) : "";
 
     if (!apiKey.trim()) {
-      await handleClear();
+      // Field key kosong = tidak diubah. Penghapusan key HANYA via tombol "Clear Key".
       safeSetLocalStorage("PRD_AI_PROVIDER", provider);
       safeSetLocalStorage("PRD_AI_MODEL", model.trim());
       if (isNineRouter) safeSetLocalStorage("PRD_CUSTOM_ENDPOINT", finalEndpoint);
@@ -134,6 +142,43 @@ export function ApiKeyModal({
       alert(language === "en"
         ? "Failed to save API key. Please check your connection."
         : "Gagal menyimpan API key. Periksa koneksi Anda.");
+    }
+  };
+
+  const handleTest = async () => {
+    setTestState("testing");
+    setTestMessage("");
+    const isNineRouter = provider === "nine_router";
+    const finalEndpoint = isNineRouter ? (endpoint.trim() || PROVIDER_MODELS.nine_router.endpoint) : "";
+    try {
+      // Key baru harus tersimpan lebih dulu agar test memakai key tersebut.
+      if (apiKey.trim()) {
+        await fetch("/api/auth/set-key", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ apiKey: apiKey.trim(), language }),
+        });
+      }
+      const res = await fetch("/api/test-connection", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ provider, model: model.trim(), customEndpoint: finalEndpoint || undefined, language }),
+      });
+      const data = await res.json();
+      if (data?.ok) {
+        setTestState("success");
+        setTestMessage(language === "en"
+          ? `Connected to ${data.model} (${data.latencyMs}ms)`
+          : `Terhubung ke ${data.model} (${data.latencyMs}ms)`);
+      } else {
+        setTestState("error");
+        setTestMessage(data?.error || (language === "en" ? "Connection failed." : "Koneksi gagal."));
+      }
+    } catch {
+      setTestState("error");
+      setTestMessage(language === "en"
+        ? "Could not reach the server. Check your connection."
+        : "Tidak dapat menghubungi server. Periksa koneksi Anda.");
     }
   };
 
@@ -322,6 +367,36 @@ export function ApiKeyModal({
                       ? "Custom key will be securely saved in httpOnly cookie and never exposed to browser scripts."
                       : "Key disimpan aman di cookie httpOnly (tidak disimpan di localStorage dan tidak bisa diakses oleh skrip browser)."}
                   </p>
+                </div>
+              </div>
+
+              <div>
+                <button
+                  type="button"
+                  onClick={handleTest}
+                  disabled={testState === "testing"}
+                  aria-label={language === "en" ? "Test Connection" : "Tes Koneksi"}
+                  className="flex items-center gap-1.5 text-[12.5px] font-medium px-3 py-2 rounded-xl transition-all bg-[var(--color-surface-elevated)] border border-[var(--color-border)] text-[var(--color-text-secondary)] hover:border-[var(--color-interactive)] hover:text-[var(--color-text-primary)] disabled:opacity-50 disabled:cursor-not-allowed cursor-pointer focus-visible:ring-2 focus-visible:ring-[var(--color-interactive)] focus-visible:outline-none"
+                >
+                  {testState === "testing" ? (
+                    <Loader2 size={14} strokeWidth={1.5} className="animate-spin" aria-hidden="true" />
+                  ) : (
+                    <PlugZap size={14} strokeWidth={1.5} aria-hidden="true" />
+                  )}
+                  <span>{language === "en" ? "Test Connection" : "Tes Koneksi"}</span>
+                </button>
+
+                <div role="status" aria-live="polite">
+                  {testState !== "idle" && testState !== "testing" && (
+                    <div className="mt-2 flex gap-2 items-start text-[11.5px] leading-relaxed">
+                      {testState === "success" ? (
+                        <Check size={14} strokeWidth={2} className="shrink-0 mt-0.5 text-[var(--color-success)]" aria-hidden="true" />
+                      ) : (
+                        <XCircle size={14} strokeWidth={1.5} className="shrink-0 mt-0.5 text-[var(--color-error)]" aria-hidden="true" />
+                      )}
+                      <p className="text-[var(--color-text-secondary)]">{testMessage}</p>
+                    </div>
+                  )}
                 </div>
               </div>
             </div>

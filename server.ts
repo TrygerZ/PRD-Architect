@@ -2,8 +2,6 @@ import express from "express";
 import path from "path";
 import fs from "fs";
 import os from "os";
-import net from "net";
-import dns from "dns";
 import dotenv from "dotenv";
 
 import multer from "multer";
@@ -19,6 +17,7 @@ import { composeCustomSystemPrompt, validateCustomChapterIds, getCustomGuard } f
 import { getChapterBlock } from "./shared/chapterBlocks";
 import { activeParses, acquireParseSlot, releaseParseSlot, extractTextFromFile } from "./server/fileExtraction";
 import { registerAuthRoutes } from "./server/auth";
+import { resolveEndpoint, endpointErrorMessage, resolveApiKey } from "./server/endpoint";
 
 // Wave 7 — Track A: Union types for type safety (TS-04 to TS-07)
 // Shared with the frontend via /shared/types.ts (single source of truth)
@@ -33,7 +32,6 @@ interface ChatRequest {
   max_tokens: number;
   temperature: number;
   top_p?: number;
-  seed?: number;
 }
 
 // Wave 7 — Track A: SafeError with brand for pre-sanitized errors (TS-11 to TS-13)
@@ -72,67 +70,33 @@ const activeGenerations = new Set<AbortController>();
 
 // Wave 3 — Task 3.3: Safe error messages for upstream API errors (prevents leaking sensitive info)
 const safeErrorMessages: Record<number, { en: string; id: string }> = {
+  400: { en: 'Model rejected the request. Check the model name and endpoint in Settings.', id: 'Model menolak permintaan. Periksa nama model dan endpoint di Pengaturan.' },
   401: { en: 'Invalid API key. Please check your settings.', id: 'API key tidak valid. Harap periksa pengaturan Anda.' },
   403: { en: 'API key does not have access. Please check your settings.', id: 'API key tidak memiliki akses. Harap periksa pengaturan Anda.' },
+  404: { en: 'Endpoint or model not found. Check the endpoint URL and model name in Settings.', id: 'Endpoint atau model tidak ditemukan. Periksa URL endpoint dan nama model di Pengaturan.' },
   429: { en: 'Rate limit reached. Please wait a moment and try again.', id: 'Batas permintaan tercapai. Harap tunggu sebentar dan coba lagi.' },
   500: { en: 'AI service error. Please try again.', id: 'Layanan AI error. Harap coba lagi.' },
   502: { en: 'AI service unavailable. Please try again.', id: 'Layanan AI tidak tersedia. Harap coba lagi.' },
   503: { en: 'AI service temporarily unavailable. Please try again.', id: 'Layanan AI sementara tidak tersedia. Harap coba lagi.' },
 };
 
+const GENERIC_UPSTREAM_ERROR = { en: 'An error occurred. Please try again.', id: 'Terjadi kesalahan. Harap coba lagi.' };
+
+// Baca body error upstream untuk log server-side saja (JANGAN kirim ke client).
+async function readUpstreamErrorBody(response: Response): Promise<string> {
+  try {
+    const body = await response.text();
+    return body.length > 500 ? body.slice(0, 500) + '…[truncated]' : body;
+  } catch {
+    return '<unreadable>';
+  }
+}
+
 const app = express();
 const PORT = parseInt(process.env.PORT || "3000", 10);
 
-// SSRF guard — tolak custom endpoint yang menunjuk ke alamat privat/loopback/metadata.
-// Cek IP literal via range; untuk nama domain, resolve DNS dan tolak bila ADA hasil privat
-// (mitigasi DNS rebinding sederhana). Stdlib saja (net + dns), tanpa dependency baru.
-function isPrivateAddress(ip: string): boolean {
-  const type = net.isIP(ip);
-  if (type === 4) {
-    const parts = ip.split('.').map(Number);
-    const [a, b] = parts;
-    if (a === 0) return true;                          // 0.0.0.0/8
-    if (a === 127) return true;                        // 127.0.0.0/8 loopback
-    if (a === 10) return true;                         // 10.0.0.0/8
-    if (a === 172 && b >= 16 && b <= 31) return true;  // 172.16.0.0/12
-    if (a === 192 && b === 168) return true;           // 192.168.0.0/16
-    if (a === 169 && b === 254) return true;           // 169.254.0.0/16 link-local + metadata
-    return false;
-  }
-  if (type === 6) {
-    const lower = ip.toLowerCase();
-    if (lower === '::1' || lower === '::') return true;       // loopback / unspecified
-    if (lower.startsWith('fe8') || lower.startsWith('fe9') ||
-        lower.startsWith('fea') || lower.startsWith('feb')) return true; // fe80::/10 link-local
-    if (lower.startsWith('fc') || lower.startsWith('fd')) return true;   // fc00::/7 unique-local
-    // IPv4-mapped (::ffff:a.b.c.d)
-    const v4 = lower.match(/::ffff:(\d+\.\d+\.\d+\.\d+)$/);
-    if (v4) return isPrivateAddress(v4[1]);
-    return false;
-  }
-  return false;
-}
-
-async function assertPublicEndpoint(urlStr: string): Promise<boolean> {
-  let hostname: string;
-  try {
-    hostname = new URL(urlStr).hostname;
-  } catch {
-    return false;
-  }
-  const h = hostname.toLowerCase();
-  if (h === 'localhost' || h.endsWith('.localhost')) return false;
-  // IP literal — cek langsung
-  if (net.isIP(h)) return !isPrivateAddress(h);
-  // Nama domain — resolve, tolak bila ada hasil di range privat
-  try {
-    const results = await dns.promises.lookup(h, { all: true });
-    if (results.length === 0) return false;
-    return !results.some(r => isPrivateAddress(r.address));
-  } catch {
-    return false; // resolve gagal → jangan izinkan
-  }
-}
+// SSRF guard + resolusi endpoint/API key: lihat ./server/endpoint.ts
+// (dipakai bersama oleh /api/generate-prd dan /api/test-connection).
 
 // Trust proxy — memastikan rate limiting bekerja di belakang reverse proxy
 app.set('trust proxy', 1);
@@ -510,40 +474,22 @@ app.post("/api/generate-prd", async (req, res) => {
 
     // Katalog model & endpoint terpusat (shared/models.ts) — hindari drift FE/BE.
     const providerConfig = PROVIDER_MODELS[provider as AIProvider] ?? PROVIDER_MODELS.deepseek;
-    const apiKeyEnvName = providerConfig.apiKeyEnvName;
-    let endpoint = providerConfig.endpoint;
 
-    // Support custom endpoint URL (khususnya untuk 9router / custom proxy)
-    // FIX 1 (SSRF): validasi host — tolak alamat privat/loopback/metadata (blok DNS rebinding sederhana).
-    let usingCustomEndpoint = false;
-    if (provider === "nine_router" && typeof customEndpoint === "string" && customEndpoint.trim()) {
-      const trimmed = customEndpoint.trim();
-      let parsedOk = false;
-      try {
-        const parsed = new URL(trimmed);
-        parsedOk = parsed.protocol === "http:" || parsed.protocol === "https:";
-      } catch {
-        parsedOk = false;
+    // Resolusi endpoint (helper bersama dengan /api/test-connection).
+    // Custom endpoint yang ditolak → error eksplisit, TIDAK fallback diam-diam.
+    const resolved = await resolveEndpoint(provider, customEndpoint);
+    if (!resolved.ok) {
+      if (!res.writableEnded) {
+        res.write(`data: ${JSON.stringify({ error: endpointErrorMessage(resolved, language) })}\n\n`);
+        res.end();
       }
-      if (parsedOk && await assertPublicEndpoint(trimmed)) {
-        endpoint = trimmed;
-        usingCustomEndpoint = trimmed !== providerConfig.endpoint;
-      } else {
-        // Tolak: fallback ke default endpoint + log WARN (invalid URL, non-http, atau alamat privat)
-        log('WARN', `Rejected custom endpoint (SSRF guard), falling back to default: ${trimmed}`);
-      }
+      return;
     }
+    const { endpoint, usingCustomEndpoint } = resolved;
 
     const modelName = model || providerConfig.defaultModel;
 
-    // Server-side API key resolution — prioritas: cookie > .env
-    // FIX 2: server key (.env) tetap boleh jadi fallback untuk provider builtin
-    // (deepseek/gemini/opencode) agar deploy owner-hosted jalan. TAPI untuk custom
-    // endpoint (nine_router + customEndpoint) HANYA pakai cookieKey milik user —
-    // JANGAN pernah forward server .env key ke endpoint pihak ketiga (FIX 1: cegah exfil key).
-    const serverKey = process.env[apiKeyEnvName];
-    const cookieKey = req.cookies?.prd_session;
-    const apiKey = usingCustomEndpoint ? cookieKey : (cookieKey || serverKey);
+    const { apiKey, apiKeyEnvName } = resolveApiKey(provider, usingCustomEndpoint, req.cookies?.prd_session);
 
     if (!apiKey) {
       if (!res.writableEnded) {
@@ -612,6 +558,7 @@ app.post("/api/generate-prd", async (req, res) => {
 
     // 2. Siapkan body request
     let fetchBody: ChatRequest;
+    const maxTokens = providerConfig.maxTokens ?? 16384;
 
     if (provider === "gemini") {
       fetchBody = {
@@ -621,7 +568,7 @@ app.post("/api/generate-prd", async (req, res) => {
           { role: "user", content: finalUserPrompt }
         ],
         stream: true,
-        max_tokens: 65536, // Wave 8 — Track A: Increased from 8192 for full PRD generation (Task 8.3 / STREAM-12)
+        max_tokens: maxTokens,
         temperature: 0.1,
       };
     } else {
@@ -632,10 +579,9 @@ app.post("/api/generate-prd", async (req, res) => {
           { role: "user", content: finalUserPrompt }
         ],
         stream: true,
-        max_tokens: 65536, // Wave 8 — Track A: Increased from 16384 for full PRD generation (Task 8.3 / STREAM-12)
+        max_tokens: maxTokens,
         temperature: 0.1,
         top_p: 0.1,
-        seed: 42,
       };
     }
 
@@ -676,9 +622,11 @@ app.post("/api/generate-prd", async (req, res) => {
     if (!response.ok) {
       // Wave 3 — Task 3.3: Use safe error messages map, log full details server-side only
       const status = response.status;
-      const safeMsg = safeErrorMessages[status] || { en: 'An error occurred. Please try again.', id: 'Terjadi kesalahan. Harap coba lagi.' };
+      const safeMsg = safeErrorMessages[status] || GENERIC_UPSTREAM_ERROR;
       const errorMsg = language === 'en' ? safeMsg.en : safeMsg.id;
-      log('ERROR', `Upstream API error (status ${status}): ${response.statusText}`);
+      // Body upstream HANYA untuk log server-side — jangan pernah dikirim ke client.
+      const body = await readUpstreamErrorBody(response);
+      log('ERROR', `Upstream API error (status ${status} ${response.statusText}) endpoint=${endpoint} model=${modelName} body=${body}`);
       const safeError = markSafe(new Error(errorMsg)); // Mark as pre-sanitized
       throw safeError;
     }
@@ -837,6 +785,82 @@ app.post("/api/generate-prd", async (req, res) => {
     if (abortController) {
       activeGenerations.delete(abortController);
     }
+  }
+});
+
+// Test Connection — cek provider/model/endpoint dengan request minimal non-streaming.
+// Rate limit: memakai apiLimiter global untuk /api/ (10 req/menit) — cukup.
+app.post("/api/test-connection", async (req, res) => {
+  const language: "id" | "en" = (req.body?.language === 'en' || req.body?.language === 'id') ? req.body.language : 'id';
+  const { provider: rawProvider, model, customEndpoint } = req.body ?? {};
+
+  const VALID_PROVIDERS: AIProvider[] = ["deepseek", "gemini", "opencode", "nine_router"];
+  if (!VALID_PROVIDERS.includes(rawProvider)) {
+    return res.status(400).json({
+      ok: false,
+      error: language === 'en'
+        ? `Invalid provider. Must be one of: ${VALID_PROVIDERS.join(", ")}`
+        : `Provider tidak valid. Harus salah satu dari: ${VALID_PROVIDERS.join(", ")}`,
+    });
+  }
+  const provider = rawProvider as AIProvider;
+  if (model !== undefined && (typeof model !== 'string' || !/^[a-zA-Z0-9._/:-]+$/.test(model))) {
+    return res.status(400).json({ ok: false, error: t('Invalid model format', 'Format model tidak valid', language) });
+  }
+  if (customEndpoint !== undefined && typeof customEndpoint !== 'string') {
+    return res.status(400).json({ ok: false, error: t('Invalid endpoint', 'Endpoint tidak valid', language) });
+  }
+
+  const providerConfig = PROVIDER_MODELS[provider];
+  const resolved = await resolveEndpoint(provider, customEndpoint);
+  if (!resolved.ok) {
+    return res.json({ ok: false, error: endpointErrorMessage(resolved, language) });
+  }
+  const { endpoint, usingCustomEndpoint } = resolved;
+  const modelName = model || providerConfig.defaultModel;
+
+  const { apiKey, apiKeyEnvName } = resolveApiKey(provider, usingCustomEndpoint, req.cookies?.prd_session);
+  if (!apiKey) {
+    return res.json({
+      ok: false,
+      error: language === 'en'
+        ? `API KEY not found. Please provide a custom key in Settings or set ${apiKeyEnvName} in .env file.`
+        : `API KEY tidak ditemukan. Silakan masukkan API Key di Pengaturan atau set ${apiKeyEnvName} di file .env.`,
+    });
+  }
+
+  const controller = new AbortController();
+  const timer = setTimeout(() => controller.abort(), 15_000);
+  const startedAt = Date.now();
+  try {
+    const response = await fetch(endpoint, {
+      method: "POST",
+      headers: { "Content-Type": "application/json", "Authorization": "Bearer " + apiKey },
+      signal: controller.signal,
+      body: JSON.stringify({ model: modelName, messages: [{ role: "user", content: "ping" }], max_tokens: 8, stream: false }),
+    });
+    const latencyMs = Date.now() - startedAt;
+
+    if (!response.ok) {
+      const safeMsg = safeErrorMessages[response.status] || GENERIC_UPSTREAM_ERROR;
+      const body = await readUpstreamErrorBody(response);
+      log('ERROR', `Test connection failed (status ${response.status} ${response.statusText}) endpoint=${endpoint} model=${modelName} body=${body}`);
+      return res.json({ ok: false, error: language === 'en' ? safeMsg.en : safeMsg.id });
+    }
+
+    log('INFO', `Test connection ok endpoint=${endpoint} model=${modelName} latency=${latencyMs}ms`);
+    return res.json({ ok: true, provider, model: modelName, endpoint, latencyMs });
+  } catch (error) {
+    const aborted = error instanceof Error && error.name === 'AbortError';
+    log('ERROR', `Test connection error endpoint=${endpoint} model=${modelName}:`, error instanceof Error ? error.message : error);
+    return res.json({
+      ok: false,
+      error: aborted
+        ? t('Connection timed out after 15 seconds.', 'Koneksi habis waktu setelah 15 detik.', language)
+        : t('Could not reach the endpoint. Check the endpoint URL in Settings.', 'Tidak dapat menghubungi endpoint. Periksa URL endpoint di Pengaturan.', language),
+    });
+  } finally {
+    clearTimeout(timer);
   }
 });
 
