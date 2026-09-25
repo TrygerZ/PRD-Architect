@@ -8,6 +8,8 @@
     <br />
     <a href="#overview">Explore Features</a>
     ·
+    <a href="https://prd-architect.onrender.com/">Live Demo</a>
+    ·
     <a href="#getting-started">Get Started</a>
     ·
     <a href="#configuration">Configuration</a>
