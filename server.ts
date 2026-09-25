@@ -864,6 +864,14 @@ app.post("/api/test-connection", async (req, res) => {
   }
 });
 
+// 404 handler untuk route /api/* yang tidak dikenal — cegah ditelan oleh SPA fallback
+app.all(['/api', '/api/*'], (req, res) => {
+  res.status(404).json({
+    error: 'API endpoint not found',
+    path: req.originalUrl || req.path,
+  });
+});
+
 async function main() {
   await startServer();
 
