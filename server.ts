@@ -880,13 +880,23 @@ async function main() {
   });
 
   // Graceful shutdown — batalkan semua koneksi upstream yang masih aktif (BUG L6)
-  const gracefulShutdown = () => {
-    log('INFO', `Shutting down... ${activeGenerations.size} active upstream connection(s) will be aborted.`);
+  let isShuttingDown = false;
+  const gracefulShutdown = (signal: string) => {
+    if (isShuttingDown) {
+      log('WARN', `${signal} received during shutdown — already shutting down.`);
+      return;
+    }
+    isShuttingDown = true;
+
+    log('INFO', `${signal} received. Shutting down... ${activeGenerations.size} active upstream connection(s) will be aborted.`);
     // Abort semua koneksi upstream ke AI provider yang masih aktif
     for (const controller of activeGenerations) {
       controller.abort();
     }
     activeGenerations.clear();
+
+    // Tutup koneksi keep-alive idle jika runtime mendukung (Node 18.2+)
+    server.closeIdleConnections?.();
 
     server.close(() => {
       log('INFO', 'HTTP server closed.');
@@ -894,20 +904,15 @@ async function main() {
     });
 
     // Force exit setelah 10 detik jika server masih belum tertutup (menghindari hanging)
-    setTimeout(() => {
+    const forceExitTimer = setTimeout(() => {
       log('ERROR', 'Forced shutdown after timeout — some connections may still be hanging.');
       process.exit(1);
     }, 10000);
+    forceExitTimer.unref?.();
   };
 
-  process.on('SIGTERM', () => {
-    log('INFO', 'SIGTERM received.');
-    gracefulShutdown();
-  });
-  process.on('SIGINT', () => {
-    log('INFO', 'SIGINT received.');
-    gracefulShutdown();
-  });
+  process.on('SIGTERM', () => gracefulShutdown('SIGTERM'));
+  process.on('SIGINT', () => gracefulShutdown('SIGINT'));
 }
 
 // BUG 4.1: Global error handler — cegah crash process karena unhandled promise rejection / exception
