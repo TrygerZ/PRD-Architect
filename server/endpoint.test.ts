@@ -1,5 +1,5 @@
 import { describe, it, expect, beforeEach, afterEach, vi } from "vitest";
-import { assertPublicEndpoint, isPrivateAddress, allowPrivateEndpoints, resolveEndpoint, resolveApiKey } from "./endpoint";
+import { assertPublicEndpoint, isPrivateAddress, allowPrivateEndpoints, allowServerKeyFallback, resolveEndpoint, resolveApiKey } from "./endpoint";
 import { PROVIDER_MODELS } from "../shared/models";
 
 const originalEnv = { ...process.env };
@@ -95,20 +95,55 @@ describe("resolveEndpoint", () => {
   });
 });
 
+describe("allowServerKeyFallback", () => {
+  it("defaults to false when unset", () => {
+    delete process.env.ALLOW_SERVER_KEY_FALLBACK;
+    expect(allowServerKeyFallback()).toBe(false);
+  });
+
+  it("returns false for non-'true' values", () => {
+    process.env.ALLOW_SERVER_KEY_FALLBACK = "false";
+    expect(allowServerKeyFallback()).toBe(false);
+    process.env.ALLOW_SERVER_KEY_FALLBACK = "1";
+    expect(allowServerKeyFallback()).toBe(false);
+  });
+
+  it("returns true when set to 'true'", () => {
+    process.env.ALLOW_SERVER_KEY_FALLBACK = "true";
+    expect(allowServerKeyFallback()).toBe(true);
+  });
+});
+
 describe("resolveApiKey", () => {
-  it("prefers the cookie key over the env key", () => {
-    process.env.DEEPSEEK_API_KEY = "env-key";
-    expect(resolveApiKey("deepseek", false, "cookie-key").apiKey).toBe("cookie-key");
-  });
-
-  it("falls back to the env key for builtin providers", () => {
-    process.env.DEEPSEEK_API_KEY = "env-key";
-    expect(resolveApiKey("deepseek", false, undefined).apiKey).toBe("env-key");
-  });
-
-  it("never forwards the env key to a custom endpoint", () => {
+  it("branch 1: usingCustomEndpoint always uses only cookieKey and never forwards serverKey", () => {
     process.env.NINE_ROUTER_API_KEY = "env-key";
-    expect(resolveApiKey("nine_router", true, undefined).apiKey).toBeUndefined();
+    // cookieKey present
+    expect(resolveApiKey("nine_router", true, "user-key", true).apiKey).toBe("user-key");
+    expect(resolveApiKey("nine_router", true, "user-key", false).apiKey).toBe("user-key");
+    // cookieKey absent -> undefined even when fallback is true
+    expect(resolveApiKey("nine_router", true, undefined, true).apiKey).toBeUndefined();
+    expect(resolveApiKey("nine_router", true, undefined, false).apiKey).toBeUndefined();
+  });
+
+  it("branch 2: non-custom endpoint with cookieKey present uses cookieKey regardless of fallback flag", () => {
+    process.env.DEEPSEEK_API_KEY = "env-key";
+    expect(resolveApiKey("deepseek", false, "cookie-key", false).apiKey).toBe("cookie-key");
+    expect(resolveApiKey("deepseek", false, "cookie-key", true).apiKey).toBe("cookie-key");
+  });
+
+  it("branch 3: non-custom endpoint with cookieKey empty and fallback=true uses serverKey", () => {
+    process.env.DEEPSEEK_API_KEY = "env-key";
+    expect(resolveApiKey("deepseek", false, undefined, true).apiKey).toBe("env-key");
+    expect(resolveApiKey("deepseek", false, "", true).apiKey).toBe("env-key");
+  });
+
+  it("branch 4: non-custom endpoint with cookieKey empty and fallback=false returns undefined", () => {
+    process.env.DEEPSEEK_API_KEY = "env-key";
+    expect(resolveApiKey("deepseek", false, undefined, false).apiKey).toBeUndefined();
+    expect(resolveApiKey("deepseek", false, "", false).apiKey).toBeUndefined();
+    // Default fallback parameter should also be false when env is not set
+    delete process.env.ALLOW_SERVER_KEY_FALLBACK;
+    expect(resolveApiKey("deepseek", false, undefined).apiKey).toBeUndefined();
   });
 });
 

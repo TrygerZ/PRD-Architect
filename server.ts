@@ -17,7 +17,7 @@ import { composeCustomSystemPrompt, validateCustomChapterIds, getCustomGuard } f
 import { getChapterBlock } from "./shared/chapterBlocks";
 import { activeParses, acquireParseSlot, releaseParseSlot, extractTextFromFile } from "./server/fileExtraction";
 import { registerAuthRoutes } from "./server/auth";
-import { resolveEndpoint, endpointErrorMessage, resolveApiKey } from "./server/endpoint";
+import { resolveEndpoint, endpointErrorMessage, resolveApiKey, allowServerKeyFallback } from "./server/endpoint";
 
 // Wave 7 — Track A: Union types for type safety (TS-04 to TS-07)
 // Shared with the frontend via /shared/types.ts (single source of truth)
@@ -489,7 +489,7 @@ app.post("/api/generate-prd", async (req, res) => {
 
     const modelName = model || providerConfig.defaultModel;
 
-    const { apiKey, apiKeyEnvName } = resolveApiKey(provider, usingCustomEndpoint, req.cookies?.prd_session);
+    const { apiKey, apiKeyEnvName } = resolveApiKey(provider, usingCustomEndpoint, req.cookies?.prd_session, allowServerKeyFallback());
 
     if (!apiKey) {
       if (!res.writableEnded) {
@@ -819,7 +819,7 @@ app.post("/api/test-connection", async (req, res) => {
   const { endpoint, usingCustomEndpoint } = resolved;
   const modelName = model || providerConfig.defaultModel;
 
-  const { apiKey, apiKeyEnvName } = resolveApiKey(provider, usingCustomEndpoint, req.cookies?.prd_session);
+  const { apiKey, apiKeyEnvName } = resolveApiKey(provider, usingCustomEndpoint, req.cookies?.prd_session, allowServerKeyFallback());
   if (!apiKey) {
     return res.json({
       ok: false,

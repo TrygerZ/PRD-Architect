@@ -18,6 +18,13 @@ export function allowPrivateEndpoints(): boolean {
   return process.env.NODE_ENV !== "production" || process.env.ALLOW_PRIVATE_ENDPOINTS === "true";
 }
 
+// Fallback ke server API key dari .env dinonaktifkan secara default untuk
+// mencegah open-proxy / exfil kredit owner oleh pengguna anonim di production.
+// Hanya aktif bila ALLOW_SERVER_KEY_FALLBACK=true di-set secara eksplisit.
+export function allowServerKeyFallback(): boolean {
+  return process.env.ALLOW_SERVER_KEY_FALLBACK === "true";
+}
+
 export function isPrivateAddress(ip: string): boolean {
   const type = net.isIP(ip);
   if (type === 4) {
@@ -137,17 +144,30 @@ export function endpointErrorMessage(
     : `Endpoint kustom ditolak: ${res.url}. Alamat privat/loopback diblokir di mode produksi. Set ALLOW_PRIVATE_ENDPOINTS=true untuk mengizinkan.`;
 }
 
-// Prioritas: cookie > .env. Untuk custom endpoint HANYA cookieKey milik user —
-// jangan pernah forward server .env key ke endpoint pihak ketiga (cegah exfil key).
+// Prioritas: cookie > .env (hanya jika allowFallback=true). Untuk custom endpoint
+// HANYA cookieKey milik user — jangan pernah forward server .env key ke endpoint pihak ketiga.
 export function resolveApiKey(
   provider: AIProvider,
   usingCustomEndpoint: boolean,
   cookieKey: string | undefined,
+  allowFallback: boolean = allowServerKeyFallback(),
 ): { apiKey: string | undefined; apiKeyEnvName: string } {
   const providerConfig = PROVIDER_MODELS[provider] ?? PROVIDER_MODELS.deepseek;
   const serverKey = process.env[providerConfig.apiKeyEnvName];
+
+  let apiKey: string | undefined;
+  if (usingCustomEndpoint) {
+    apiKey = cookieKey;
+  } else if (cookieKey) {
+    apiKey = cookieKey;
+  } else if (allowFallback) {
+    apiKey = serverKey;
+  } else {
+    apiKey = undefined;
+  }
+
   return {
-    apiKey: usingCustomEndpoint ? cookieKey : (cookieKey || serverKey),
+    apiKey,
     apiKeyEnvName: providerConfig.apiKeyEnvName,
   };
 }
