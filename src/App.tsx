@@ -548,7 +548,7 @@ export default function App() {
 
           {/* Scroll Controls — horizontal center, above ChatInput */}
           {(showScrollTop || showScrollDown) && (
-            <div className="fixed bottom-[124px] sm:bottom-[116px] left-1/2 -translate-x-1/2 z-35 flex items-center gap-2 pointer-events-none no-print">
+            <div className="absolute bottom-[124px] sm:bottom-[116px] left-1/2 -translate-x-1/2 z-35 flex items-center gap-2 pointer-events-none no-print">
               {showScrollTop && (
                 <button
                   type="button"
