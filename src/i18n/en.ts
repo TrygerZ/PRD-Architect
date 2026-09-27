@@ -47,6 +47,10 @@ export const en = {
     dropHint: "Drop to add here",
     reset: "Reset",
   },
+  scroll: {
+    top: "Scroll to top",
+    bottom: "Scroll to latest content",
+  },
 };
 
 export type Dict = typeof en;
