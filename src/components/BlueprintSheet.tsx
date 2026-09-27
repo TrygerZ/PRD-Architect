@@ -190,7 +190,7 @@ export const BlueprintSheet = memo(function BlueprintSheet({
   }, []);
 
   return (
-    <div className="w-full mx-auto relative z-10 print:block print:w-full print:max-w-full print:bg-white print:text-black">
+    <div className="w-full mx-auto relative print:block print:w-full print:max-w-full print:bg-white print:text-black">
       {/* Hidden container for full PRD print export */}
       <div id="prd-print-only" style={{ display: "none" }}>
         <PrintOnlyContent content={content} language={language} />
