@@ -7,7 +7,7 @@ import { ProductType, UploadedFile, AIProvider, PRDMode } from "../shared/types"
 import { getChapterBlock, MAX_CUSTOM_BLOCKS } from "../shared/chapterBlocks";
 import type { PRDVersion } from "./types";
 import DOMPurify from "dompurify";
-import { ArrowUp, X } from "lucide-react";
+import { ArrowUp, ArrowDown, X } from "lucide-react";
 import { safeGetLocalStorage, safeSetLocalStorage } from "./utils/storage";
 import { buildPrintHtml, downloadMarkdown } from "./utils/printTemplate";
 import { useSettings } from "./hooks/useSettings";
@@ -38,7 +38,7 @@ export default function App() {
   const { provider, model, customEndpoint, persistSettings } = useSettings();
   const [productType, setProductType] = useState<ProductType>("Unknown");
   const [language, setLanguage] = useState<"id" | "en">("id");
-  const { showScrollTop, handleScroll: onContainerScroll } = useScroll();
+  const { showScrollTop, showScrollBottom, handleScroll: onContainerScroll } = useScroll();
   const { toastMessage, showToast } = useToast();
 
   const [uploadedFiles, setUploadedFiles] = useState<UploadedFile[]>([]);
@@ -374,6 +374,15 @@ export default function App() {
   const handleScrollTop = useCallback(() => {
     if (chatContainerRef.current) chatContainerRef.current.scrollTo({ top: 0, behavior: 'smooth' });
   }, []);
+  const handleScrollBottom = useCallback(() => {
+    if (chatContainerRef.current) {
+      chatContainerRef.current.scrollTo({
+        top: chatContainerRef.current.scrollHeight,
+        behavior: 'smooth',
+      });
+    }
+  }, []);
+  const showScrollDown = showScrollBottom && isGenerating;
   const handleOpenDiff = useCallback(() => setIsDiffOpen(true), []);
   const handleCloseDiff = useCallback(() => setIsDiffOpen(false), []);
 
@@ -442,7 +451,14 @@ export default function App() {
             id="chat-messages-container"
             aria-busy={isGenerating}
             aria-live="polite"
-            onScroll={(e) => onContainerScroll(e.currentTarget.scrollTop)}
+            onScroll={(e) => {
+              const el = e.currentTarget;
+              onContainerScroll({
+                scrollTop: el.scrollTop,
+                clientHeight: el.clientHeight,
+                scrollHeight: el.scrollHeight,
+              });
+            }}
           >
             {showUploader && (
               <div className="max-w-[640px] mx-auto w-full mb-4 mt-4">
@@ -530,6 +546,34 @@ export default function App() {
           </div>
           )}
 
+          {/* Scroll Controls — horizontal center, above ChatInput */}
+          {(showScrollTop || showScrollDown) && (
+            <div className="absolute bottom-[124px] sm:bottom-[116px] left-1/2 -translate-x-1/2 z-35 flex items-center gap-2 pointer-events-none no-print">
+              {showScrollTop && (
+                <button
+                  type="button"
+                  onClick={handleScrollTop}
+                  className="pointer-events-auto min-w-[44px] min-h-[44px] rounded-full bg-[var(--color-surface-elevated)] border border-[var(--color-border)] text-[var(--color-text-secondary)] hover:bg-[var(--color-border-subtle)] hover:text-[var(--color-text-primary)] shadow-sm flex items-center justify-center transition-colors duration-200 focus-visible:ring-2 focus-visible:ring-[var(--color-interactive)] focus-visible:outline-none"
+                  aria-label={language === "en" ? "Scroll to top" : "Kembali ke atas"}
+                  title={language === "en" ? "Scroll to top" : "Kembali ke atas"}
+                >
+                  <ArrowUp size={16} strokeWidth={1.5} />
+                </button>
+              )}
+              {showScrollDown && (
+                <button
+                  type="button"
+                  onClick={handleScrollBottom}
+                  className="pointer-events-auto min-w-[44px] min-h-[44px] rounded-full bg-[var(--color-surface-elevated)] border border-[var(--color-border)] text-[var(--color-text-secondary)] hover:bg-[var(--color-border-subtle)] hover:text-[var(--color-text-primary)] shadow-sm flex items-center justify-center transition-colors duration-200 focus-visible:ring-2 focus-visible:ring-[var(--color-interactive)] focus-visible:outline-none"
+                  aria-label={language === "en" ? "Scroll to latest content" : "Kembali ke konten terbaru"}
+                  title={language === "en" ? "Scroll to latest content" : "Kembali ke konten terbaru"}
+                >
+                  <ArrowDown size={16} strokeWidth={1.5} />
+                </button>
+              )}
+            </div>
+          )}
+
           {/* Input — fixed bottom */}
           <ChatInput
             onSend={handleSend}
@@ -565,18 +609,6 @@ export default function App() {
         activeVersionId={activeVersionId}
         language={language}
       />
-
-      {/* Scroll to Top Button */}
-      {showScrollTop && (
-        <button
-          onClick={handleScrollTop}
-          className={`fixed bottom-[196px] sm:bottom-[156px] right-[16px] sm:right-[40px] z-[35] min-w-[44px] min-h-[44px] rounded-full bg-[var(--color-surface-elevated)] border border-[var(--color-border)] text-[var(--color-text-secondary)] hover:bg-[var(--color-border-subtle)] hover:text-[var(--color-text-primary)] flex items-center justify-center transition-colors duration-200 no-print will-change-transform focus-visible:ring-2 focus-visible:ring-[var(--color-interactive)] focus-visible:outline-none`}
-          aria-label={language === "en" ? "Scroll to top" : "Kembali ke atas"}
-          title={language === "en" ? "Scroll to top" : "Kembali ke atas"}
-        >
-          <ArrowUp size={16} strokeWidth={1.5} />
-        </button>
-      )}
 
       {/* Toast Notification */}
       <div 
