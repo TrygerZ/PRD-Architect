@@ -49,4 +49,8 @@ export const id: Dict = {
     dropHint: "Lepas untuk menambah di sini",
     reset: "Atur ulang",
   },
+  scroll: {
+    top: "Kembali ke atas",
+    bottom: "Kembali ke konten terbaru",
+  },
 };
