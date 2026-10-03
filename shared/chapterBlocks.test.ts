@@ -63,6 +63,13 @@ describe("CHAPTER_BLOCKS", () => {
       expect(["product", "technical"]).toContain(block.category);
     }
   });
+
+  it("keeps card descriptions short enough to fit the 2-line card", () => {
+    for (const block of CHAPTER_BLOCKS) {
+      expect(block.descEn.length, block.id).toBeLessThanOrEqual(70);
+      expect(block.descId.length, block.id).toBeLessThanOrEqual(75);
+    }
+  });
 });
 
 describe("STANDARD_TEMPLATES", () => {
