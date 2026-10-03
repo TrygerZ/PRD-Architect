@@ -292,6 +292,104 @@ const BLOCK_INSTRUCTIONS: Record<string, BlockInstruction> = {
 - Gunakan tabel dengan kolom: Pertanyaan | Dampak Jika Tidak Dijawab | Deadline Keputusan | Decision Maker — minimal 4 pertanyaan.
 - Setiap pertanyaan harus mengidentifikasi WHO decides dan WHEN.`,
   },
+  "glossary-references": {
+    en: `**Glossary & References**
+- Define 8-15 domain terms, acronyms, and product-specific names used in this document, in a table: Term | Definition | Avoid Synonyms.
+- Pick ONE canonical name per concept and use exactly that spelling in every later chapter.
+- Add a References list: source documents, standards, research, and tools cited (title, owner, location). Mark anything you cannot verify as "to be confirmed" instead of inventing links.`,
+    id: `**Glosarium & Referensi**
+- Definisikan 8-15 istilah domain, akronim, dan nama khusus produk yang dipakai di dokumen ini, dalam tabel: Istilah | Definisi | Hindari Sinonim.
+- Pilih SATU nama kanonik per konsep dan pakai ejaan persis itu di semua chapter berikutnya.
+- Tambahkan daftar Referensi: dokumen sumber, standar, riset, dan tool yang dikutip (judul, pemilik, lokasi). Tandai yang tidak bisa diverifikasi sebagai "perlu dikonfirmasi", jangan mengarang tautan.`,
+  },
+  personas: {
+    en: `**User Personas**
+- Create 3-5 personas, each as a Heading 3: \`### PERS-01. <Name> — <Role>\`, numbered sequentially with NO gaps.
+- For each persona give: Context (who, where, tech comfort), Goals (2-3), Pain Points (2-3), Current Workaround, Key Scenarios (2 situations where they use the product), and Success Signal (what "it works" means to them).
+- Mark exactly one persona as Primary and the rest as Secondary. End with a summary table: ID | Persona | Type (Primary/Secondary) | Core Need.
+- Use concrete, realistic details, not generic archetypes.`,
+    id: `**Persona Pengguna**
+- Buat 3-5 persona, masing-masing sebagai Heading 3: \`### PERS-01. <Nama> — <Peran>\`, bernomor berurutan TANPA celah.
+- Untuk tiap persona sertakan: Konteks (siapa, di mana, kenyamanan teknologi), Tujuan (2-3), Pain Point (2-3), Workaround Saat Ini, Skenario Utama (2 situasi pemakaian produk), dan Sinyal Sukses (arti "berhasil" baginya).
+- Tandai tepat satu persona sebagai Primer dan sisanya Sekunder. Tutup dengan tabel ringkasan: ID | Persona | Tipe (Primer/Sekunder) | Kebutuhan Inti.
+- Gunakan detail konkret dan realistis, bukan arketipe generik.`,
+  },
+  "constraints-dependencies": {
+    en: `**Constraints, Assumptions & Dependencies**
+- Use one continuous DEP-xx sequence across both tables below.
+- Table 1 (Constraints & Assumptions): ID | Type (Constraint/Assumption) | Description | Impact if Wrong | Owner — minimum 5 rows covering budget, time, technology, legal, and team limits.
+- Table 2 (External Dependencies): ID | Provider | Purpose | Limits / SLA | Fallback if Unavailable — minimum 3 rows (third-party APIs, vendors, internal teams).
+- State which scope items are blocked by each dependency.`,
+    id: `**Batasan, Asumsi & Dependensi**
+- Pakai satu urutan DEP-xx berkelanjutan di kedua tabel di bawah.
+- Tabel 1 (Batasan & Asumsi): ID | Tipe (Batasan/Asumsi) | Deskripsi | Dampak Jika Salah | Owner — minimal 5 baris mencakup batas anggaran, waktu, teknologi, hukum, dan tim.
+- Tabel 2 (Dependensi Eksternal): ID | Penyedia | Tujuan | Batas / SLA | Fallback Jika Tidak Tersedia — minimal 3 baris (API pihak ketiga, vendor, tim internal).
+- Sebutkan item cakupan yang terblokir oleh tiap dependensi.`,
+  },
+  "security-privacy": {
+    en: `**Security & Privacy Requirements**
+- Data Classification table: Data Type | Classification (Public/Internal/Confidential/Restricted) | Storage | Retention | Encryption (at rest / in transit).
+- Roles & Permissions matrix: rows = roles, columns = key actions or resources, cells = Allow / Deny / Own-only.
+- Authentication & Session: method, token lifetime, MFA, password and recovery rules.
+- Threat Model table: ID | Threat (STRIDE category) | Asset | Mitigation | Residual Risk — minimum 5 threats.- Privacy by design: consent, data minimization, deletion and export requests, audit logging.`,
+    id: `**Persyaratan Keamanan & Privasi**
+- Tabel Klasifikasi Data: Jenis Data | Klasifikasi (Publik/Internal/Rahasia/Terbatas) | Penyimpanan | Retensi | Enkripsi (at rest / in transit).
+- Matriks Peran & Izin: baris = peran, kolom = aksi atau resource kunci, sel = Boleh / Tolak / Hanya milik sendiri.
+- Autentikasi & Sesi: metode, masa berlaku token, MFA, aturan password dan pemulihan.
+- Tabel Threat Model: ID | Ancaman (kategori STRIDE) | Aset | Mitigasi | Risiko Residual — minimal 5 ancaman.- Privacy by design: consent, minimisasi data, permintaan hapus dan ekspor data, audit logging.`,
+  },
+  "analytics-tracking": {
+    en: `**Analytics & Event Tracking Plan**
+- Event Taxonomy table: ID | Event Name (snake_case) | Trigger | Properties | Related Feature | Feeds KPI — minimum 8 events.
+- Name events as object_action and keep property names consistent across events.
+- Map every KPI from the Success Metrics chapter (when present) to at least one event; list any KPI with no event under "Tracking Gaps".
+- Cover tooling (analytics provider, data warehouse), consent-gated tracking, and PII rules for event properties.`,
+    id: `**Rencana Analitik & Pelacakan Event**
+- Tabel Taksonomi Event: ID | Nama Event (snake_case) | Pemicu | Properti | Fitur Terkait | Mengisi KPI — minimal 8 event.
+- Beri nama event dengan pola object_action dan jaga nama properti konsisten antar event.
+- Petakan setiap KPI dari chapter Metrik Keberhasilan (jika ada) ke minimal satu event; daftarkan KPI tanpa event di "Celah Pelacakan".
+- Cakup tooling (penyedia analitik, data warehouse), pelacakan berbasis consent, dan aturan PII untuk properti event.`,
+  },
+  "release-operations": {
+    en: `**Release, Operations & Monitoring**
+- Environments table: Environment | Purpose | Data | Deploy Trigger.
+- Release strategy: CI/CD pipeline stages, feature flags, canary or staged rollout percentages, and explicit rollback criteria and steps.
+- Observability: table of SLIs with SLO targets and alert thresholds (Metric | SLO | Alert Threshold | Owner), plus logging and tracing approach.
+- Capacity and resilience: expected load, scaling triggers, backup frequency, RPO and RTO.
+- Launch readiness checklist (8-10 checkbox items) and a support/on-call plan.`,
+    id: `**Rilis, Operasional & Monitoring**
+- Tabel Environment: Environment | Tujuan | Data | Pemicu Deploy.
+- Strategi rilis: tahap pipeline CI/CD, feature flag, persentase canary atau staged rollout, serta kriteria dan langkah rollback yang eksplisit.
+- Observability: tabel SLI dengan target SLO dan threshold alert (Metrik | SLO | Threshold Alert | Owner), plus pendekatan logging dan tracing.
+- Kapasitas dan ketahanan: beban yang diharapkan, pemicu scaling, frekuensi backup, RPO dan RTO.
+- Checklist kesiapan peluncuran (8-10 item checkbox) dan rencana dukungan/on-call.`,
+  },
+  "platform-accessibility": {
+    en: `**Platform, Accessibility & Localization**
+- Supported Platforms table: Platform | Minimum Version | Support Level (Full/Best-effort/None). Cover browsers, OS, devices, and screen-size breakpoints.
+- Accessibility: target standard (WCAG 2.2 AA), keyboard navigation, screen-reader behavior, color contrast, focus management, and reduced-motion handling. Note that full compliance needs manual testing with assistive technologies.
+- Localization: launch languages, text expansion, date/number/currency formats, right-to-left needs, and translation workflow.
+- Offline and low-bandwidth behavior where relevant.`,
+    id: `**Platform, Aksesibilitas & Lokalisasi**
+- Tabel Platform yang Didukung: Platform | Versi Minimum | Level Dukungan (Penuh/Sebisanya/Tidak). Cakup browser, OS, perangkat, dan breakpoint ukuran layar.
+- Aksesibilitas: standar target (WCAG 2.2 AA), navigasi keyboard, perilaku screen reader, kontras warna, manajemen fokus, dan penanganan reduced-motion. Catat bahwa kepatuhan penuh butuh pengujian manual dengan teknologi bantu.
+- Lokalisasi: bahasa peluncuran, ekspansi teks, format tanggal/angka/mata uang, kebutuhan right-to-left, dan alur terjemahan.
+- Perilaku offline dan bandwidth rendah jika relevan.`,
+  },
+  traceability: {
+    en: `**Requirements Traceability Matrix**
+- Build ONE matrix tying earlier chapters together: Feature (FEAT) | Persona (PERS) | User Story (US) | Entity (ENT) | API | NFR | Test Case (TC) | Risk (RISK) | KPI.
+- Use ONLY IDs that were defined in earlier chapters, verbatim. Never invent an ID. Write "—" for a cell with no link and leave out columns whose chapter is not in this document.
+- One row per Must-have feature (or per FEAT when available).
+- After the matrix add "Coverage Gaps": a bullet list of features with no story, no test, or no API, and tests or stories that map to no feature. Write "None" only if truly none.
+- Keep this the last data chapter; no new requirements here.`,
+    id: `**Matriks Keterlacakan Kebutuhan**
+- Bangun SATU matriks yang mengikat chapter-chapter sebelumnya: Fitur (FEAT) | Persona (PERS) | User Story (US) | Entitas (ENT) | API | NFR | Test Case (TC) | Risiko (RISK) | KPI.
+- Pakai HANYA ID yang sudah didefinisikan di chapter sebelumnya, persis. Jangan mengarang ID. Tulis "—" untuk sel tanpa tautan dan buang kolom yang chapter-nya tidak ada di dokumen ini.
+- Satu baris per fitur Must-have (atau per FEAT jika tersedia).
+- Setelah matriks tambahkan "Celah Cakupan": daftar bullet fitur tanpa story, tanpa test, atau tanpa API, serta test atau story yang tidak terhubung ke fitur. Tulis "Tidak ada" hanya jika memang tidak ada.
+- Pertahankan sebagai chapter data terakhir; jangan menambah kebutuhan baru di sini.`,
+  },
 };
 
 // ---------------------------------------------------------------------------

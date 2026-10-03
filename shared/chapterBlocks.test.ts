@@ -11,31 +11,39 @@ import {
 // The canonical order is part of this registry's public contract.
 const EXPECTED_BLOCK_IDS = [
   "overview",
+  "glossary-references",
   "problem-market",
+  "personas",
   "feature-scope",
   "out-of-scope",
   "feature-spec",
   "user-stories",
   "ux-journey",
+  "constraints-dependencies",
   "architecture",
   "data-models",
   "api-contracts",
   "frontend-arch",
+  "security-privacy",
   "nfr",
   "success-metrics",
+  "analytics-tracking",
   "gtm",
   "risks",
   "timeline",
   "compliance",
+  "platform-accessibility",
   "testing",
   "error-handling",
+  "release-operations",
   "ai-agent-guidelines",
+  "traceability",
   "open-questions",
 ];
 
 describe("CHAPTER_BLOCKS", () => {
-  it("contains exactly 21 blocks", () => {
-    expect(CHAPTER_BLOCKS).toHaveLength(21);
+  it("contains exactly 29 blocks", () => {
+    expect(CHAPTER_BLOCKS).toHaveLength(29);
   });
 
   it("has unique ids", () => {

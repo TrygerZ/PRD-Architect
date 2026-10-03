@@ -141,6 +141,34 @@ describe("composeCustomSystemPrompt", () => {
     );
   });
 
+  it("wires new modules: personas feed user-stories, traceability cites earlier IDs", () => {
+    const prompt = composeCustomSystemPrompt(
+      ["personas", "feature-spec", "user-stories", "testing", "traceability"],
+      "en",
+    );
+    expect(prompt).toContain("`PERS-01`");
+    expect(prompt).toContain("Chapter 1 (User Personas; PERS-xx)");
+    expect(prompt).toContain("Chapter 3 (User Stories & Acceptance Criteria; US-xx)");
+    expect(prompt).toContain("Never invent an ID");
+  });
+
+  it("every new module composes in both languages at the cap", () => {
+    const ids = [
+      "glossary-references",
+      "personas",
+      "constraints-dependencies",
+      "security-privacy",
+      "analytics-tracking",
+      "platform-accessibility",
+      "release-operations",
+      "traceability",
+    ];
+    for (const lang of ["en", "id"] as const) {
+      const prompt = composeCustomSystemPrompt(ids, lang);
+      expect((prompt.match(/^## \d+\./gm) || []).length).toBe(ids.length);
+    }
+  });
+
   it("closing directive reflects exact count", () => {
     const prompt = composeCustomSystemPrompt(["overview", "nfr"], "en");
     expect(prompt).toContain("ALL 2 chapters");

@@ -46,6 +46,14 @@ import {
   RefreshCcw,
   Bot,
   HelpCircle,
+  BookOpen,
+  UserRound,
+  Link2,
+  Lock,
+  BarChart3,
+  ServerCog,
+  Smartphone,
+  GitMerge,
   X,
   GripVertical,
   RotateCcw,
@@ -57,8 +65,16 @@ import type { ChapterBlock } from "../../shared/chapterBlocks";
 import { safeSetLocalStorage } from "../utils/storage";
 import { useT } from "../hooks/useT";
 
-// icon map explicit for all 21 registry icons
+// icon map explicit for every registry icon (unknown names fall back to FileText)
 const ICON_MAP: Record<string, React.ComponentType<{ size?: number; className?: string; strokeWidth?: number }>> = {
+  BookOpen,
+  UserRound,
+  Link2,
+  Lock,
+  BarChart3,
+  ServerCog,
+  Smartphone,
+  GitMerge,
   FileText,
   AlertTriangle,
   Layers,

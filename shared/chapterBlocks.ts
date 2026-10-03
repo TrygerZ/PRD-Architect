@@ -1,5 +1,5 @@
 // Canonical registry of PRD chapter blocks — single source of truth shared by FE & BE.
-// Holds the 21 deduplicated chapter blocks merged across all PRD modes
+// Holds the 29 deduplicated chapter blocks merged across all PRD modes
 // (business / simple / technical), consumed by the Custom PRD Builder to render
 // selectable chapter cards and to validate user-composed structures.
 //
@@ -41,6 +41,15 @@ export const CHAPTER_BLOCKS: ChapterBlock[] = [
     category: "product",
   },
   {
+    id: "glossary-references",
+    titleEn: "Glossary & References",
+    titleId: "Glosarium & Referensi",
+    descEn: "Shared terms and sources used across the document.",
+    descId: "Istilah bersama dan sumber yang dipakai di dokumen.",
+    icon: "BookOpen",
+    category: "product",
+  },
+  {
     id: "problem-market",
     titleEn: "Problem Definition & Market Analysis",
     titleId: "Definisi Masalah & Analisis Pasar",
@@ -49,6 +58,15 @@ export const CHAPTER_BLOCKS: ChapterBlock[] = [
     descId:
       "Masalah pengguna, ukuran pasar, dan kompetitor.",
     icon: "AlertTriangle",
+    category: "product",
+  },
+  {
+    id: "personas",
+    titleEn: "User Personas",
+    titleId: "Persona Pengguna",
+    descEn: "Who your users are: goals, pain points, scenarios.",
+    descId: "Siapa penggunamu: tujuan, kendala, dan skenario.",
+    icon: "UserRound",
     category: "product",
   },
   {
@@ -107,6 +125,15 @@ export const CHAPTER_BLOCKS: ChapterBlock[] = [
     category: "product",
   },
   {
+    id: "constraints-dependencies",
+    titleEn: "Constraints, Assumptions & Dependencies",
+    titleId: "Batasan, Asumsi & Dependensi",
+    descEn: "Limits, assumptions, and third-party dependencies.",
+    descId: "Batasan, asumsi, dan dependensi pihak ketiga.",
+    icon: "Link2",
+    category: "product",
+  },
+  {
     id: "architecture",
     titleEn: "High-Level Technical Architecture",
     titleId: "Arsitektur Teknis Tingkat Tinggi",
@@ -151,6 +178,15 @@ export const CHAPTER_BLOCKS: ChapterBlock[] = [
     category: "technical",
   },
   {
+    id: "security-privacy",
+    titleEn: "Security & Privacy Requirements",
+    titleId: "Persyaratan Keamanan & Privasi",
+    descEn: "Data classes, roles and permissions, and threat model.",
+    descId: "Klasifikasi data, peran dan izin, serta threat model.",
+    icon: "Lock",
+    category: "technical",
+  },
+  {
     id: "nfr",
     titleEn: "Non-Functional Requirements",
     titleId: "Persyaratan Non-Fungsional",
@@ -170,6 +206,15 @@ export const CHAPTER_BLOCKS: ChapterBlock[] = [
     descId:
       "KPI dengan baseline, target, dan cara mengukurnya.",
     icon: "Gauge",
+    category: "product",
+  },
+  {
+    id: "analytics-tracking",
+    titleEn: "Analytics & Event Tracking Plan",
+    titleId: "Rencana Analitik & Pelacakan Event",
+    descEn: "Which events to track and which KPI each one feeds.",
+    descId: "Event apa yang dilacak dan KPI mana yang diisinya.",
+    icon: "BarChart3",
     category: "product",
   },
   {
@@ -217,6 +262,15 @@ export const CHAPTER_BLOCKS: ChapterBlock[] = [
     category: "product",
   },
   {
+    id: "platform-accessibility",
+    titleEn: "Platform, Accessibility & Localization",
+    titleId: "Platform, Aksesibilitas & Lokalisasi",
+    descEn: "Supported devices, accessibility, and languages.",
+    descId: "Perangkat didukung, aksesibilitas, dan bahasa.",
+    icon: "Smartphone",
+    category: "technical",
+  },
+  {
     id: "testing",
     titleEn: "Edge Case & Integration Testing Criteria",
     titleId: "Kriteria Pengujian Edge Case & Integrasi",
@@ -239,6 +293,15 @@ export const CHAPTER_BLOCKS: ChapterBlock[] = [
     category: "technical",
   },
   {
+    id: "release-operations",
+    titleEn: "Release, Operations & Monitoring",
+    titleId: "Rilis, Operasional & Monitoring",
+    descEn: "Rollout, rollback, monitoring, and launch checklist.",
+    descId: "Rollout, rollback, monitoring, dan checklist peluncuran.",
+    icon: "ServerCog",
+    category: "technical",
+  },
+  {
     id: "ai-agent-guidelines",
     titleEn: "AI Agent Implementation Guidelines",
     titleId: "Panduan Implementasi AI Agent",
@@ -247,6 +310,15 @@ export const CHAPTER_BLOCKS: ChapterBlock[] = [
     descId:
       "Langkah setup dan urutan file agar AI coder bisa membangunnya.",
     icon: "Bot",
+    category: "technical",
+  },
+  {
+    id: "traceability",
+    titleEn: "Requirements Traceability Matrix",
+    titleId: "Matriks Keterlacakan Kebutuhan",
+    descEn: "Links features to stories, APIs, tests, and risks.",
+    descId: "Menghubungkan fitur ke story, API, test, dan risiko.",
+    icon: "GitMerge",
     category: "technical",
   },
   {
@@ -312,33 +384,82 @@ export interface BlockLink {
 // Cross-chapter wiring. Canonical block order must never consume a later block
 // (asserted in chapterBlocks.test.ts), so the default layout has no forward refs.
 export const BLOCK_LINKS: Record<string, BlockLink> = {
-  "feature-scope": { consumes: ["overview", "problem-market"] },
+  personas: { produces: "PERS", consumes: ["overview", "problem-market"] },
+  "feature-scope": { consumes: ["overview", "problem-market", "personas"] },
   "out-of-scope": { consumes: ["feature-scope"] },
   "feature-spec": { produces: "FEAT", consumes: ["feature-scope"] },
-  "user-stories": { produces: "US", consumes: ["feature-spec", "feature-scope"] },
-  "ux-journey": { consumes: ["user-stories", "feature-spec", "feature-scope"] },
-  architecture: { consumes: ["feature-spec", "feature-scope"] },
+  "user-stories": {
+    produces: "US",
+    consumes: ["personas", "feature-spec", "feature-scope"],
+  },
+  "ux-journey": { consumes: ["personas", "user-stories", "feature-spec", "feature-scope"] },
+  "constraints-dependencies": { produces: "DEP", consumes: ["overview", "feature-scope"] },
+  architecture: { consumes: ["constraints-dependencies", "feature-spec", "feature-scope"] },
   "data-models": { produces: "ENT", consumes: ["feature-spec", "feature-scope", "architecture"] },
   "api-contracts": {
     produces: "API",
     consumes: ["data-models", "feature-spec", "feature-scope", "architecture"],
   },
   "frontend-arch": { consumes: ["api-contracts", "ux-journey", "feature-spec"] },
-  nfr: { produces: "NFR", consumes: ["architecture"] },
+  "security-privacy": {
+    consumes: ["personas", "data-models", "api-contracts", "architecture"],
+  },
+  nfr: { produces: "NFR", consumes: ["architecture", "security-privacy"] },
   "success-metrics": { produces: "KPI", consumes: ["overview", "feature-scope"] },
-  gtm: { consumes: ["success-metrics", "overview", "problem-market"] },
-  risks: { produces: "RISK", consumes: ["feature-scope", "architecture", "problem-market"] },
+  "analytics-tracking": {
+    produces: "EVT",
+    consumes: ["success-metrics", "feature-spec", "feature-scope"],
+  },
+  gtm: { consumes: ["success-metrics", "personas", "overview", "problem-market"] },
+  risks: {
+    produces: "RISK",
+    consumes: [
+      "constraints-dependencies",
+      "security-privacy",
+      "feature-scope",
+      "architecture",
+      "problem-market",
+    ],
+  },
   timeline: { produces: "MS", consumes: ["feature-spec", "feature-scope", "risks"] },
-  compliance: { consumes: ["data-models", "feature-scope"] },
+  compliance: { consumes: ["security-privacy", "data-models", "feature-scope"] },
+  "platform-accessibility": { consumes: ["personas", "ux-journey", "frontend-arch"] },
   testing: {
     produces: "TC",
-    consumes: ["feature-spec", "user-stories", "nfr", "api-contracts", "risks"],
+    consumes: [
+      "feature-spec",
+      "user-stories",
+      "nfr",
+      "api-contracts",
+      "security-privacy",
+      "platform-accessibility",
+      "risks",
+    ],
   },
-  "error-handling": { consumes: ["api-contracts", "nfr", "feature-spec"] },
+  "error-handling": {
+    consumes: ["api-contracts", "nfr", "constraints-dependencies", "feature-spec"],
+  },
+  "release-operations": {
+    consumes: ["architecture", "nfr", "risks", "constraints-dependencies", "testing"],
+  },
   "ai-agent-guidelines": {
     consumes: ["architecture", "data-models", "api-contracts", "frontend-arch"],
   },
-  "open-questions": { consumes: ["risks"] },
+  traceability: {
+    consumes: [
+      "feature-spec",
+      "personas",
+      "user-stories",
+      "data-models",
+      "api-contracts",
+      "nfr",
+      "testing",
+      "risks",
+      "success-metrics",
+      "analytics-tracking",
+    ],
+  },
+  "open-questions": { consumes: ["risks", "constraints-dependencies"] },
 };
 
 /** Look up a block by its slug id. Returns undefined for unknown ids. */
