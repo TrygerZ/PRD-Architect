@@ -37,7 +37,7 @@ export default function App() {
   const [customApiKey, setCustomApiKey] = useState("");
   const { provider, model, customEndpoint, persistSettings } = useSettings();
   const [productType, setProductType] = useState<ProductType>("Unknown");
-  const [language, setLanguage] = useState<"id" | "en">("id");
+  const [language, setLanguage] = useState<"id" | "en">("en");
   const { showScrollTop, showScrollBottom, handleScroll: onContainerScroll } = useScroll();
   const { toastMessage, showToast } = useToast();
 
@@ -170,7 +170,7 @@ export default function App() {
     };
   }, []);
 
-  // Load preferensi bahasa dari localStorage (default "id")
+  // Load preferensi bahasa dari localStorage (default "en")
   useEffect(() => {
     const VALID_LANGUAGES: Array<"id" | "en"> = ["id", "en"];
     const storedLang = safeGetLocalStorage("PRD_LANGUAGE");
