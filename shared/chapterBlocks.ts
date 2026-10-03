@@ -1,5 +1,5 @@
 // Canonical registry of PRD chapter blocks — single source of truth shared by FE & BE.
-// Holds the 21 deduplicated chapter blocks merged across all PRD modes
+// Holds the 29 deduplicated chapter blocks merged across all PRD modes
 // (business / simple / technical), consumed by the Custom PRD Builder to render
 // selectable chapter cards and to validate user-composed structures.
 //
@@ -34,10 +34,19 @@ export const CHAPTER_BLOCKS: ChapterBlock[] = [
     titleEn: "Executive Summary & Value Proposition",
     titleId: "Ringkasan Eksekutif & Proposisi Nilai",
     descEn:
-      "Summarizes the product vision, core objectives, target users, and unique value proposition in an executive-ready format.",
+      "Product vision, goals, target users, and value in one page.",
     descId:
-      "Merangkum visi produk, tujuan inti, pengguna target, dan proposisi nilai unik dalam format siap-eksekutif.",
+      "Visi produk, tujuan, pengguna target, dan nilai jual dalam satu halaman.",
     icon: "FileText",
+    category: "product",
+  },
+  {
+    id: "glossary-references",
+    titleEn: "Glossary & References",
+    titleId: "Glosarium & Referensi",
+    descEn: "Shared terms and sources used across the document.",
+    descId: "Istilah bersama dan sumber yang dipakai di dokumen.",
+    icon: "BookOpen",
     category: "product",
   },
   {
@@ -45,10 +54,19 @@ export const CHAPTER_BLOCKS: ChapterBlock[] = [
     titleEn: "Problem Definition & Market Analysis",
     titleId: "Definisi Masalah & Analisis Pasar",
     descEn:
-      "Defines the core user problems and analyzes market size (TAM/SAM/SOM) along with the competitive landscape.",
+      "User problems, market size, and competitors.",
     descId:
-      "Mendefinisikan masalah inti pengguna dan menganalisis ukuran pasar (TAM/SAM/SOM) beserta lanskap kompetitif.",
+      "Masalah pengguna, ukuran pasar, dan kompetitor.",
     icon: "AlertTriangle",
+    category: "product",
+  },
+  {
+    id: "personas",
+    titleEn: "User Personas",
+    titleId: "Persona Pengguna",
+    descEn: "Who your users are: goals, pain points, scenarios.",
+    descId: "Siapa penggunamu: tujuan, kendala, dan skenario.",
+    icon: "UserRound",
     category: "product",
   },
   {
@@ -56,9 +74,9 @@ export const CHAPTER_BLOCKS: ChapterBlock[] = [
     titleEn: "Solution Overview & Scope (MoSCoW)",
     titleId: "Ringkasan Solusi & Cakupan (MoSCoW)",
     descEn:
-      "Outlines the solution approach and groups all features into MoSCoW priority tiers (Must, Should, Could, Won't).",
+      "Features ranked by priority (MoSCoW) plus a work breakdown.",
     descId:
-      "Menjelaskan pendekatan solusi dan mengelompokkan seluruh fitur ke dalam tingkat prioritas MoSCoW (Must, Should, Could, Won't).",
+      "Fitur diurutkan per prioritas (MoSCoW) beserta rincian pekerjaan.",
     icon: "Layers",
     category: "product",
   },
@@ -67,9 +85,9 @@ export const CHAPTER_BLOCKS: ChapterBlock[] = [
     titleEn: "Out of Scope Rules & Boundaries",
     titleId: "Aturan Batas di Luar Cakupan",
     descEn:
-      "Explicitly lists what will not be built, with boundary rules and revisit conditions for each exclusion.",
+      "What you will not build, why, and when to revisit.",
     descId:
-      "Memuat daftar eksplisit hal yang tidak dibangun, lengkap dengan aturan batas dan kondisi peninjauan ulang untuk setiap pengecualian.",
+      "Yang tidak akan dibuat, alasannya, dan kapan ditinjau ulang.",
     icon: "Ban",
     category: "product",
   },
@@ -78,9 +96,9 @@ export const CHAPTER_BLOCKS: ChapterBlock[] = [
     titleEn: "Feature Specification & Logic",
     titleId: "Spesifikasi Fitur & Logika",
     descEn:
-      "Details each feature down to input fields, flows, business logic, error states, loading states, and integrations.",
+      "Each key feature: inputs, steps, rules, and error states.",
     descId:
-      "Merinci setiap fitur hingga level field input, alur, logika bisnis, state error, state loading, dan integrasi.",
+      "Tiap fitur utama: input, langkah, aturan, dan kondisi error.",
     icon: "ListChecks",
     category: "product",
   },
@@ -89,9 +107,9 @@ export const CHAPTER_BLOCKS: ChapterBlock[] = [
     titleEn: "User Stories & Acceptance Criteria",
     titleId: "User Story & Kriteria Penerimaan",
     descEn:
-      "Captures personas, prioritized user stories, and Given/When/Then acceptance criteria in a structured backlog table.",
+      "User stories with acceptance criteria per persona.",
     descId:
-      "Menangkap persona, user story berprioritas, dan kriteria penerimaan Given/When/Then dalam tabel backlog terstruktur.",
+      "User story dan kriteria penerimaan per persona.",
     icon: "Users",
     category: "product",
   },
@@ -100,10 +118,19 @@ export const CHAPTER_BLOCKS: ChapterBlock[] = [
     titleEn: "UX Design, User Journey & Wireframe Flow",
     titleId: "Desain UX, Perjalanan Pengguna & Alur Wireframe",
     descEn:
-      "Describes UX principles, complete end-to-end user journeys, wireframe flows, and key screen layouts including Mermaid diagrams.",
+      "User journey, key screens, and UX principles with a diagram.",
     descId:
-      "Menjelaskan prinsip UX, perjalanan pengguna menyeluruh, alur wireframe, dan tata letak layar utama termasuk diagram Mermaid.",
+      "Perjalanan pengguna, layar utama, dan prinsip UX dengan diagram.",
     icon: "Palette",
+    category: "product",
+  },
+  {
+    id: "constraints-dependencies",
+    titleEn: "Constraints, Assumptions & Dependencies",
+    titleId: "Batasan, Asumsi & Dependensi",
+    descEn: "Limits, assumptions, and third-party dependencies.",
+    descId: "Batasan, asumsi, dan dependensi pihak ketiga.",
+    icon: "Link2",
     category: "product",
   },
   {
@@ -111,9 +138,9 @@ export const CHAPTER_BLOCKS: ChapterBlock[] = [
     titleEn: "High-Level Technical Architecture",
     titleId: "Arsitektur Teknis Tingkat Tinggi",
     descEn:
-      "Presents the high-level system architecture, tech stack decisions, alternatives considered, and a Mermaid system context diagram.",
+      "System overview, tech stack choices, and a context diagram.",
     descId:
-      "Menyajikan arsitektur sistem tingkat tinggi, keputusan tech stack, alternatif yang dipertimbangkan, dan diagram konteks sistem Mermaid.",
+      "Gambaran sistem, pilihan tech stack, dan diagram konteks.",
     icon: "Server",
     category: "technical",
   },
@@ -122,9 +149,9 @@ export const CHAPTER_BLOCKS: ChapterBlock[] = [
     titleEn: "Data Models & Database Schema",
     titleId: "Model Data & Skema Basis Data",
     descEn:
-      "Specifies database entities, column-level schemas, relations, constraints, indexes, and an ERD in Mermaid syntax.",
+      "Database tables, relations, and an ER diagram.",
     descId:
-      "Menentukan entitas basis data, skema tingkat kolom, relasi, constraint, indeks, serta ERD dalam sintaks Mermaid.",
+      "Tabel database, relasi, dan diagram ER.",
     icon: "Database",
     category: "technical",
   },
@@ -133,9 +160,9 @@ export const CHAPTER_BLOCKS: ChapterBlock[] = [
     titleEn: "API Contracts & Interfaces",
     titleId: "Kontrak API & Antarmuka",
     descEn:
-      "Documents REST endpoints with literal JSON request/response payloads, error responses, and per-endpoint authentication requirements.",
+      "API endpoints with JSON examples, errors, and auth.",
     descId:
-      "Mendokumentasikan endpoint REST dengan contoh literal payload JSON request/response, respons error, dan kebutuhan autentikasi per endpoint.",
+      "Endpoint API dengan contoh JSON, error, dan autentikasi.",
     icon: "Webhook",
     category: "technical",
   },
@@ -144,10 +171,19 @@ export const CHAPTER_BLOCKS: ChapterBlock[] = [
     titleEn: "Frontend Component Architecture & State Management",
     titleId: "Arsitektur Komponen Frontend & Manajemen State",
     descEn:
-      "Maps the UI component hierarchy, routing paths, state management strategy, lazy loading plan, and client-side data flow diagrams.",
+      "UI components, routes, state management, and data flow.",
     descId:
-      "Memetakan hierarki komponen UI, path routing, strategi manajemen state, rencana lazy loading, dan diagram alur data sisi klien.",
+      "Komponen UI, routing, manajemen state, dan alur data.",
     icon: "LayoutTemplate",
+    category: "technical",
+  },
+  {
+    id: "security-privacy",
+    titleEn: "Security & Privacy Requirements",
+    titleId: "Persyaratan Keamanan & Privasi",
+    descEn: "Data classes, roles and permissions, and threat model.",
+    descId: "Klasifikasi data, peran dan izin, serta threat model.",
+    icon: "Lock",
     category: "technical",
   },
   {
@@ -155,9 +191,9 @@ export const CHAPTER_BLOCKS: ChapterBlock[] = [
     titleEn: "Non-Functional Requirements",
     titleId: "Persyaratan Non-Fungsional",
     descEn:
-      "Defines measurable performance, scalability, security, usability, and availability targets together with their measurement methods.",
+      "Measurable targets for speed, scale, security, and uptime.",
     descId:
-      "Mendefinisikan target terukur untuk performa, skalabilitas, keamanan, usability, dan availability beserta metode pengukurannya.",
+      "Target terukur untuk kecepatan, skala, keamanan, dan uptime.",
     icon: "ShieldCheck",
     category: "technical",
   },
@@ -166,10 +202,19 @@ export const CHAPTER_BLOCKS: ChapterBlock[] = [
     titleEn: "Success Metrics & Business KPIs",
     titleId: "Metrik Keberhasilan & KPI Bisnis",
     descEn:
-      "Sets business KPIs such as MRR, churn, and conversion rate with baselines, targets, and tracking plans.",
+      "KPIs with baseline, target, and how to measure them.",
     descId:
-      "Menetapkan KPI bisnis seperti MRR, churn, dan conversion rate dengan baseline, target, dan rencana pelacakan.",
+      "KPI dengan baseline, target, dan cara mengukurnya.",
     icon: "Gauge",
+    category: "product",
+  },
+  {
+    id: "analytics-tracking",
+    titleEn: "Analytics & Event Tracking Plan",
+    titleId: "Rencana Analitik & Pelacakan Event",
+    descEn: "Which events to track and which KPI each one feeds.",
+    descId: "Event apa yang dilacak dan KPI mana yang diisinya.",
+    icon: "BarChart3",
     category: "product",
   },
   {
@@ -177,9 +222,9 @@ export const CHAPTER_BLOCKS: ChapterBlock[] = [
     titleEn: "Go-to-Market Strategy & Monetization",
     titleId: "Strategi Go-to-Market & Monetisasi",
     descEn:
-      "Covers launch strategy, pricing, monetization model, channel plan, and projected ROI estimates.",
+      "Launch plan, pricing, channels, and expected return.",
     descId:
-      "Mencakup strategi peluncuran, pricing, model monetisasi, rencana kanal, serta estimasi proyeksi ROI.",
+      "Rencana peluncuran, harga, kanal, dan proyeksi hasil.",
     icon: "Rocket",
     category: "product",
   },
@@ -188,9 +233,9 @@ export const CHAPTER_BLOCKS: ChapterBlock[] = [
     titleEn: "Risk Register & Mitigation",
     titleId: "Register Risiko & Mitigasi",
     descEn:
-      "Maintains a risk register scoring probability, impact, and mitigation ownership for every identified risk.",
+      "Risks scored by likelihood and impact, each with an owner.",
     descId:
-      "Menyimpan register risiko dengan skor probabilitas, dampak, dan penanggung jawab mitigasi untuk setiap risiko yang teridentifikasi.",
+      "Risiko dinilai dari kemungkinan dan dampak, masing-masing ada pemilik.",
     icon: "ShieldAlert",
     category: "product",
   },
@@ -199,9 +244,9 @@ export const CHAPTER_BLOCKS: ChapterBlock[] = [
     titleEn: "Project Timeline & Roadmap",
     titleId: "Linimasa Proyek & Roadmap",
     descEn:
-      "Breaks the roadmap into weekly sprints or phased milestones visualized with a Mermaid Gantt chart.",
+      "Roadmap by sprint or milestone with a Gantt chart.",
     descId:
-      "Memecah roadmap menjadi sprint mingguan atau milestone bertahap yang divisualisasikan dengan diagram Gantt Mermaid.",
+      "Roadmap per sprint atau milestone dengan diagram Gantt.",
     icon: "CalendarRange",
     category: "product",
   },
@@ -210,20 +255,29 @@ export const CHAPTER_BLOCKS: ChapterBlock[] = [
     titleEn: "Regulatory & Compliance",
     titleId: "Regulasi & Kepatuhan",
     descEn:
-      "Identifies applicable regulations (e.g., GDPR, OJK, HIPAA), data privacy duties, and audit requirements.",
+      "Laws that apply (GDPR, HIPAA) and what you must do.",
     descId:
-      "Mengidentifikasi regulasi yang berlaku (mis. GDPR, OJK, HIPAA), kewajiban privasi data, dan kebutuhan audit.",
+      "Regulasi yang berlaku (GDPR, HIPAA) dan yang harus dilakukan.",
     icon: "Scale",
     category: "product",
+  },
+  {
+    id: "platform-accessibility",
+    titleEn: "Platform, Accessibility & Localization",
+    titleId: "Platform, Aksesibilitas & Lokalisasi",
+    descEn: "Supported devices, accessibility, and languages.",
+    descId: "Perangkat didukung, aksesibilitas, dan bahasa.",
+    icon: "Smartphone",
+    category: "technical",
   },
   {
     id: "testing",
     titleEn: "Edge Case & Integration Testing Criteria",
     titleId: "Kriteria Pengujian Edge Case & Integrasi",
     descEn:
-      "Enumerates critical edge cases around race conditions, concurrency, and API failures plus the testing pyramid strategy.",
+      "Critical edge cases and the testing strategy.",
     descId:
-      "Menjabarkan edge case kritis seputar race condition, konkurensi, dan kegagalan API beserta strategi testing pyramid.",
+      "Edge case kritis dan strategi pengujian.",
     icon: "FlaskConical",
     category: "technical",
   },
@@ -232,10 +286,19 @@ export const CHAPTER_BLOCKS: ChapterBlock[] = [
     titleEn: "Error Handling, Fallbacks & Retry Strategies",
     titleId: "Penanganan Error, Fallback & Strategi Retry",
     descEn:
-      "Defines HTTP status mappings, global error boundaries, retry with exponential backoff, circuit breakers, and graceful degradation.",
+      "How failures are shown, retried, and recovered.",
     descId:
-      "Mendefinisikan pemetaan status HTTP, global error boundary, retry dengan exponential backoff, circuit breaker, dan graceful degradation.",
+      "Cara error ditampilkan, dicoba ulang, dan dipulihkan.",
     icon: "RefreshCcw",
+    category: "technical",
+  },
+  {
+    id: "release-operations",
+    titleEn: "Release, Operations & Monitoring",
+    titleId: "Rilis, Operasional & Monitoring",
+    descEn: "Rollout, rollback, monitoring, and launch checklist.",
+    descId: "Rollout, rollback, monitoring, dan checklist peluncuran.",
+    icon: "ServerCog",
     category: "technical",
   },
   {
@@ -243,10 +306,19 @@ export const CHAPTER_BLOCKS: ChapterBlock[] = [
     titleEn: "AI Agent Implementation Guidelines",
     titleId: "Panduan Implementasi AI Agent",
     descEn:
-      "Provides step-by-step setup commands, file creation order, environment templates, and run instructions for AI coders like Cursor or Copilot.",
+      "Setup steps and file order so an AI coder can build it.",
     descId:
-      "Menyediakan perintah setup langkah demi langkah, urutan pembuatan file, template environment, dan instruksi run untuk AI coder seperti Cursor atau Copilot.",
+      "Langkah setup dan urutan file agar AI coder bisa membangunnya.",
     icon: "Bot",
+    category: "technical",
+  },
+  {
+    id: "traceability",
+    titleEn: "Requirements Traceability Matrix",
+    titleId: "Matriks Keterlacakan Kebutuhan",
+    descEn: "Links features to stories, APIs, tests, and risks.",
+    descId: "Menghubungkan fitur ke story, API, test, dan risiko.",
+    icon: "GitMerge",
     category: "technical",
   },
   {
@@ -254,9 +326,9 @@ export const CHAPTER_BLOCKS: ChapterBlock[] = [
     titleEn: "Open Questions",
     titleId: "Pertanyaan Terbuka",
     descEn:
-      "Lists unresolved questions with decision owners, impact if left unanswered, and decision deadlines.",
+      "Unresolved questions with owners and deadlines.",
     descId:
-      "Mendaftar pertanyaan yang belum terjawab beserta pemilik keputusan, dampak jika tak dijawab, dan tenggat pengambilan keputusan.",
+      "Pertanyaan belum terjawab beserta pemilik dan tenggat.",
     icon: "HelpCircle",
     category: "product",
   },
@@ -302,10 +374,120 @@ export const STANDARD_TEMPLATES: Record<PRDMode, string[]> = {
   ],
 };
 
+export interface BlockLink {
+  /** ID prefix this block mints (e.g. "FEAT"); later chapters cite "FEAT-01" verbatim. */
+  produces?: string;
+  /** Block ids whose content this block must stay consistent with. */
+  consumes?: string[];
+}
+
+// Cross-chapter wiring. Canonical block order must never consume a later block
+// (asserted in chapterBlocks.test.ts), so the default layout has no forward refs.
+export const BLOCK_LINKS: Record<string, BlockLink> = {
+  personas: { produces: "PERS", consumes: ["overview", "problem-market"] },
+  "feature-scope": { consumes: ["overview", "problem-market", "personas"] },
+  "out-of-scope": { consumes: ["feature-scope"] },
+  "feature-spec": { produces: "FEAT", consumes: ["feature-scope"] },
+  "user-stories": {
+    produces: "US",
+    consumes: ["personas", "feature-spec", "feature-scope"],
+  },
+  "ux-journey": { consumes: ["personas", "user-stories", "feature-spec", "feature-scope"] },
+  "constraints-dependencies": { produces: "DEP", consumes: ["overview", "feature-scope"] },
+  architecture: { consumes: ["constraints-dependencies", "feature-spec", "feature-scope"] },
+  "data-models": { produces: "ENT", consumes: ["feature-spec", "feature-scope", "architecture"] },
+  "api-contracts": {
+    produces: "API",
+    consumes: ["data-models", "feature-spec", "feature-scope", "architecture"],
+  },
+  "frontend-arch": { consumes: ["api-contracts", "ux-journey", "feature-spec"] },
+  "security-privacy": {
+    consumes: ["personas", "data-models", "api-contracts", "architecture"],
+  },
+  nfr: { produces: "NFR", consumes: ["architecture", "security-privacy"] },
+  "success-metrics": { produces: "KPI", consumes: ["overview", "feature-scope"] },
+  "analytics-tracking": {
+    produces: "EVT",
+    consumes: ["success-metrics", "feature-spec", "feature-scope"],
+  },
+  gtm: { consumes: ["success-metrics", "personas", "overview", "problem-market"] },
+  risks: {
+    produces: "RISK",
+    consumes: [
+      "constraints-dependencies",
+      "security-privacy",
+      "feature-scope",
+      "architecture",
+      "problem-market",
+    ],
+  },
+  timeline: { produces: "MS", consumes: ["feature-spec", "feature-scope", "risks"] },
+  compliance: { consumes: ["security-privacy", "data-models", "feature-scope"] },
+  "platform-accessibility": { consumes: ["personas", "ux-journey", "frontend-arch"] },
+  testing: {
+    produces: "TC",
+    consumes: [
+      "feature-spec",
+      "user-stories",
+      "nfr",
+      "api-contracts",
+      "security-privacy",
+      "platform-accessibility",
+      "risks",
+    ],
+  },
+  "error-handling": {
+    consumes: ["api-contracts", "nfr", "constraints-dependencies", "feature-spec"],
+  },
+  "release-operations": {
+    consumes: ["architecture", "nfr", "risks", "constraints-dependencies", "testing"],
+  },
+  "ai-agent-guidelines": {
+    consumes: ["architecture", "data-models", "api-contracts", "frontend-arch"],
+  },
+  traceability: {
+    consumes: [
+      "feature-spec",
+      "personas",
+      "user-stories",
+      "data-models",
+      "api-contracts",
+      "nfr",
+      "testing",
+      "risks",
+      "success-metrics",
+      "analytics-tracking",
+    ],
+  },
+  "open-questions": { consumes: ["risks", "constraints-dependencies"] },
+};
+
+export interface OrderIssue {
+  blockId: string;
+  /** Selected source blocks that currently sit after `blockId`. */
+  sourceIds: string[];
+}
+
+/**
+ * Blocks placed before a selected source they depend on. The prompt composer
+ * skips such references, so the chapters would lose their cross-links.
+ * Unselected sources are fine: the block defines a minimal version itself.
+ */
+export function findOrderIssues(selectedIds: string[]): OrderIssue[] {
+  const issues: OrderIssue[] = [];
+  selectedIds.forEach((id, index) => {
+    const sourceIds = (BLOCK_LINKS[id]?.consumes ?? []).filter(
+      (src) => selectedIds.indexOf(src) > index,
+    );
+    if (sourceIds.length > 0) issues.push({ blockId: id, sourceIds });
+  });
+  return issues;
+}
+
 /** Look up a block by its slug id. Returns undefined for unknown ids. */
 export function getChapterBlock(id: string): ChapterBlock | undefined {
   return CHAPTER_BLOCKS.find((block) => block.id === id);
 }
 
 /** Hard cap on how many extra blocks a user may compose in the Custom PRD Builder. */
-export const MAX_CUSTOM_BLOCKS = 15;
+export const MAX_CUSTOM_BLOCKS = 20;

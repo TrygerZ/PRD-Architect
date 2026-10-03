@@ -5,36 +5,46 @@ import {
   STANDARD_TEMPLATES,
   getChapterBlock,
   MAX_CUSTOM_BLOCKS,
+  BLOCK_LINKS,
+  findOrderIssues,
 } from "./chapterBlocks";
 
 // The canonical order is part of this registry's public contract.
 const EXPECTED_BLOCK_IDS = [
   "overview",
+  "glossary-references",
   "problem-market",
+  "personas",
   "feature-scope",
   "out-of-scope",
   "feature-spec",
   "user-stories",
   "ux-journey",
+  "constraints-dependencies",
   "architecture",
   "data-models",
   "api-contracts",
   "frontend-arch",
+  "security-privacy",
   "nfr",
   "success-metrics",
+  "analytics-tracking",
   "gtm",
   "risks",
   "timeline",
   "compliance",
+  "platform-accessibility",
   "testing",
   "error-handling",
+  "release-operations",
   "ai-agent-guidelines",
+  "traceability",
   "open-questions",
 ];
 
 describe("CHAPTER_BLOCKS", () => {
-  it("contains exactly 21 blocks", () => {
-    expect(CHAPTER_BLOCKS).toHaveLength(21);
+  it("contains exactly 29 blocks", () => {
+    expect(CHAPTER_BLOCKS).toHaveLength(29);
   });
 
   it("has unique ids", () => {
@@ -61,6 +71,13 @@ describe("CHAPTER_BLOCKS", () => {
         expect(field.trim().length).toBeGreaterThan(0);
       }
       expect(["product", "technical"]).toContain(block.category);
+    }
+  });
+
+  it("keeps card descriptions short enough to fit the 2-line card", () => {
+    for (const block of CHAPTER_BLOCKS) {
+      expect(block.descEn.length, block.id).toBeLessThanOrEqual(70);
+      expect(block.descId.length, block.id).toBeLessThanOrEqual(75);
     }
   });
 });
@@ -109,8 +126,57 @@ describe("getChapterBlock", () => {
   });
 });
 
+describe("BLOCK_LINKS", () => {
+  const ids = CHAPTER_BLOCKS.map((b) => b.id);
+
+  it("only references known block ids and never self-consumes", () => {
+    for (const [id, link] of Object.entries(BLOCK_LINKS)) {
+      expect(ids, id).toContain(id);
+      for (const src of link.consumes ?? []) {
+        expect(ids, `${id} -> ${src}`).toContain(src);
+        expect(src, id).not.toBe(id);
+      }
+    }
+  });
+
+  it("uses a unique ID prefix per producing block", () => {
+    const prefixes = Object.values(BLOCK_LINKS)
+      .map((l) => l.produces)
+      .filter((p): p is string => Boolean(p));
+    expect(new Set(prefixes).size).toBe(prefixes.length);
+    for (const p of prefixes) expect(p).toMatch(/^[A-Z]{2,5}$/);
+  });
+
+  it("never consumes a block that comes later in canonical order", () => {
+    for (const [id, link] of Object.entries(BLOCK_LINKS)) {
+      for (const src of link.consumes ?? []) {
+        expect(ids.indexOf(src), `${id} consumes later block ${src}`).toBeLessThan(
+          ids.indexOf(id),
+        );
+      }
+    }
+  });
+});
+
+describe("findOrderIssues", () => {
+  it("is empty for the canonical order and for empty input", () => {
+    expect(findOrderIssues(CHAPTER_BLOCKS.map((b) => b.id))).toEqual([]);
+    expect(findOrderIssues([])).toEqual([]);
+  });
+
+  it("flags a block placed before a selected source", () => {
+    expect(findOrderIssues(["user-stories", "feature-spec"])).toEqual([
+      { blockId: "user-stories", sourceIds: ["feature-spec"] },
+    ]);
+  });
+
+  it("ignores sources that are not selected", () => {
+    expect(findOrderIssues(["user-stories"])).toEqual([]);
+  });
+});
+
 describe("MAX_CUSTOM_BLOCKS", () => {
-  it("equals 15", () => {
-    expect(MAX_CUSTOM_BLOCKS).toBe(15);
+  it("equals 20", () => {
+    expect(MAX_CUSTOM_BLOCKS).toBe(20);
   });
 });

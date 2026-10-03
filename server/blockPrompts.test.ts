@@ -122,6 +122,53 @@ describe("composeCustomSystemPrompt", () => {
     expect(prompt).toContain("### Feature Breakdown (WBS)");
   });
 
+  it("tells a producing block to mint sequential IDs", () => {
+    expect(composeCustomSystemPrompt(["user-stories"], "en")).toContain("`US-01`");
+    expect(composeCustomSystemPrompt(["user-stories"], "id")).toContain("Aturan ID");
+  });
+
+  it("links a block to a selected source that comes earlier", () => {
+    const prompt = composeCustomSystemPrompt(["feature-spec", "user-stories"], "en");
+    expect(prompt).toContain("Chapter 1 (Feature Specification & Logic; FEAT-xx)");
+    const idPrompt = composeCustomSystemPrompt(["feature-spec", "user-stories"], "id");
+    expect(idPrompt).toContain("Chapter 1 (Spesifikasi Fitur & Logika; FEAT-xx)");
+  });
+
+  it("skips sources that are unselected or come later", () => {
+    expect(composeCustomSystemPrompt(["user-stories"], "en")).not.toContain("Stay consistent");
+    expect(composeCustomSystemPrompt(["user-stories", "feature-spec"], "en")).not.toContain(
+      "Stay consistent",
+    );
+  });
+
+  it("wires new modules: personas feed user-stories, traceability cites earlier IDs", () => {
+    const prompt = composeCustomSystemPrompt(
+      ["personas", "feature-spec", "user-stories", "testing", "traceability"],
+      "en",
+    );
+    expect(prompt).toContain("`PERS-01`");
+    expect(prompt).toContain("Chapter 1 (User Personas; PERS-xx)");
+    expect(prompt).toContain("Chapter 3 (User Stories & Acceptance Criteria; US-xx)");
+    expect(prompt).toContain("Never invent an ID");
+  });
+
+  it("every new module composes in both languages at the cap", () => {
+    const ids = [
+      "glossary-references",
+      "personas",
+      "constraints-dependencies",
+      "security-privacy",
+      "analytics-tracking",
+      "platform-accessibility",
+      "release-operations",
+      "traceability",
+    ];
+    for (const lang of ["en", "id"] as const) {
+      const prompt = composeCustomSystemPrompt(ids, lang);
+      expect((prompt.match(/^## \d+\./gm) || []).length).toBe(ids.length);
+    }
+  });
+
   it("closing directive reflects exact count", () => {
     const prompt = composeCustomSystemPrompt(["overview", "nfr"], "en");
     expect(prompt).toContain("ALL 2 chapters");
@@ -192,14 +239,10 @@ describe("validateCustomChapterIds", () => {
 
   it("rejects > MAX_CUSTOM_BLOCKS", () => {
     const ids = CHAPTER_BLOCKS.slice(0, MAX_CUSTOM_BLOCKS + 1).map((b) => b.id);
-    // Need 16 ids but we only have 21 blocks — use duplicates padded to exceed via valid ids
-    // Instead build 16 unique ids by adding synthetic valid ones; we have 21 so slice 16 works
-    const many = CHAPTER_BLOCKS.slice(0, 16).map((b) => b.id);
-    const r = validateCustomChapterIds(many);
+    expect(ids.length).toBeGreaterThan(MAX_CUSTOM_BLOCKS);
+    const r = validateCustomChapterIds(ids);
     expect(r.ok).toBe(false);
     if (!r.ok) expect(r.reason).toMatch(/at most/i);
-    // Also test via the variable
-    expect(ids.length).toBeGreaterThan(MAX_CUSTOM_BLOCKS);
   });
 
   it("rejects duplicate ids", () => {

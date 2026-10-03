@@ -46,19 +46,35 @@ import {
   RefreshCcw,
   Bot,
   HelpCircle,
+  BookOpen,
+  UserRound,
+  Link2,
+  Lock,
+  BarChart3,
+  ServerCog,
+  Smartphone,
+  GitMerge,
   X,
   GripVertical,
   RotateCcw,
   Library,
   Layers2,
 } from "lucide-react";
-import { CHAPTER_BLOCKS, MAX_CUSTOM_BLOCKS, getChapterBlock } from "../../shared/chapterBlocks";
+import { CHAPTER_BLOCKS, MAX_CUSTOM_BLOCKS, findOrderIssues, getChapterBlock } from "../../shared/chapterBlocks";
 import type { ChapterBlock } from "../../shared/chapterBlocks";
 import { safeSetLocalStorage } from "../utils/storage";
 import { useT } from "../hooks/useT";
 
-// icon map explicit for all 21 registry icons
+// icon map explicit for every registry icon (unknown names fall back to FileText)
 const ICON_MAP: Record<string, React.ComponentType<{ size?: number; className?: string; strokeWidth?: number }>> = {
+  BookOpen,
+  UserRound,
+  Link2,
+  Lock,
+  BarChart3,
+  ServerCog,
+  Smartphone,
+  GitMerge,
   FileText,
   AlertTriangle,
   Layers,
@@ -435,6 +451,18 @@ export function CustomPrdBuilder({ language, selectedIds, onChangeSelectedIds }:
 
   const counterText = `${selectedIds.length}/${MAX_CUSTOM_BLOCKS}`;
 
+  const orderWarnings = useMemo(() => {
+    const titleOf = (id: string) => {
+      const b = getChapterBlock(id);
+      return b ? (language === "en" ? b.titleEn : b.titleId) : id;
+    };
+    return findOrderIssues(selectedIds).map((issue) =>
+      t.builder.orderWarningItem
+        .replace("{block}", titleOf(issue.blockId))
+        .replace("{sources}", issue.sourceIds.map(titleOf).join(", ")),
+    );
+  }, [selectedIds, language, t]);
+
   return (
     <div className="w-full">
       {/* Toolbar */}
@@ -479,6 +507,23 @@ export function CustomPrdBuilder({ language, selectedIds, onChangeSelectedIds }:
           </button>
         </div>
       </div>
+
+      {orderWarnings.length > 0 && (
+        <div
+          role="status"
+          className="mb-3 rounded-xl border border-[var(--color-warning)]/30 bg-[var(--color-surface)] px-3 py-2.5 text-[11.5px] leading-snug text-[var(--color-text-secondary)]"
+        >
+          <p className="mb-1 flex items-center gap-1.5 font-medium text-[var(--color-warning)]">
+            <AlertTriangle size={12} strokeWidth={1.7} aria-hidden="true" />
+            {t.builder.orderWarningTitle}
+          </p>
+          <ul className="list-disc space-y-0.5 pl-5">
+            {orderWarnings.map((text) => (
+              <li key={text}>{text}</li>
+            ))}
+          </ul>
+        </div>
+      )}
 
       <DndContext
         sensors={sensors}
