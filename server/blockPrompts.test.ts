@@ -192,14 +192,10 @@ describe("validateCustomChapterIds", () => {
 
   it("rejects > MAX_CUSTOM_BLOCKS", () => {
     const ids = CHAPTER_BLOCKS.slice(0, MAX_CUSTOM_BLOCKS + 1).map((b) => b.id);
-    // Need 16 ids but we only have 21 blocks — use duplicates padded to exceed via valid ids
-    // Instead build 16 unique ids by adding synthetic valid ones; we have 21 so slice 16 works
-    const many = CHAPTER_BLOCKS.slice(0, 16).map((b) => b.id);
-    const r = validateCustomChapterIds(many);
+    expect(ids.length).toBeGreaterThan(MAX_CUSTOM_BLOCKS);
+    const r = validateCustomChapterIds(ids);
     expect(r.ok).toBe(false);
     if (!r.ok) expect(r.reason).toMatch(/at most/i);
-    // Also test via the variable
-    expect(ids.length).toBeGreaterThan(MAX_CUSTOM_BLOCKS);
   });
 
   it("rejects duplicate ids", () => {

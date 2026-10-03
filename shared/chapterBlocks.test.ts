@@ -110,7 +110,7 @@ describe("getChapterBlock", () => {
 });
 
 describe("MAX_CUSTOM_BLOCKS", () => {
-  it("equals 15", () => {
-    expect(MAX_CUSTOM_BLOCKS).toBe(15);
+  it("equals 20", () => {
+    expect(MAX_CUSTOM_BLOCKS).toBe(20);
   });
 });

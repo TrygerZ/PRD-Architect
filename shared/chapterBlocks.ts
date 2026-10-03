@@ -308,4 +308,4 @@ export function getChapterBlock(id: string): ChapterBlock | undefined {
 }
 
 /** Hard cap on how many extra blocks a user may compose in the Custom PRD Builder. */
-export const MAX_CUSTOM_BLOCKS = 15;
+export const MAX_CUSTOM_BLOCKS = 20;
