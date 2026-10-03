@@ -5,6 +5,7 @@ import {
   STANDARD_TEMPLATES,
   getChapterBlock,
   MAX_CUSTOM_BLOCKS,
+  BLOCK_LINKS,
 } from "./chapterBlocks";
 
 // The canonical order is part of this registry's public contract.
@@ -113,6 +114,38 @@ describe("getChapterBlock", () => {
   it("returns undefined for unknown or empty ids", () => {
     expect(getChapterBlock("does-not-exist")).toBeUndefined();
     expect(getChapterBlock("")).toBeUndefined();
+  });
+});
+
+describe("BLOCK_LINKS", () => {
+  const ids = CHAPTER_BLOCKS.map((b) => b.id);
+
+  it("only references known block ids and never self-consumes", () => {
+    for (const [id, link] of Object.entries(BLOCK_LINKS)) {
+      expect(ids, id).toContain(id);
+      for (const src of link.consumes ?? []) {
+        expect(ids, `${id} -> ${src}`).toContain(src);
+        expect(src, id).not.toBe(id);
+      }
+    }
+  });
+
+  it("uses a unique ID prefix per producing block", () => {
+    const prefixes = Object.values(BLOCK_LINKS)
+      .map((l) => l.produces)
+      .filter((p): p is string => Boolean(p));
+    expect(new Set(prefixes).size).toBe(prefixes.length);
+    for (const p of prefixes) expect(p).toMatch(/^[A-Z]{2,5}$/);
+  });
+
+  it("never consumes a block that comes later in canonical order", () => {
+    for (const [id, link] of Object.entries(BLOCK_LINKS)) {
+      for (const src of link.consumes ?? []) {
+        expect(ids.indexOf(src), `${id} consumes later block ${src}`).toBeLessThan(
+          ids.indexOf(id),
+        );
+      }
+    }
   });
 });
 

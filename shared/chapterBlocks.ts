@@ -302,6 +302,45 @@ export const STANDARD_TEMPLATES: Record<PRDMode, string[]> = {
   ],
 };
 
+export interface BlockLink {
+  /** ID prefix this block mints (e.g. "FEAT"); later chapters cite "FEAT-01" verbatim. */
+  produces?: string;
+  /** Block ids whose content this block must stay consistent with. */
+  consumes?: string[];
+}
+
+// Cross-chapter wiring. Canonical block order must never consume a later block
+// (asserted in chapterBlocks.test.ts), so the default layout has no forward refs.
+export const BLOCK_LINKS: Record<string, BlockLink> = {
+  "feature-scope": { consumes: ["overview", "problem-market"] },
+  "out-of-scope": { consumes: ["feature-scope"] },
+  "feature-spec": { produces: "FEAT", consumes: ["feature-scope"] },
+  "user-stories": { produces: "US", consumes: ["feature-spec", "feature-scope"] },
+  "ux-journey": { consumes: ["user-stories", "feature-spec", "feature-scope"] },
+  architecture: { consumes: ["feature-spec", "feature-scope"] },
+  "data-models": { produces: "ENT", consumes: ["feature-spec", "feature-scope", "architecture"] },
+  "api-contracts": {
+    produces: "API",
+    consumes: ["data-models", "feature-spec", "feature-scope", "architecture"],
+  },
+  "frontend-arch": { consumes: ["api-contracts", "ux-journey", "feature-spec"] },
+  nfr: { produces: "NFR", consumes: ["architecture"] },
+  "success-metrics": { produces: "KPI", consumes: ["overview", "feature-scope"] },
+  gtm: { consumes: ["success-metrics", "overview", "problem-market"] },
+  risks: { produces: "RISK", consumes: ["feature-scope", "architecture", "problem-market"] },
+  timeline: { produces: "MS", consumes: ["feature-spec", "feature-scope", "risks"] },
+  compliance: { consumes: ["data-models", "feature-scope"] },
+  testing: {
+    produces: "TC",
+    consumes: ["feature-spec", "user-stories", "nfr", "api-contracts", "risks"],
+  },
+  "error-handling": { consumes: ["api-contracts", "nfr", "feature-spec"] },
+  "ai-agent-guidelines": {
+    consumes: ["architecture", "data-models", "api-contracts", "frontend-arch"],
+  },
+  "open-questions": { consumes: ["risks"] },
+};
+
 /** Look up a block by its slug id. Returns undefined for unknown ids. */
 export function getChapterBlock(id: string): ChapterBlock | undefined {
   return CHAPTER_BLOCKS.find((block) => block.id === id);
