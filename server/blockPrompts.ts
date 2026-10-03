@@ -48,8 +48,7 @@ const BLOCK_INSTRUCTIONS: Record<string, BlockInstruction> = {
 - For MoSCoW, use EXACTLY this structure: a category heading line **Must-have**, then **Should-have**, **Could-have**, **Won't-have** (in that order), each followed IMMEDIATELY by a Markdown table with header \`| Feature | Description |\` and one table row per feature.
 - Each table row = EXACTLY ONE feature. The Feature cell contains a short, specific feature name (e.g. "User Registration"), NOT a long description and NOT multiple features.
 - STRICTLY FORBIDDEN: merging two features into a single cell, mixing multiple categories inside one table, or using a single MoSCoW table with a Priority column.
-- After the MoSCoW grouping, add a "Non-Goals / Out of Scope" subsection explicitly listing what is intentionally NOT being built in this phase, with a brief rationale for each item.
-- Right after the MoSCoW grouping (and Non-Goals), add a Heading 3 section named exactly "### Feature Breakdown (WBS)" containing nested Markdown bullet levels:
+- Right after the MoSCoW grouping, add a Heading 3 section named exactly "### Feature Breakdown (WBS)" containing nested Markdown bullet levels:
     - Level 1 (no indent or "- "): Feature Module / Epic — bold name, e.g. "- **Customer Account**"
     - Level 2 (indent 2 spaces): Feature — e.g. "  - User Registration"
     - Level 3 (indent 4 spaces): Sub-feature — e.g. "    - Email verification"
@@ -61,8 +60,7 @@ const BLOCK_INSTRUCTIONS: Record<string, BlockInstruction> = {
 - Untuk MoSCoW, gunakan TEPAT struktur ini: baris judul kategori **Must-have**, lalu **Should-have**, **Could-have**, **Won't-have** (sesuai urutan), masing-masing langsung diikuti tabel Markdown dengan header \`| Feature | Description |\` dan satu baris tabel per fitur.
 - Setiap baris tabel = TEPAT SATU fitur. Sel Feature berisi nama fitur singkat dan spesifik (mis. "Registrasi Pengguna"), BUKAN deskripsi panjang dan BUKAN beberapa fitur sekaligus.
 - DILARANG: menggabungkan dua fitur dalam satu sel, mencampur beberapa kategori dalam satu tabel, atau menggunakan satu tabel MoSCoW dengan kolom Priority.
-- Setelah pengelompokan MoSCoW, tambahkan sub-bagian "Non-Goals / Out of Scope" yang secara eksplisit mendaftar hal yang sengaja TIDAK dibangun pada fase ini, dengan alasan singkat untuk setiap item.
-- Tepat SETELAH pengelompokan MoSCoW (dan Non-Goals), tambahkan section Heading 3 dengan nama persis "### Feature Breakdown (WBS)" yang berisi level bullet Markdown bersarang:
+- Tepat SETELAH pengelompokan MoSCoW, tambahkan section Heading 3 dengan nama persis "### Feature Breakdown (WBS)" yang berisi level bullet Markdown bersarang:
     - Level 1 (tanpa indent atau "- "): Modul Fitur / Epic — nama tebal, mis. "- **Akun Pelanggan**"
     - Level 2 (indent 2 spasi): Fitur — mis. "  - Registrasi Pengguna"
     - Level 3 (indent 4 spasi): Sub-fitur — mis. "    - Verifikasi email"
@@ -134,12 +132,12 @@ const BLOCK_INSTRUCTIONS: Record<string, BlockInstruction> = {
     en: `**High-Level Technical Architecture**
 - Present the high-level system architecture, tech stack decisions, and alternatives considered for key architectural choices.
 - Include a System Context Diagram using Mermaid graph syntax (\`\`\`mermaid graph TD) showing how the system fits into the broader landscape: users, external services, and integrations.
-- Include an API Design Table with columns: Endpoint | Method | Description | Request | Response — minimum 5 endpoints.
+- Describe the main external interfaces (clients, third-party services) in prose only; do NOT list endpoints or payloads here, API Contracts owns that detail.
 - Mermaid graph rules: wrap node labels containing parentheses, commas, or special characters in double quotes; never use parentheses in edge labels (|...|).`,
     id: `**Arsitektur Teknis Tingkat Tinggi**
 - Sajikan arsitektur sistem tingkat tinggi, keputusan tech stack, dan alternatif yang dipertimbangkan untuk pilihan arsitektur kunci.
 - Sertakan Diagram Konteks Sistem menggunakan sintaks Mermaid graph (\`\`\`mermaid graph TD) yang menunjukkan bagaimana sistem cocok dalam lanskap yang lebih luas: pengguna, layanan eksternal, dan integrasi.
-- Sertakan Tabel Desain API dengan kolom: Endpoint | Method | Description | Request | Response — minimal 5 endpoint.
+- Jelaskan antarmuka eksternal utama (klien, layanan pihak ketiga) hanya dalam prosa; JANGAN daftar endpoint atau payload di sini, detailnya milik Kontrak API.
 - Aturan Mermaid graph: bungkus label node yang mengandung tanda kurung, koma, atau karakter khusus dengan tanda kutip ganda; jangan gunakan tanda kurung di edge label (|...|).`,
   },
   "data-models": {
