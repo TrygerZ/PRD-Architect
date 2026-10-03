@@ -2,7 +2,7 @@
 // Pure, deterministic, side-effect free.
 // Each block has a single canonical instruction merged across modes; split into per-mode variants when granularity needed.
 
-import { getChapterBlock, MAX_CUSTOM_BLOCKS } from "../shared/chapterBlocks";
+import { BLOCK_LINKS, getChapterBlock, MAX_CUSTOM_BLOCKS } from "../shared/chapterBlocks";
 
 // ---------------------------------------------------------------------------
 // Per-block canonical instructions (adapted from server/prompts.ts)
@@ -353,6 +353,46 @@ export function validateCustomChapterIds(
 }
 
 /**
+ * Cross-chapter notes for the block at `index`: the ID scheme it mints and a
+ * reference line to selected sources that appear EARLIER in the user's order.
+ * Sources that are unselected or come later are skipped, so the model never
+ * cites a chapter that does not exist yet.
+ */
+function buildLinkNotes(blockIds: string[], index: number, language: Lang): string {
+  const isEn = language === "en";
+  const link = BLOCK_LINKS[blockIds[index]];
+  const notes: string[] = [];
+
+  if (link?.produces) {
+    const p = link.produces;
+    notes.push(
+      isEn
+        ? `- ID rule: label every item in this chapter with a sequential ID \`${p}-01\`, \`${p}-02\`, ... (no gaps). Later chapters cite these IDs verbatim.`
+        : `- Aturan ID: beri setiap item di chapter ini ID berurutan \`${p}-01\`, \`${p}-02\`, ... (tanpa celah). Chapter berikutnya mengutip ID ini persis.`,
+    );
+  }
+
+  const refs: string[] = [];
+  for (const src of link?.consumes ?? []) {
+    const srcIndex = blockIds.indexOf(src);
+    if (srcIndex === -1 || srcIndex > index) continue;
+    const srcBlock = getChapterBlock(src)!;
+    const title = isEn ? srcBlock.titleEn : srcBlock.titleId;
+    const prefix = BLOCK_LINKS[src]?.produces;
+    refs.push(`Chapter ${srcIndex + 1} (${title}${prefix ? `; ${prefix}-xx` : ""})`);
+  }
+  if (refs.length > 0) {
+    notes.push(
+      isEn
+        ? `- Stay consistent with earlier chapters: ${refs.join(", ")}. Reuse their names and IDs verbatim; never invent or rename them.`
+        : `- Konsisten dengan chapter sebelumnya: ${refs.join(", ")}. Pakai nama dan ID-nya persis; jangan mengarang atau mengganti nama.`,
+    );
+  }
+
+  return notes.join("\n");
+}
+
+/**
  * Compose a deterministic system prompt for custom PRD generation.
  * Throws with a clear message if validation fails.
  */
@@ -410,7 +450,8 @@ ${chapterList}`;
       const block = getChapterBlock(id)!;
       const title = isEn ? block.titleEn : block.titleId;
       const instruction = getBlockInstructions(id, language)!;
-      return `Chapter ${idx + 1} — ${title}:\n${instruction}`;
+      const linkNotes = buildLinkNotes(blockIds, idx, language);
+      return `Chapter ${idx + 1} — ${title}:\n${instruction}${linkNotes ? `\n${linkNotes}` : ""}`;
     })
     .join("\n\n");
 

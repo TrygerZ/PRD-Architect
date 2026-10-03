@@ -122,6 +122,25 @@ describe("composeCustomSystemPrompt", () => {
     expect(prompt).toContain("### Feature Breakdown (WBS)");
   });
 
+  it("tells a producing block to mint sequential IDs", () => {
+    expect(composeCustomSystemPrompt(["user-stories"], "en")).toContain("`US-01`");
+    expect(composeCustomSystemPrompt(["user-stories"], "id")).toContain("Aturan ID");
+  });
+
+  it("links a block to a selected source that comes earlier", () => {
+    const prompt = composeCustomSystemPrompt(["feature-spec", "user-stories"], "en");
+    expect(prompt).toContain("Chapter 1 (Feature Specification & Logic; FEAT-xx)");
+    const idPrompt = composeCustomSystemPrompt(["feature-spec", "user-stories"], "id");
+    expect(idPrompt).toContain("Chapter 1 (Spesifikasi Fitur & Logika; FEAT-xx)");
+  });
+
+  it("skips sources that are unselected or come later", () => {
+    expect(composeCustomSystemPrompt(["user-stories"], "en")).not.toContain("Stay consistent");
+    expect(composeCustomSystemPrompt(["user-stories", "feature-spec"], "en")).not.toContain(
+      "Stay consistent",
+    );
+  });
+
   it("closing directive reflects exact count", () => {
     const prompt = composeCustomSystemPrompt(["overview", "nfr"], "en");
     expect(prompt).toContain("ALL 2 chapters");
