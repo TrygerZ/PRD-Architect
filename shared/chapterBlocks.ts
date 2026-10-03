@@ -462,6 +462,28 @@ export const BLOCK_LINKS: Record<string, BlockLink> = {
   "open-questions": { consumes: ["risks", "constraints-dependencies"] },
 };
 
+export interface OrderIssue {
+  blockId: string;
+  /** Selected source blocks that currently sit after `blockId`. */
+  sourceIds: string[];
+}
+
+/**
+ * Blocks placed before a selected source they depend on. The prompt composer
+ * skips such references, so the chapters would lose their cross-links.
+ * Unselected sources are fine: the block defines a minimal version itself.
+ */
+export function findOrderIssues(selectedIds: string[]): OrderIssue[] {
+  const issues: OrderIssue[] = [];
+  selectedIds.forEach((id, index) => {
+    const sourceIds = (BLOCK_LINKS[id]?.consumes ?? []).filter(
+      (src) => selectedIds.indexOf(src) > index,
+    );
+    if (sourceIds.length > 0) issues.push({ blockId: id, sourceIds });
+  });
+  return issues;
+}
+
 /** Look up a block by its slug id. Returns undefined for unknown ids. */
 export function getChapterBlock(id: string): ChapterBlock | undefined {
   return CHAPTER_BLOCKS.find((block) => block.id === id);

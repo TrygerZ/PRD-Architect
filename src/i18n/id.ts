@@ -42,6 +42,8 @@ export const id: Dict = {
     productGroup: "Produk & Bisnis",
     technicalGroup: "Teknis",
     limitHint: "Maksimal 20 blok tercapai — hapus blok untuk menambah lagi.",
+    orderWarningTitle: "Urutan disarankan",
+    orderWarningItem: "{block} paling baik setelah {sources}.",
     libraryHint: "Klik kartu untuk menambah. Seret untuk ubah urutan atau pindah panel.",
     canvasHint: "Klik kartu untuk menghapus. Seret untuk ubah urutan. Nomor = urutan chapter final.",
     emptyTitle: "Belum ada chapter",

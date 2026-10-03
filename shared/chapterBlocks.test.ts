@@ -6,6 +6,7 @@ import {
   getChapterBlock,
   MAX_CUSTOM_BLOCKS,
   BLOCK_LINKS,
+  findOrderIssues,
 } from "./chapterBlocks";
 
 // The canonical order is part of this registry's public contract.
@@ -154,6 +155,23 @@ describe("BLOCK_LINKS", () => {
         );
       }
     }
+  });
+});
+
+describe("findOrderIssues", () => {
+  it("is empty for the canonical order and for empty input", () => {
+    expect(findOrderIssues(CHAPTER_BLOCKS.map((b) => b.id))).toEqual([]);
+    expect(findOrderIssues([])).toEqual([]);
+  });
+
+  it("flags a block placed before a selected source", () => {
+    expect(findOrderIssues(["user-stories", "feature-spec"])).toEqual([
+      { blockId: "user-stories", sourceIds: ["feature-spec"] },
+    ]);
+  });
+
+  it("ignores sources that are not selected", () => {
+    expect(findOrderIssues(["user-stories"])).toEqual([]);
   });
 });
 
