@@ -18,6 +18,7 @@ import { getChapterBlock } from "./shared/chapterBlocks";
 import { activeParses, acquireParseSlot, releaseParseSlot, extractTextFromFile } from "./server/fileExtraction";
 import { registerAuthRoutes } from "./server/auth";
 import { resolveEndpoint, endpointErrorMessage, resolveApiKey, allowServerKeyFallback } from "./server/endpoint";
+import { isBlockedStaticPath } from "./server/staticPathGuard";
 
 // Wave 7 — Track A: Union types for type safety (TS-04 to TS-07)
 // Shared with the frontend via /shared/types.ts (single source of truth)
@@ -957,10 +958,13 @@ async function startServer() {
       res.send(html);
     };
 
-    // Cegah eksposur server bundle dan file source map (*.map) via express.static
+    // Cegah eksposur server bundle dan file source map (*.map) via express.static.
+    // Predikatnya di server/staticPathGuard.ts (pure + unit-tested): decode +
+    // normalize seperti yang dilakukan express.static, karena `//server.js`,
+    // `/./server.js` dan `/server.js/.` menunjuk file yang sama.
+    // 404 untuk semua kasus, termasuk escape rusak - bedanya cuma kosmetik.
     app.use((req, res, next) => {
-      const p = req.path.toLowerCase();
-      if (p === '/server.js' || p.endsWith('.map')) {
+      if (isBlockedStaticPath(req.path)) {
         return res.status(404).send('Not Found');
       }
       next();
@@ -970,9 +974,16 @@ async function startServer() {
     // Asset ber-hash di /assets aman di-cache selamanya; index.html tetap lewat renderSpa.
     app.use(
       '/assets',
-      express.static(path.join(distPath, 'assets'), { index: false, maxAge: '1y', immutable: true }),
+      express.static(path.join(distPath, 'assets'), {
+        index: false,
+        maxAge: '1y',
+        immutable: true,
+        dotfiles: 'deny',
+      }),
     );
-    app.use(express.static(distPath, { index: false }));
+    // Asset hashed yang hilang harus 404, bukan HTML dari SPA fallback (bikin browser salah parse).
+    app.use('/assets', (_req, res) => res.status(404).end());
+    app.use(express.static(distPath, { index: false, dotfiles: 'deny' }));
     app.get('*', renderSpa);
   }
 }
