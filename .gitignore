@@ -8,6 +8,7 @@ coverage/
 !.env.example
 docs/
 .playwright-mcp
+.docs/
 
 # Local agent / MCP tooling (machine-specific, never committed)
 .codegraph/
@@ -16,3 +17,4 @@ docs/
 .mcp.json
 opencode.jsonc
 bugs/
+.supervisor/
