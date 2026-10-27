@@ -14,7 +14,7 @@ export function startKeepWarm(
   // Local dev / tanpa env var: tidak ada yang perlu dijaga tetap hidup.
   if (!baseUrl) return () => {};
 
-  const intervalMs = opts?.intervalMs ?? 10 * 60 * 1000;
+  const intervalMs = opts?.intervalMs ?? 5 * 60 * 1000;
   const fetchImpl = opts?.fetchImpl ?? fetch;
   const onError = opts?.onError ?? ((err: unknown) => log("WARN", "Keep-warm ping failed.", err));
 

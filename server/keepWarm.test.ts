@@ -51,12 +51,12 @@ describe("startKeepWarm", () => {
     expect(fn).toHaveBeenCalledTimes(1);
   });
 
-  it("defaults to a 10 minute interval", async () => {
+  it("defaults to a 5 minute interval", async () => {
     vi.useFakeTimers();
     const { fn, fetchImpl } = fakeFetch();
 
     startKeepWarm(BASE, { fetchImpl });
-    await vi.advanceTimersByTimeAsync(10 * 60 * 1000 - 1);
+    await vi.advanceTimersByTimeAsync(5 * 60 * 1000 - 1);
     expect(fn).not.toHaveBeenCalled();
 
     await vi.advanceTimersByTimeAsync(1);
