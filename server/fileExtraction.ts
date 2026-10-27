@@ -1,9 +1,6 @@
 // Ekstraksi teks dari file upload (PDF/DOCX/XLSX/CSV/image/text) + concurrency
 // limiter. Dipisah dari server.ts agar monolit tidak membengkak (pure move).
 import fsp from "fs/promises";
-import mammoth from "mammoth";
-import ExcelJS from "exceljs";
-import { fileTypeFromFile } from 'file-type';
 import { sanitizeCellForAI } from "./sanitize";
 import { log } from "./log";
 
@@ -54,6 +51,10 @@ export async function extractTextFromFile(filePath: string, mimeType: string, or
   const isBinaryFile = binaryMimeTypes.includes(mimeType);
 
   try {
+    // Parser berat dimuat lazily (pola sama dengan pdf-parse di bawah) agar boot
+    // server tidak membayar biaya import-nya. `await import()` di-cache Node, jadi
+    // hanya request upload pertama yang menanggung biayanya.
+    const { fileTypeFromFile } = await import("file-type");
     const detectedType = await fileTypeFromFile(filePath);
     if (detectedType) {
       const ext = detectedType.ext;
@@ -101,6 +102,7 @@ export async function extractTextFromFile(filePath: string, mimeType: string, or
         text = text.substring(0, MAX_EXTRACTED_CHARS) + '\n[TRUNCATED: Content exceeded extraction limit]';
       }
     } else if (mimeType === 'application/vnd.openxmlformats-officedocument.wordprocessingml.document') {
+      const mammoth = (await import("mammoth")).default;
       const result = await mammoth.extractRawText({ path: filePath });
       text = result.value;
       if (text.length > MAX_EXTRACTED_CHARS) {
@@ -115,6 +117,7 @@ export async function extractTextFromFile(filePath: string, mimeType: string, or
       originalName.toLowerCase().endsWith('.xlsx') ||
       originalName.toLowerCase().endsWith('.xls')
     ) {
+      const ExcelJS = (await import("exceljs")).default;
       const workbook = new ExcelJS.Workbook();
       const lowerName = originalName.toLowerCase();
 
