@@ -19,6 +19,7 @@ import { activeParses, acquireParseSlot, releaseParseSlot, extractTextFromFile }
 import { registerAuthRoutes } from "./server/auth";
 import { resolveEndpoint, endpointErrorMessage, resolveApiKey, allowServerKeyFallback } from "./server/endpoint";
 import { isBlockedStaticPath } from "./server/staticPathGuard";
+import { startKeepWarm } from "./server/keepWarm";
 
 // Wave 7 — Track A: Union types for type safety (TS-04 to TS-07)
 // Shared with the frontend via /shared/types.ts (single source of truth)
@@ -880,6 +881,12 @@ async function main() {
     log('INFO', `Server running on http://localhost:${PORT}`);
   });
 
+  // Render free tier spin-down setelah 15 menit idle — ping diri sendiri agar tetap hidup.
+  // Hanya di production dan hanya jika Render menyediakan URL publiknya.
+  const stopKeepWarm = process.env.NODE_ENV === "production"
+    ? startKeepWarm(process.env.RENDER_EXTERNAL_URL ?? "")
+    : () => {};
+
   // Graceful shutdown — batalkan semua koneksi upstream yang masih aktif (BUG L6)
   let isShuttingDown = false;
   const gracefulShutdown = (signal: string) => {
@@ -895,6 +902,8 @@ async function main() {
       controller.abort();
     }
     activeGenerations.clear();
+
+    stopKeepWarm();
 
     // Tutup koneksi keep-alive idle jika runtime mendukung (Node 18.2+)
     server.closeIdleConnections?.();
