@@ -967,6 +967,11 @@ async function startServer() {
     });
 
     app.get('/index.html', renderSpa);
+    // Asset ber-hash di /assets aman di-cache selamanya; index.html tetap lewat renderSpa.
+    app.use(
+      '/assets',
+      express.static(path.join(distPath, 'assets'), { index: false, maxAge: '1y', immutable: true }),
+    );
     app.use(express.static(distPath, { index: false }));
     app.get('*', renderSpa);
   }
