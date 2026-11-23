@@ -39,6 +39,13 @@ export const id: Dict = {
     document: "Dokumen",
     canvas: "WBS Canvas",
     canvasLabel: "Lihat canvas Work Breakdown Structure",
+    specification: "Spesifikasi",
+    deliverables: "Deliverable & Sub-item",
+    criteria: "Kriteria & Spesifikasi",
+    openChapter: "Buka Bab {num}",
+    openDocument: "Buka Dokumen",
+    moduleSummary: "{count} fitur terkelompok di dalam modul ini.",
+    subfeatureSummary: "Deliverable sub-fitur dalam cakupan ini.",
   },
   builder: {
     tabStandard: "Standar",

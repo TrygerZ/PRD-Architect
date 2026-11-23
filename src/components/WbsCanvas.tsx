@@ -23,6 +23,8 @@ import {
   ChevronsUpDown,
 } from "lucide-react";
 import { extractWbs, flattenWbs, type WbsNode, type WbsPriority } from "../utils/wbs";
+import { getSections } from "../utils/sections";
+import { WBS_SECTION_RE } from "../utils/wbsTable";
 import type { ThemeMode } from "../utils/theme";
 import { DetailPanel } from "./DetailPanel";
 import { layout, type WbsFlowNode } from "./wbsLayout";
@@ -481,6 +483,17 @@ export function WbsCanvas({
     [tree.root, selected?.id],
   );
 
+  const wbsChapterNumber = useMemo(() => {
+    const sections = getSections(content);
+    const idx = sections.findIndex(
+      (s) =>
+        WBS_SECTION_RE.test(s.heading) ||
+        WBS_SECTION_RE.test(s.content) ||
+        /moscow|feature\s+scope|cakupan/i.test(s.heading),
+    );
+    return idx >= 0 ? String(idx + 1).padStart(2, "0") : undefined;
+  }, [content]);
+
   return (
     <div className="relative flex flex-col h-full min-h-0 no-print">
       {/* Warnings banner - info, not error */}
@@ -577,6 +590,7 @@ export function WbsCanvas({
             language={language}
             theme={theme}
             breadcrumb={selectedBreadcrumb}
+            chapterNumber={wbsChapterNumber}
             onClose={() => setSelected(null)}
             onOpenDocument={onJumpToDocument}
             onAddNote={onAddWbsNote}

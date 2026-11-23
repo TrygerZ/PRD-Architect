@@ -93,6 +93,13 @@ const REQUIRED_KEYS = [
   "sheet.incompleteLengthDesc",
   "sheet.incompleteChaptersDesc",
   "sheet.continueCta",
+  "wbs.specification",
+  "wbs.deliverables",
+  "wbs.criteria",
+  "wbs.openChapter",
+  "wbs.openDocument",
+  "wbs.moduleSummary",
+  "wbs.subfeatureSummary",
 ];
 
 describe("i18n dictionary parity and copy hygiene", () => {

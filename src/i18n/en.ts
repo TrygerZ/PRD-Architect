@@ -37,6 +37,13 @@ export const en = {
     document: "Document",
     canvas: "WBS Canvas",
     canvasLabel: "View Work Breakdown Structure canvas",
+    specification: "Specification",
+    deliverables: "Deliverables & Sub-items",
+    criteria: "Criteria & Specs",
+    openChapter: "Open Ch. {num}",
+    openDocument: "Open Document",
+    moduleSummary: "{count} features grouped under this module.",
+    subfeatureSummary: "Sub-feature deliverable within this scope.",
   },
   builder: {
     tabStandard: "Standard",

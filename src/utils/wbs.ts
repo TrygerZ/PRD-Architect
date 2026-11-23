@@ -15,7 +15,6 @@ import type { Section } from "./sections";
 export type { WbsNode, WbsPriority, WbsTree } from "../types";
 
 const DETAIL_LIMIT = 2000;
-const CONTEXT_LINES = 3;
 
 const FEAT_RE = /FEAT[-_\s]?\d+/i;
 const BULLET_RE = /^\s*[-*]\s+\*\*([^*]+?)\*\*\s*[:：]?\s*(.*)$/;
@@ -136,10 +135,56 @@ function priorityFromLabelLine(line: string | undefined): WbsPriority | undefine
   return toPriority(core);
 }
 
-function buildDetail(lines: string[], rowIndex: number): string {
-  const from = Math.max(0, rowIndex - CONTEXT_LINES);
-  const to = Math.min(lines.length, rowIndex + 1 + CONTEXT_LINES);
-  return lines.slice(from, to).join("\n").slice(0, DETAIL_LIMIT);
+/**
+ * Format a clean single-feature specification string from one MoSCoW row
+ * without dragging neighboring rows or raw headerless Markdown pipes.
+ */
+function buildMoscowRowDetail(title: string, extraCells: string[]): string {
+  const normalizedTitle = title.trim().toLowerCase();
+  const descriptions = extraCells
+    .map((c) => c.trim())
+    .filter((c) => c.length > 0 && c.toLowerCase() !== normalizedTitle);
+  if (descriptions.length === 0) return title.trim().slice(0, DETAIL_LIMIT);
+  return `**${title.trim()}**: ${descriptions.join(". ")}`.slice(0, DETAIL_LIMIT);
+}
+
+/**
+ * Extract concise specification prose (Purpose/Tujuan) plus the first valid
+ * GFM table (if any) from a `### FEAT-XX` block for DetailPanel enrichment.
+ */
+function summarizeFeatSpecDetail(lines: string[], fallbackDescription?: string): string {
+  const bodyLines = lines.slice(1); // skip `### FEAT-XX` heading
+  let purpose = "";
+  for (const raw of bodyLines) {
+    const trimmed = raw.trim();
+    const purposeMatch = trimmed.match(/^(?:\*{0,2})(?:Purpose|Tujuan|Description|Deskripsi)(?:\*{0,2})\s*[:：]\s*(.+)$/i);
+    if (purposeMatch && purposeMatch[1].trim()) {
+      purpose = purposeMatch[1].trim();
+      break;
+    }
+  }
+
+  // Extract first valid GFM table (header + separator + up to 6 rows) if present
+  const firstTable: string[] = [];
+  for (let i = 0; i < bodyLines.length; i++) {
+    const cur = bodyLines[i].trim();
+    const next = bodyLines[i + 1]?.trim() ?? "";
+    if (cur.startsWith("|") && /^\s*\|?\s*:?-{2,}:?\s*\|/.test(next)) {
+      firstTable.push(bodyLines[i], bodyLines[i + 1]);
+      for (let j = i + 2; j < bodyLines.length && firstTable.length < 8; j++) {
+        if (!bodyLines[j].trim().startsWith("|")) break;
+        firstTable.push(bodyLines[j]);
+      }
+      break;
+    }
+  }
+
+  const parts: string[] = [];
+  if (purpose) parts.push(purpose);
+  else if (fallbackDescription) parts.push(fallbackDescription);
+  if (firstTable.length >= 3) parts.push(firstTable.join("\n"));
+
+  return parts.join("\n\n").slice(0, DETAIL_LIMIT);
 }
 
 // ---------------------------------------------------------------------------
@@ -280,6 +325,26 @@ function mergeMoscow(breakdown: ParsedFeature[], moscow: ParsedFeature[]): void 
   }
 }
 
+// Perkaya fitur breakdown dengan kode FEAT-XX & ringkasan spesifikasi / tabel dari Ch 5 bila cocok.
+function mergeFeatSpecs(breakdown: ParsedFeature[], featSpecs: ParsedFeature[]): void {
+  if (featSpecs.length === 0) return;
+  const byTitle = new Map<string, ParsedFeature>();
+  for (const spec of featSpecs) {
+    const k = normalizeTitle(spec.title);
+    if (k && !byTitle.has(k)) byTitle.set(k, spec);
+  }
+  const moduleStyle = breakdown.some((r) => r.children.length > 0);
+  const targets = moduleStyle ? breakdown.flatMap((r) => r.children) : breakdown;
+  for (const t of targets) {
+    const k = normalizeTitle(t.title);
+    const spec = byTitle.get(k);
+    if (!spec) continue;
+    if (spec.code && !t.code) t.code = spec.code;
+    const enriched = summarizeFeatSpecDetail(spec.detail.split("\n"), t.detail);
+    if (enriched) t.detail = enriched;
+  }
+}
+
 function breakdownNode(f: ParsedFeature, id: string, type: WbsNodeType): WbsNode {
   return {
     id,
@@ -319,11 +384,13 @@ function parseMoscowTable(block: TableBlock): ParsedFeature[] {
     const nonEmpty = cells.filter(Boolean);
 
     if (colBased) {
-      const title = nonEmpty[featCol];
+      const title = cells[featCol]?.trim() || nonEmpty[featCol];
       if (!title) return;
       // W1: kolom priority menang; jika tidak ada, pakai label kategori di atas blok.
-      const priority = toPriority(nonEmpty[prioCol]) ?? labelPriority;
-      out.push({ title, detail: buildDetail(block.rows, i), priority, children: [] });
+      const rawPriority = prioCol >= 0 ? (cells[prioCol] ?? nonEmpty[prioCol]) : undefined;
+      const priority = toPriority(rawPriority) ?? labelPriority;
+      const extraCells = cells.filter((_, idx) => idx !== featCol && idx !== prioCol);
+      out.push({ title, detail: buildMoscowRowDetail(title, extraCells), priority, children: [] });
       return;
     }
 
@@ -336,15 +403,17 @@ function parseMoscowTable(block: TableBlock): ParsedFeature[] {
         currentCategory = p; // category header row, e.g. `| Must-have |`
       } else if (currentCategory) {
         // bare item under a category — tanpa kategori, blok single-col ditolak (W3)
-        out.push({ title: cell, detail: buildDetail(block.rows, i), priority: currentCategory, children: [] });
+        out.push({ title: cell, detail: buildMoscowRowDetail(cell, []), priority: currentCategory, children: [] });
       }
       return;
     }
 
-    // `| Must-have | Feature A |` — priority label as first cell
+    // `| Must-have | Feature A |` atau `| Must-have | Feature A | Description |`
     const p = toPriority(nonEmpty[0]);
-    if (p && nonEmpty.length === 2) {
-      out.push({ title: nonEmpty[1], detail: buildDetail(block.rows, i), priority: p, children: [] });
+    if (p && (nonEmpty.length === 2 || nonEmpty.length === 3)) {
+      const title = nonEmpty[1];
+      const extraCells = nonEmpty.length === 3 ? [nonEmpty[2]] : [];
+      out.push({ title, detail: buildMoscowRowDetail(title, extraCells), priority: p, children: [] });
     }
     // Multi-cell rows without a leading priority label (e.g. Non-Goals / User
     // Stories tables) are NOT MoSCoW features — skip.
@@ -500,8 +569,9 @@ export function extractWbs(content: string, prdMode?: PRDMode): WbsTree {
     }
 
     if (breakdown) {
-      // breakdown menang; MoSCoW hanya memberi priority/code/detail via title-match
+      // breakdown menang; MoSCoW memberi priority/deskripsi bersih, FEAT-XX menambah kode & tabel spec
       mergeMoscow(breakdown, moscow);
+      mergeFeatSpecs(breakdown, extractFeatSpecs(content));
       features = breakdown;
     } else {
       features = moscow;
