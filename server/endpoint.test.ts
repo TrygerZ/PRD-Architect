@@ -1,5 +1,13 @@
 import { describe, it, expect, beforeEach, afterEach, vi } from "vitest";
-import { assertPublicEndpoint, isPrivateAddress, allowPrivateEndpoints, allowServerKeyFallback, resolveEndpoint, resolveApiKey } from "./endpoint";
+import {
+  assertPublicEndpoint,
+  isPrivateAddress,
+  allowPrivateEndpoints,
+  allowServerKeyFallback,
+  resolveEndpoint,
+  resolveApiKey,
+  endpointErrorMessage,
+} from "./endpoint";
 import { PROVIDER_MODELS } from "../shared/models";
 
 const originalEnv = { ...process.env };
@@ -66,31 +74,81 @@ describe("assertPublicEndpoint", () => {
 });
 
 describe("resolveEndpoint", () => {
-  it("uses the provider default when no custom endpoint is given", async () => {
-    const res = await resolveEndpoint("deepseek", undefined);
-    expect(res).toEqual({ ok: true, endpoint: PROVIDER_MODELS.deepseek.endpoint, usingCustomEndpoint: false });
-  });
-
-  it("ignores a custom endpoint for non nine_router providers", async () => {
-    const res = await resolveEndpoint("gemini", "http://localhost:20128/v1/chat/completions");
-    expect(res).toEqual({ ok: true, endpoint: PROVIDER_MODELS.gemini.endpoint, usingCustomEndpoint: false });
-  });
-
-  it("accepts a loopback custom endpoint outside production", async () => {
+  it("normalizes Base URLs for openai_compatible and sets isPrivate accurately", async () => {
     process.env.NODE_ENV = "development";
-    const res = await resolveEndpoint("nine_router", "http://localhost:20128/v1/chat/completions");
-    expect(res).toEqual({ ok: true, endpoint: "http://localhost:20128/v1/chat/completions", usingCustomEndpoint: true });
+    const localRes = await resolveEndpoint("openai_compatible", "http://localhost:11434/v1");
+    expect(localRes).toEqual({
+      ok: true,
+      endpoint: "http://localhost:11434/v1/chat/completions",
+      isPrivate: true,
+      usingCustomEndpoint: true,
+    });
+
+    const pubIpRes = await resolveEndpoint("openai_compatible", "https://8.8.8.8/v1");
+    expect(pubIpRes).toEqual({
+      ok: true,
+      endpoint: "https://8.8.8.8/v1/chat/completions",
+      isPrivate: false,
+      usingCustomEndpoint: true,
+    });
   });
 
-  it("rejects without falling back in production", async () => {
+  it("accepts customEndpoint even when legacy provider alias is passed", async () => {
+    process.env.NODE_ENV = "development";
+    const res = await resolveEndpoint("gemini", "http://localhost:20128/v1");
+    expect(res).toEqual({
+      ok: true,
+      endpoint: "http://localhost:20128/v1/chat/completions",
+      isPrivate: true,
+      usingCustomEndpoint: true,
+    });
+  });
+
+  it("uses legacy provider default when customEndpoint is omitted for legacy providers", async () => {
+    const res = await resolveEndpoint("deepseek", undefined);
+    expect(res).toEqual({
+      ok: true,
+      endpoint: PROVIDER_MODELS.deepseek.endpoint,
+      isPrivate: false,
+      usingCustomEndpoint: false,
+    });
+  });
+
+  it("uses server AI_ENDPOINT when openai_compatible has no customEndpoint and AI_ENDPOINT is set", async () => {
+    process.env.NODE_ENV = "production";
+    process.env.AI_ENDPOINT = "https://8.8.8.8/v1";
+    const res = await resolveEndpoint("openai_compatible", "");
+    expect(res).toEqual({
+      ok: true,
+      endpoint: "https://8.8.8.8/v1/chat/completions",
+      isPrivate: false,
+      usingCustomEndpoint: false,
+    });
+  });
+
+  it("returns missing_endpoint when openai_compatible has no customEndpoint and no server AI_ENDPOINT", async () => {
+    delete process.env.AI_ENDPOINT;
+    const res = await resolveEndpoint("openai_compatible", "");
+    expect(res).toEqual({ ok: false, reason: "missing_endpoint", url: "" });
+    if (!res.ok) {
+      expect(endpointErrorMessage(res, "en")).toMatch(/endpoint/i);
+      expect(endpointErrorMessage(res, "id")).toMatch(/endpoint/i);
+    }
+  });
+
+  it("rejects loopback/private endpoint in production without falling back", async () => {
     process.env.NODE_ENV = "production";
     delete process.env.ALLOW_PRIVATE_ENDPOINTS;
-    const res = await resolveEndpoint("nine_router", "http://localhost:20128/v1/chat/completions");
-    expect(res).toEqual({ ok: false, reason: "private_blocked", url: "http://localhost:20128/v1/chat/completions" });
+    const res = await resolveEndpoint("openai_compatible", "http://localhost:11434/v1");
+    expect(res).toEqual({
+      ok: false,
+      reason: "private_blocked",
+      url: "http://localhost:11434/v1/chat/completions",
+    });
   });
 
-  it("rejects non-http protocols", async () => {
-    const res = await resolveEndpoint("nine_router", "file:///etc/passwd");
+  it("rejects non-http protocols without falling back", async () => {
+    const res = await resolveEndpoint("openai_compatible", "file:///etc/passwd");
     expect(res).toEqual({ ok: false, reason: "invalid_url", url: "file:///etc/passwd" });
   });
 });
@@ -115,45 +173,54 @@ describe("allowServerKeyFallback", () => {
 });
 
 describe("resolveApiKey", () => {
-  it("branch 1: usingCustomEndpoint always uses only cookieKey and never forwards serverKey", () => {
+  it("never forwards server .env key to third-party custom endpoints", () => {
+    process.env.AI_API_KEY = "server-secret";
     process.env.NINE_ROUTER_API_KEY = "env-key";
-    // cookieKey present
-    expect(resolveApiKey("nine_router", true, "user-key", true).apiKey).toBe("user-key");
-    expect(resolveApiKey("nine_router", true, "user-key", false).apiKey).toBe("user-key");
-    // cookieKey absent -> undefined even when fallback is true
-    expect(resolveApiKey("nine_router", true, undefined, true).apiKey).toBeUndefined();
-    expect(resolveApiKey("nine_router", true, undefined, false).apiKey).toBeUndefined();
+    expect(resolveApiKey("openai_compatible", true, "user-key", true, false)).toMatchObject({
+      apiKey: "user-key",
+      optional: false,
+    });
+    expect(resolveApiKey("openai_compatible", true, undefined, true, false)).toMatchObject({
+      apiKey: undefined,
+      optional: false,
+    });
   });
 
-  it("branch 2: non-custom endpoint with cookieKey present uses cookieKey regardless of fallback flag", () => {
+  it("marks API key optional ONLY for allowed private/local endpoints", () => {
+    process.env.NODE_ENV = "development";
+    delete process.env.ALLOW_PRIVATE_ENDPOINTS;
+    expect(resolveApiKey("openai_compatible", true, undefined, false, true)).toMatchObject({
+      apiKey: undefined,
+      optional: true,
+    });
+    // Still passes user key if provided for local proxy that requires auth
+    expect(resolveApiKey("openai_compatible", true, "local-token", false, true)).toMatchObject({
+      apiKey: "local-token",
+      optional: true,
+    });
+    // In production without ALLOW_PRIVATE_ENDPOINTS, optional is false
+    process.env.NODE_ENV = "production";
+    expect(resolveApiKey("openai_compatible", true, undefined, false, true)).toMatchObject({
+      apiKey: undefined,
+      optional: false,
+    });
+  });
+
+  it("uses cookieKey over server fallback on non-custom default endpoints", () => {
+    process.env.AI_API_KEY = "env-ai-key";
     process.env.DEEPSEEK_API_KEY = "env-key";
-    expect(resolveApiKey("deepseek", false, "cookie-key", false).apiKey).toBe("cookie-key");
-    expect(resolveApiKey("deepseek", false, "cookie-key", true).apiKey).toBe("cookie-key");
+    expect(resolveApiKey("deepseek", false, "cookie-key", true, false).apiKey).toBe("cookie-key");
+    expect(resolveApiKey("openai_compatible", false, "cookie-key", true, false).apiKey).toBe("cookie-key");
   });
 
-  it("branch 3: non-custom endpoint with cookieKey empty and fallback=true uses serverKey", () => {
-    process.env.DEEPSEEK_API_KEY = "env-key";
-    expect(resolveApiKey("deepseek", false, undefined, true).apiKey).toBe("env-key");
-    expect(resolveApiKey("deepseek", false, "", true).apiKey).toBe("env-key");
-  });
-
-  it("branch 4: non-custom endpoint with cookieKey empty and fallback=false returns undefined", () => {
-    process.env.DEEPSEEK_API_KEY = "env-key";
-    expect(resolveApiKey("deepseek", false, undefined, false).apiKey).toBeUndefined();
-    expect(resolveApiKey("deepseek", false, "", false).apiKey).toBeUndefined();
-    // Default fallback parameter should also be false when env is not set
-    delete process.env.ALLOW_SERVER_KEY_FALLBACK;
-    expect(resolveApiKey("deepseek", false, undefined).apiKey).toBeUndefined();
-  });
-});
-
-describe("PROVIDER_MODELS maxTokens", () => {
-  it.each([
-    ["deepseek", 65536],
-    ["gemini", 65536],
-    ["opencode", 65536],
-    ["nine_router", 16384],
-  ] as const)("%s resolves to %i", (provider, expected) => {
-    expect(PROVIDER_MODELS[provider].maxTokens ?? 16384).toBe(expected);
+  it("uses AI_API_KEY (or legacy env key) only when non-custom endpoint and allowFallback=true", () => {
+    process.env.AI_API_KEY = "env-ai-key";
+    process.env.DEEPSEEK_API_KEY = "env-deepseek-key";
+    expect(resolveApiKey("openai_compatible", false, undefined, true, false)).toMatchObject({
+      apiKey: "env-ai-key",
+      optional: false,
+    });
+    expect(resolveApiKey("deepseek", false, undefined, true, false).apiKey).toBe("env-deepseek-key");
+    expect(resolveApiKey("openai_compatible", false, undefined, false, false).apiKey).toBeUndefined();
   });
 });
