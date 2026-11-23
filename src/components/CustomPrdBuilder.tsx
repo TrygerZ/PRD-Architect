@@ -615,7 +615,10 @@ export function CustomPrdBuilder({
     { key: "technical", label: t.builder.technicalGroup },
   ];
 
-  const availableCount = CHAPTER_BLOCKS.filter((b) => !selectedSet.has(b.id)).length;
+  const availableCount = [
+    ...filteredLibraryGroups.product,
+    ...filteredLibraryGroups.technical,
+  ].filter((b) => !selectedSet.has(b.id)).length;
 
   return (
     <div className="w-full space-y-3">

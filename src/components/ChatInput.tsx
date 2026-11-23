@@ -11,6 +11,7 @@ import {
 } from "lucide-react";
 import { motion } from "motion/react";
 import type { PRDMode, UploadedFile } from "../types";
+import { CHAPTER_BLOCKS, MAX_CUSTOM_BLOCKS } from "../../shared/chapterBlocks";
 import { estimateTokens, formatTokenCount } from "../utils/tokens";
 import { SPRING_SLIDE } from "../utils/motion";
 import { useT } from "../hooks/useT";
@@ -326,7 +327,7 @@ export function ChatInput({
                   />
                   <span>{t.builder.tabCustom}</span>
                   <span className="text-[10px] font-mono text-[var(--oa-text-muted)]">
-                    {customBlockCount > 0 ? `${customBlockCount}/20` : "23"}
+                    {customBlockCount > 0 ? `${customBlockCount}/${MAX_CUSTOM_BLOCKS}` : String(CHAPTER_BLOCKS.length)}
                   </span>
                 </button>
               </div>
