@@ -120,4 +120,39 @@ describe("BlueprintSheet continuation and truncation UI", () => {
     expect(container.textContent).not.toContain("Document incomplete");
     expect(container.textContent).not.toContain("Continue Generating");
   });
+
+  it("defers rendering hidden #prd-print-only markdown while isGenerating is true", () => {
+    container = document.createElement("div");
+    document.body.appendChild(container);
+    root = createRoot(container);
+
+    act(() => {
+      root?.render(
+        <BlueprintSheet
+          content={baseVersion.content}
+          versions={[baseVersion]}
+          activeVersionId="v1"
+          isGenerating={true}
+          language="en"
+        />,
+      );
+    });
+
+    const printRoot = container.querySelector("#prd-print-only");
+    expect(printRoot?.textContent).toBe("");
+
+    act(() => {
+      root?.render(
+        <BlueprintSheet
+          content={baseVersion.content}
+          versions={[baseVersion]}
+          activeVersionId="v1"
+          isGenerating={false}
+          language="en"
+        />,
+      );
+    });
+
+    expect(printRoot?.textContent).toContain("Executive Summary");
+  });
 });

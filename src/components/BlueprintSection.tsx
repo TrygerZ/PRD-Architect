@@ -36,9 +36,11 @@ export interface SheetSectionProps {
   language: "id" | "en";
   theme: ThemeMode;
   comment: string;
-  onCommentChange?: (comment: string) => void;
+  onCommentChange?: (sectionId: string, comment: string) => void;
   isStreamingSection?: boolean;
 }
+
+const REMARK_PLUGINS = [remarkGfm];
 
 interface MarkdownRenderContextValue {
   isGenerating?: boolean;
@@ -195,7 +197,7 @@ function WbsSectionView({
       </div>
       {items.length === 0 ? (
         // Fallback aman: kalau tidak ada bullet, render markdown biasa — konten tidak hilang.
-        <ReactMarkdown remarkPlugins={[remarkGfm]} components={markdownComponents}>
+        <ReactMarkdown remarkPlugins={REMARK_PLUGINS} components={markdownComponents}>
           {content}
         </ReactMarkdown>
       ) : (
@@ -246,7 +248,7 @@ function WbsSectionView({
             </table>
           </div>
           {tailNote && (
-            <ReactMarkdown remarkPlugins={[remarkGfm]} components={markdownComponents}>
+            <ReactMarkdown remarkPlugins={REMARK_PLUGINS} components={markdownComponents}>
               {tailNote}
             </ReactMarkdown>
           )}
@@ -301,7 +303,7 @@ export const SheetSection = memo(function SheetSection({
   };
 
   const handleSaveNote = () => {
-    onCommentChange?.(draftNote.trim());
+    onCommentChange?.(sectionId, draftNote.trim());
     setIsEditingNote(false);
   };
 
@@ -313,7 +315,7 @@ export const SheetSection = memo(function SheetSection({
   const handleClearNote = () => {
     setDraftNote("");
     setIsEditingNote(false);
-    onCommentChange?.("");
+    onCommentChange?.(sectionId, "");
   };
 
   const wbs = useMemo(() => splitWbsSection(section.content), [section.content]);
@@ -410,7 +412,7 @@ export const SheetSection = memo(function SheetSection({
                 {isWbsSection ? (
                   <>
                     {wbs && wbs.before.trim() ? (
-                      <ReactMarkdown remarkPlugins={[remarkGfm]} components={MARKDOWN_COMPONENTS}>
+                      <ReactMarkdown remarkPlugins={REMARK_PLUGINS} components={MARKDOWN_COMPONENTS}>
                         {wbs.before}
                       </ReactMarkdown>
                     ) : null}
@@ -422,7 +424,7 @@ export const SheetSection = memo(function SheetSection({
                     />
                   </>
                 ) : (
-                  <ReactMarkdown remarkPlugins={[remarkGfm]} components={MARKDOWN_COMPONENTS}>
+                  <ReactMarkdown remarkPlugins={REMARK_PLUGINS} components={MARKDOWN_COMPONENTS}>
                     {section.content}
                   </ReactMarkdown>
                 )}
@@ -575,4 +577,25 @@ export const SheetSection = memo(function SheetSection({
       </div>
     </div>
   );
-});
+}, areSheetSectionPropsEqual);
+
+function areSheetSectionPropsEqual(
+  prev: Readonly<SheetSectionProps>,
+  next: Readonly<SheetSectionProps>,
+): boolean {
+  return (
+    prev.section.heading === next.section.heading &&
+    prev.section.content === next.section.content &&
+    prev.sectionId === next.sectionId &&
+    prev.index === next.index &&
+    prev.total === next.total &&
+    prev.isCollapsed === next.isCollapsed &&
+    prev.isGenerating === next.isGenerating &&
+    prev.isStreamingSection === next.isStreamingSection &&
+    prev.language === next.language &&
+    prev.theme === next.theme &&
+    prev.comment === next.comment &&
+    prev.onToggleCollapse === next.onToggleCollapse &&
+    prev.onCommentChange === next.onCommentChange
+  );
+}

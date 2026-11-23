@@ -1,4 +1,4 @@
-import { useState, useRef, useEffect } from "react";
+import { memo, useState, useRef, useEffect } from "react";
 import {
   Settings,
   Copy,
@@ -56,7 +56,7 @@ const MODE_DOT_CLASSES: Record<PRDMode, string> = {
   technical: "bg-[var(--oa-signal-steel)]",
 };
 
-export function Header({
+export const Header = memo(function Header({
   onOpenSettings,
   onExportMd,
   onExportDocx,
@@ -477,4 +477,4 @@ export function Header({
       </div>
     </header>
   );
-}
+});

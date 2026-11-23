@@ -109,4 +109,52 @@ describe("SheetSection MermaidRenderer mount stability", () => {
       isGenerating: false,
     });
   });
+
+  it("skips re-rendering a finished SheetSection when a fresh Section object has identical heading and content", async () => {
+    const onToggle = vi.fn();
+    const onComment = vi.fn();
+
+    await act(async () => {
+      root.render(
+        <SheetSection
+          section={{ ...section }}
+          sectionId="sec_System_Architecture_0"
+          index={0}
+          total={5}
+          isCollapsed={false}
+          onToggleCollapse={onToggle}
+          onCommentChange={onComment}
+          isGenerating={true}
+          isStreamingSection={false}
+          language="en"
+          theme="dark"
+          comment=""
+        />,
+      );
+    });
+    expect(mermaidLifecycle.renders).toHaveLength(1);
+
+    // Simulate another chapter receiving a streaming chunk: getSections() produces a brand-new Section object for chapter 0
+    await act(async () => {
+      root.render(
+        <SheetSection
+          section={{ ...section }}
+          sectionId="sec_System_Architecture_0"
+          index={0}
+          total={5}
+          isCollapsed={false}
+          onToggleCollapse={onToggle}
+          onCommentChange={onComment}
+          isGenerating={true}
+          isStreamingSection={false}
+          language="en"
+          theme="dark"
+          comment=""
+        />,
+      );
+    });
+
+    // Memo comparator must skip re-rendering the finished chapter completely
+    expect(mermaidLifecycle.renders).toHaveLength(1);
+  });
 });

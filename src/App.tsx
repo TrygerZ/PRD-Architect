@@ -11,7 +11,7 @@ import DOMPurify from "dompurify";
 import { ArrowUp, ArrowDown, X, AlertCircle, AlertTriangle, Check } from "lucide-react";
 import { safeGetLocalStorage, safeSetLocalStorage, serializeDraft, parseDraft } from "./utils/storage";
 import { MAX_PERSISTED_VERSIONS } from "./utils/persistence";
-import { buildChapterOutline } from "./utils/outline";
+import { buildChapterOutline, areOutlineItemsEqual, type OutlineItem } from "./utils/outline";
 import { MODAL_SLIDE_UP, POPOVER_FADE } from "./utils/motion";
 import { WBS_SECTION_RE } from "./utils/wbsTable";
 import { buildPrintHtml, downloadMarkdown } from "./utils/printTemplate";
@@ -305,10 +305,15 @@ export default function App() {
   const hasMessage = !!activeVersionId || versions.length > 0;
   const userPrompt = activeVersion?.prompt || "";
 
-  const outlineItems = useMemo(
-    () => buildChapterOutline(prdContent, comments, isGenerating),
-    [prdContent, comments, isGenerating],
-  );
+  const prevOutlineRef = useRef<OutlineItem[]>([]);
+  const outlineItems = useMemo(() => {
+    const next = buildChapterOutline(prdContent, comments, isGenerating);
+    if (areOutlineItemsEqual(prevOutlineRef.current, next)) {
+      return prevOutlineRef.current;
+    }
+    prevOutlineRef.current = next;
+    return next;
+  }, [prdContent, comments, isGenerating]);
 
   const activeVersionIndex = useMemo(
     () => (activeVersionId ? versions.findIndex((v) => v.id === activeVersionId) : -1),

@@ -46,3 +46,27 @@ export function buildChapterOutline(
     };
   });
 }
+
+/**
+ * Structural equality helper so streaming body updates do not force Sidebar or
+ * SmartRevisionDock to re-render when chapter headings, statuses, and comment
+ * indicators are unchanged.
+ */
+export function areOutlineItemsEqual(a: OutlineItem[], b: OutlineItem[]): boolean {
+  if (a === b) return true;
+  if (a.length !== b.length) return false;
+  for (let i = 0; i < a.length; i++) {
+    const x = a[i];
+    const y = b[i];
+    if (
+      x.id !== y.id ||
+      x.indexLabel !== y.indexLabel ||
+      x.title !== y.title ||
+      x.status !== y.status ||
+      x.hasComment !== y.hasComment
+    ) {
+      return false;
+    }
+  }
+  return true;
+}

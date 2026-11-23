@@ -149,75 +149,69 @@ export function useVersion(onSaveError?: (reason: "quota" | "error") => void) {
   // the OS/browser terminates the process. Combining `visibilitychange(hidden)` and `pagehide` (more reliable
   // than `beforeunload` on modern mobile/Safari) provides best-effort early flushing, with an in-flight guard
   // to prevent duplicate concurrent writes.
-  useEffect(() => {
-    if (!restoredRef.current) return;
+  const isSavingRef = useRef(false);
+  const saveTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  const flushSave = useCallback(async () => {
+    if (!restoredRef.current || isSavingRef.current) return;
+    const currentVersions = versionsRef.current;
+    const currentComments = commentsByVersionRef.current;
+    const currentActiveId = activeVersionIdRef.current;
 
     // D-02b — Lewati save bila state saat ini identik dengan yang terakhir disimpan/disinkronkan.
     // Mencegah redundant write & infinite loop antar-tab.
-    const isSameAsPersisted =
-      versions === lastSavedVersionsRef.current &&
-      commentsByVersion === lastSavedCommentsRef.current &&
-      activeVersionId === lastSavedActiveIdRef.current;
-    if (isSameAsPersisted) return;
+    if (
+      currentVersions === lastSavedVersionsRef.current &&
+      currentComments === lastSavedCommentsRef.current &&
+      currentActiveId === lastSavedActiveIdRef.current
+    ) {
+      return;
+    }
 
-    let isSaving = false;
-    let t: ReturnType<typeof setTimeout> | null = null;
+    isSavingRef.current = true;
+    if (saveTimerRef.current) {
+      clearTimeout(saveTimerRef.current);
+      saveTimerRef.current = null;
+    }
 
-    const doSave = async () => {
-      if (isSaving) return;
-      if (
-        versions === lastSavedVersionsRef.current &&
-        commentsByVersion === lastSavedCommentsRef.current &&
-        activeVersionId === lastSavedActiveIdRef.current
-      ) {
-        return;
-      }
-      isSaving = true;
-      if (t) {
-        clearTimeout(t);
-        t = null;
-      }
+    try {
+      const now = Date.now();
+      lastSavedAtRef.current = now;
+      lastSavedVersionsRef.current = currentVersions;
+      lastSavedCommentsRef.current = currentComments;
+      lastSavedActiveIdRef.current = currentActiveId;
 
-      try {
-        const now = Date.now();
-        lastSavedAtRef.current = now;
-        lastSavedVersionsRef.current = versions;
-        lastSavedCommentsRef.current = commentsByVersion;
-        lastSavedActiveIdRef.current = activeVersionId;
-
-        const res = await saveState({
-          versions,
-          commentsByVersion,
-          activeVersionId,
+      const res = await saveState({
+        versions: currentVersions,
+        commentsByVersion: currentComments,
+        activeVersionId: currentActiveId,
+        savedAt: now,
+      });
+      if (!res.ok) {
+        onSaveErrorRef.current?.(res.reason);
+      } else {
+        // D-02b — Notifikasi tab lain setelah penyimpanan berhasil
+        channelRef.current?.postMessage({
+          type: "SAVED",
           savedAt: now,
+          senderId: tabIdRef.current,
         });
-        if (!res.ok) {
-          onSaveErrorRef.current?.(res.reason);
-        } else {
-          // D-02b — Notifikasi tab lain setelah penyimpanan berhasil
-          channelRef.current?.postMessage({
-            type: "SAVED",
-            savedAt: now,
-            senderId: tabIdRef.current,
-          });
-        }
-      } finally {
-        isSaving = false;
       }
-    };
+    } finally {
+      isSavingRef.current = false;
+    }
+  }, []);
 
-    t = setTimeout(() => {
-      void doSave();
-    }, 800);
-
+  // Register page lifecycle flush listeners once instead of re-attaching on every streaming chunk.
+  useEffect(() => {
     const handleBeforeUnload = () => {
-      void doSave();
+      void flushSave();
     };
     const handleVisibility = () => {
-      if (document.visibilityState === "hidden") void doSave();
+      if (document.visibilityState === "hidden") void flushSave();
     };
     const handlePageHide = () => {
-      void doSave();
+      void flushSave();
     };
 
     window.addEventListener("beforeunload", handleBeforeUnload);
@@ -225,12 +219,35 @@ export function useVersion(onSaveError?: (reason: "quota" | "error") => void) {
     window.addEventListener("pagehide", handlePageHide);
 
     return () => {
-      if (t) clearTimeout(t);
       window.removeEventListener("beforeunload", handleBeforeUnload);
       document.removeEventListener("visibilitychange", handleVisibility);
       window.removeEventListener("pagehide", handlePageHide);
     };
-  }, [versions, commentsByVersion, activeVersionId]);
+  }, [flushSave]);
+
+  // Debounced autosave — only resets the 800ms timer when state changes.
+  useEffect(() => {
+    if (!restoredRef.current) return;
+    if (
+      versions === lastSavedVersionsRef.current &&
+      commentsByVersion === lastSavedCommentsRef.current &&
+      activeVersionId === lastSavedActiveIdRef.current
+    ) {
+      return;
+    }
+
+    saveTimerRef.current = setTimeout(() => {
+      saveTimerRef.current = null;
+      void flushSave();
+    }, 800);
+
+    return () => {
+      if (saveTimerRef.current) {
+        clearTimeout(saveTimerRef.current);
+        saveTimerRef.current = null;
+      }
+    };
+  }, [versions, commentsByVersion, activeVersionId, flushSave]);
 
   const activeVersion = versions.find((v) => v.id === activeVersionId);
 

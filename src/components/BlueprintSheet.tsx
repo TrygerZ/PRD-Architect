@@ -37,11 +37,13 @@ export interface BlueprintSheetProps {
   theme?: ThemeMode;
 }
 
+const PRINT_REMARK_PLUGINS = [remarkGfm];
+
 // Print view (#prd-print-only): section WBS dirender sebagai tabel HTML pola
 // sama dengan live view — deteksi via splitWbsSection + WBS_SECTION_RE.
 // CSS print di printTemplate.ts sudah styling table/th/td, jadi tabel polos
 // tanpa class. Fallback aman: tanpa bullet → markdown biasa (konten tak hilang).
-function PrintOnlyContent({ content, language }: { content: string; language: "id" | "en" }) {
+const PrintOnlyContent = memo(function PrintOnlyContent({ content, language }: { content: string; language: "id" | "en" }) {
   const sections = useMemo(() => getSections(content), [content]);
   const headers = language === "en" ? ["Module", "Feature", "Sub-feature"] : ["Modul", "Fitur", "Sub-fitur"];
   return (
@@ -51,7 +53,7 @@ function PrintOnlyContent({ content, language }: { content: string; language: "i
         const wbs = splitWbsSection(section.content);
         if (!(WBS_SECTION_RE.test(section.heading) || wbs !== null)) {
           return (
-            <ReactMarkdown key={key} remarkPlugins={[remarkGfm]}>
+            <ReactMarkdown key={key} remarkPlugins={PRINT_REMARK_PLUGINS}>
               {section.heading + "\n\n" + section.content}
             </ReactMarkdown>
           );
@@ -63,10 +65,10 @@ function PrintOnlyContent({ content, language }: { content: string; language: "i
         const tailNote = wbsTailNote(after);
         return (
           <div key={key}>
-            {wbs && wbs.before.trim() ? <ReactMarkdown remarkPlugins={[remarkGfm]}>{wbs.before}</ReactMarkdown> : null}
-            <ReactMarkdown remarkPlugins={[remarkGfm]}>{heading}</ReactMarkdown>
+            {wbs && wbs.before.trim() ? <ReactMarkdown remarkPlugins={PRINT_REMARK_PLUGINS}>{wbs.before}</ReactMarkdown> : null}
+            <ReactMarkdown remarkPlugins={PRINT_REMARK_PLUGINS}>{heading}</ReactMarkdown>
             {items.length === 0 ? (
-              <ReactMarkdown remarkPlugins={[remarkGfm]}>{after}</ReactMarkdown>
+              <ReactMarkdown remarkPlugins={PRINT_REMARK_PLUGINS}>{after}</ReactMarkdown>
             ) : (
               <>
                 <table>
@@ -87,7 +89,7 @@ function PrintOnlyContent({ content, language }: { content: string; language: "i
                     ))}
                   </tbody>
                 </table>
-                {tailNote ? <ReactMarkdown remarkPlugins={[remarkGfm]}>{tailNote}</ReactMarkdown> : null}
+                {tailNote ? <ReactMarkdown remarkPlugins={PRINT_REMARK_PLUGINS}>{tailNote}</ReactMarkdown> : null}
               </>
             )}
           </div>
@@ -95,7 +97,7 @@ function PrintOnlyContent({ content, language }: { content: string; language: "i
       })}
     </>
   );
-}
+});
 
 export const BlueprintSheet = memo(function BlueprintSheet({
   content,
@@ -193,9 +195,9 @@ export const BlueprintSheet = memo(function BlueprintSheet({
 
   return (
     <div className="w-full mx-auto relative print:block print:w-full print:max-w-full print:bg-white print:text-black">
-      {/* Hidden container for full PRD print export */}
+      {/* Hidden container for full PRD print export — skipped while streaming to avoid double markdown parsing */}
       <div id="prd-print-only" style={{ display: "none" }}>
-        <PrintOnlyContent content={content} language={language} />
+        {!isGenerating && <PrintOnlyContent content={content} language={language} />}
       </div>
 
       {activeVersion && (
@@ -334,7 +336,7 @@ export const BlueprintSheet = memo(function BlueprintSheet({
                     language={language}
                     theme={theme}
                     comment={comments[sectionId] || ""}
-                    onCommentChange={(text) => onCommentChange?.(sectionId, text)}
+                    onCommentChange={onCommentChange}
                     isStreamingSection={Boolean(
                       isGenerating && index === sections.length - 1,
                     )}

@@ -12,6 +12,7 @@ export interface GeneratePRDOptions {
 const MAX_RETRIES = 2;
 const RETRY_DELAY_MS = 1000;
 const MAX_BUFFER_SIZE = 1024 * 1024; // 1MB buffer limit
+const FLUSH_INTERVAL_MS = 80;
 
 export const generatePRD = async (
   prompt: string,
@@ -89,14 +90,57 @@ export const generatePRD = async (
       let batchedReasoning = "";
       let lastFlush = Date.now();
       let flushTimeout: ReturnType<typeof setTimeout> | null = null;
+      let flushRaf: number | null = null;
+
+      const cancelScheduledFlush = () => {
+        if (flushTimeout) {
+          clearTimeout(flushTimeout);
+          flushTimeout = null;
+        }
+        if (flushRaf !== null && typeof cancelAnimationFrame === "function") {
+          cancelAnimationFrame(flushRaf);
+          flushRaf = null;
+        }
+      };
 
       const flush = () => {
+        cancelScheduledFlush();
         if (batchedChunk || batchedReasoning) {
           onChunk({ text: batchedChunk, reasoning: batchedReasoning });
           batchedChunk = "";
           batchedReasoning = "";
+          lastFlush = Date.now();
         }
-        if (flushTimeout) clearTimeout(flushTimeout);
+      };
+
+      const scheduleFlush = () => {
+        const elapsed = Date.now() - lastFlush;
+        if (elapsed >= FLUSH_INTERVAL_MS) {
+          if (typeof requestAnimationFrame === "function") {
+            if (flushRaf === null) {
+              flushRaf = requestAnimationFrame(() => {
+                flushRaf = null;
+                flush();
+              });
+            }
+          } else {
+            flush();
+          }
+          return;
+        }
+        if (!flushTimeout && flushRaf === null) {
+          flushTimeout = setTimeout(() => {
+            flushTimeout = null;
+            if (typeof requestAnimationFrame === "function") {
+              flushRaf = requestAnimationFrame(() => {
+                flushRaf = null;
+                flush();
+              });
+            } else {
+              flush();
+            }
+          }, FLUSH_INTERVAL_MS - elapsed);
+        }
       };
 
       try {
@@ -157,17 +201,8 @@ export const generatePRD = async (
                 if (data.text || data.reasoning) {
                   if (data.text) batchedChunk += data.text;
                   if (data.reasoning) batchedReasoning += data.reasoning;
-                  // Throttle flush to avoid blocking UI thread with continuous heavy markdown parsing
-                  if (Date.now() - lastFlush > 50) {
-                    flush();
-                    lastFlush = Date.now();
-                  } else {
-                    if (flushTimeout) clearTimeout(flushTimeout);
-                    flushTimeout = setTimeout(() => {
-                      flush();
-                      lastFlush = Date.now();
-                    }, 50);
-                  }
+                  // Coalesce flushes to ~80ms + animation frames so heavy Markdown chapters stay responsive
+                  scheduleFlush();
                 }
               }
             }

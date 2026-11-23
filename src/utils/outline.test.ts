@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { getSectionId, buildChapterOutline } from "./outline";
+import { getSectionId, buildChapterOutline, areOutlineItemsEqual } from "./outline";
 
 describe("getSectionId", () => {
   it("matches the BlueprintSheet and useGeneration sectionId contract", () => {
@@ -93,5 +93,16 @@ describe("buildChapterOutline", () => {
     expect(outline[8].indexLabel).toBe("09");
     expect(outline[9].indexLabel).toBe("10");
     expect(outline[11].indexLabel).toBe("12");
+  });
+});
+
+describe("areOutlineItemsEqual", () => {
+  it("returns true for structurally identical outline arrays and false when status or title changes", () => {
+    const a = buildChapterOutline("## 1. Intro\nBody A\n## 2. Scope\nBody B", {}, true);
+    const b = buildChapterOutline("## 1. Intro\nBody A\n## 2. Scope\nBody B with more streamed text", {}, true);
+    const c = buildChapterOutline("## 1. Intro\nBody A\n## 2. Scope\nBody B", {}, false);
+
+    expect(areOutlineItemsEqual(a, b)).toBe(true);
+    expect(areOutlineItemsEqual(a, c)).toBe(false);
   });
 });
