@@ -20,23 +20,23 @@
 
 ## 1. Project snapshot
 
-**What it is**: a full-stack AI PRD generator. The user types a product idea, the app streams a structured PRD back (3 modes: `simple` 6 chapters, `business` 12 chapters, `technical` 9 chapters), with live Mermaid diagrams, a WBS canvas, revisions/version history, file-context upload, and export to Markdown/PDF/DOCX.
+**What it is**: a full-stack AI PRD generator. The user types a product idea, the app streams a structured PRD back (4 modes: `simple` 6 chapters, `business` 12 chapters, `technical` 9 chapters, `custom` up to 20 chapters from 29 modular blocks), with an Obsidian Atelier dual-mode UI (`dark` / `light`), live Mermaid diagrams, a WBS canvas, revisions/version history, file-context upload, and export to Markdown/DOCX/PDF/JSON/Print.
 
-**Stack**: React 19 + Vite + Tailwind v4 (frontend) - Express + TypeScript (backend) - Vitest (tests) - Node 22 (pinned in `.node-version` and `render.yaml`).
+**Stack**: React 19 + Vite + Tailwind v4 + Motion (frontend) - Express + TypeScript (backend) - Vitest (tests) - Node 22 (pinned in `.node-version` and `render.yaml`).
 
 **Layout**:
 
 | Path | Role |
 | --- | --- |
 | `server.ts` | Express entry point: middleware, security, SSE `/api/generate-prd` route |
-| `server/` | Backend modules: `auth.ts`, `endpoint.ts` (SSRF guard + provider resolution), `prompts.ts`, `blockPrompts.ts`, `fileExtraction.ts`, `log.ts` |
-| `shared/` | Types + constants used by BOTH frontend and backend. Single source of truth |
+| `server/` | Backend modules: `auth.ts`, `endpoint.ts` (SSRF guard + provider resolution), `prompts.ts`, `blockPrompts.ts`, `fileExtraction.ts`, `sanitize.ts`, `staticPathGuard.ts`, `keepWarm.ts`, `log.ts` |
+| `shared/` | Types + constants used by BOTH frontend and backend (`types.ts`, `models.ts`, `chapterBlocks.ts`). Single source of truth |
 | `src/App.tsx` | Thin orchestrator; owns top-level state |
 | `src/components/` | UI components (presentational, kept thin) |
-| `src/hooks/` | Stateful logic: `useGeneration`, `useVersion`, `useSettings`, `useT`, `useToast`, `useScroll` |
+| `src/hooks/` | Stateful logic: `useGeneration`, `useVersion`, `useSettings`, `useTheme`, `useT`, `useToast`, `useScroll` |
 | `src/services/aiService.ts` | Frontend SSE client with retry/backoff |
-| `src/utils/` | Pure logic: `persistence.ts`, `export.ts`, `wbs.ts`, `mermaid.ts`, `sections.ts`, `storage.ts`, `format.ts` |
-| `src/i18n/` | `en.ts` + `id.ts` dictionaries |
+| `src/utils/` | Pure logic: `persistence.ts`, `export.ts`, `printTemplate.ts`, `wbs.ts`, `wbsTable.ts`, `mermaid.ts`, `sections.ts`, `outline.ts`, `theme.ts`, `motion.ts`, `tokens.ts`, `storage.ts`, `format.ts`, `quickPrompts.ts` |
+| `src/i18n/` | `en.ts` + `id.ts` dictionaries + `i18n.test.ts` parity & copy-hygiene guard |
 | `bugs/` | RCA / bug investigation write-ups (tracked) |
 | `docs/` | Local-only docs - **gitignored**, see section 8 |
 
@@ -310,7 +310,7 @@ Conventional Commits, matching the existing history:
 - **Generation is long-running and abortable.** Respect `AbortSignal`; never add an arbitrary timeout - infinite generation time is an intentional feature for deep-reasoning models.
 - **Persistence is IndexedDB + `BroadcastChannel`**, multi-tab aware, last-writer-wins by `savedAt`. Any change to `src/utils/persistence.ts` must preserve: quota handling, schema versioning, per-version validation, and the cross-tab race guard.
 - **`src/utils/export.ts` is huge (~50KB)** and covers Markdown/PDF/DOCX/print. Never read it whole; use `codegraph node <symbol>` to get just the function you need.
-- **Two i18n dictionaries must stay in sync** (`en.ts` / `id.ts`). A missing key falls back to English silently - so a missing `id` key is a real bug, not a crash.
+- **Two i18n dictionaries must stay in sync** (`en.ts` / `id.ts`). A missing key falls back to English silently - so a missing `id` key is a real bug, not a crash. `src/i18n/i18n.test.ts` enforces EN/ID key parity, non-empty strings, and zero em-dashes or emojis in UI copy.
 - **`vitest` runs in the `node` environment** (`vitest.config.ts`), even for `.tsx` component tests. Don't assume DOM APIs are available; check how the existing tests stub them.
 - **Coverage is scoped** to `src/utils/**`, `server/**`, `src/services/**` - that is the intentional test surface. UI components are verified manually/in-browser.
 - **Node 22 is pinned** (`.node-version`, `render.yaml`, `engines.node >= 18`). Don't use APIs newer than the pin, and don't casually change the pin.
