@@ -12,6 +12,7 @@ import { ArrowUp, ArrowDown, X } from "lucide-react";
 import { safeGetLocalStorage, safeSetLocalStorage, serializeDraft, parseDraft } from "./utils/storage";
 import { MAX_PERSISTED_VERSIONS } from "./utils/persistence";
 import { buildChapterOutline } from "./utils/outline";
+import { WBS_SECTION_RE } from "./utils/wbsTable";
 import { buildPrintHtml, downloadMarkdown } from "./utils/printTemplate";
 import { useSettings } from "./hooks/useSettings";
 import { useTheme } from "./hooks/useTheme";
@@ -448,6 +449,37 @@ export default function App() {
     },
     [view, scrollToSectionElement],
   );
+  const findWbsOutlineItem = useCallback(
+    () =>
+      outlineItems.find((item) => WBS_SECTION_RE.test(item.title)) ??
+      outlineItems[0],
+    [outlineItems],
+  );
+  const handleJumpToWbsChapter = useCallback(() => {
+    const target = findWbsOutlineItem();
+    if (target) {
+      handleSelectSection(target.id);
+      return;
+    }
+    setView("document");
+  }, [findWbsOutlineItem, handleSelectSection]);
+  const handleAddWbsNote = useCallback(
+    (nodeTitle: string) => {
+      const target = findWbsOutlineItem();
+      if (!target) {
+        setView("document");
+        return;
+      }
+      const existing = commentsRef.current[target.id] ?? "";
+      const entry = `[WBS: ${nodeTitle}] `;
+      const nextComment = existing.trim()
+        ? `${existing.trimEnd()}\n${entry}`
+        : entry;
+      versionCommentChange(target.id, nextComment);
+      handleSelectSection(target.id);
+    },
+    [findWbsOutlineItem, versionCommentChange, handleSelectSection],
+  );
   const printTimerRef = useRef<ReturnType<typeof setTimeout>>(undefined);
 
   const handleQuickPrompt = useCallback((text: string) => {
@@ -547,6 +579,9 @@ export default function App() {
                   content={prdContent}
                   prdMode={activeVersion?.prdMode}
                   language={language}
+                  theme={theme}
+                  onJumpToDocument={handleJumpToWbsChapter}
+                  onAddWbsNote={handleAddWbsNote}
                 />
               </Suspense>
             ) : (
