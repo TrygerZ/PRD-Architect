@@ -8,6 +8,10 @@ import {
   isThematicBreak,
   collectTableBodyRows,
   richCellHeight,
+  parseListLine,
+  computeColumnWeights,
+  computeMermaidDisplaySize,
+  buildExportMeta,
 } from "./export";
 import type { InlineSeg } from "./export";
 
@@ -208,5 +212,93 @@ describe("collectTableBodyRows (collector body tabel PDF)", () => {
     const { rows, endIdx } = collectTableBodyRows(["| a |", "teks bebas", "| b |"], 0);
     expect(rows).toEqual([["a"]]);
     expect(endIdx).toBe(1);
+  });
+});
+
+describe("parseListLine (nested bullet & ordered list depth)", () => {
+  it("preserves indentation levels 0, 1, 2 for bullets and ordered lists", () => {
+    expect(parseListLine("- Top item")).toEqual({
+      kind: "bullet",
+      level: 0,
+      marker: "-",
+      text: "Top item",
+    });
+    expect(parseListLine("  - Nested item")).toEqual({
+      kind: "bullet",
+      level: 1,
+      marker: "-",
+      text: "Nested item",
+    });
+    expect(parseListLine("    * Deep item")).toEqual({
+      kind: "bullet",
+      level: 2,
+      marker: "*",
+      text: "Deep item",
+    });
+    expect(parseListLine("  2. Sub step")).toEqual({
+      kind: "ordered",
+      level: 1,
+      marker: "2.",
+      text: "Sub step",
+    });
+    expect(parseListLine("Regular paragraph")).toBeNull();
+  });
+});
+
+describe("computeColumnWeights (proportional table widths)", () => {
+  it("gives compact columns less width and long description columns more width while summing exactly", () => {
+    const header = ["ID", "Priority", "Feature Description", "SLA"];
+    const rows = [
+      ["F-01", "Must", "Pipeline AI mengubah video 360 derajat menjadi model 3D GLB/GLTF otomatis dalam 8 menit", "8m"],
+      ["F-02", "Must", "Render model 3D skala 1:1 pada kamera dengan ground-plane snapping di ruang kos", "30fps"],
+    ];
+    const widths = computeColumnWeights(header, rows, 500, 45);
+    expect(widths).toHaveLength(4);
+    expect(widths.reduce((a, b) => a + b, 0)).toBe(500);
+    // Description column (index 2) must be significantly wider than ID (index 0)
+    expect(widths[2]).toBeGreaterThan(widths[0] * 1.8);
+    expect(widths.every((w) => w >= 45)).toBe(true);
+  });
+});
+
+describe("computeMermaidDisplaySize (no excessive upscale)", () => {
+  it("does not stretch small diagrams beyond maxScale", () => {
+    const size = computeMermaidDisplaySize(220, 120, 550, 680, 1.15);
+    expect(size.width).toBe(253);
+    expect(size.height).toBe(138);
+  });
+
+  it("scales large diagrams down proportionally within bounds", () => {
+    const size = computeMermaidDisplaySize(1200, 600, 500, 700, 1.15);
+    expect(size.width).toBe(500);
+    expect(size.height).toBe(250);
+  });
+});
+
+describe("layoutInline continuationWidth (hanging indent wrap)", () => {
+  it("wraps continuation lines at narrower width without overflowing right margin", () => {
+    const monospace = (t: string) => t.length;
+    const lines = layoutInline(
+      parseInline("aaaa bbbb cccc dddd"),
+      10,
+      monospace,
+      false,
+      6,
+    );
+    expect(lineTexts(lines)).toEqual(["aaaa bbbb ", "cccc ", "dddd"]);
+  });
+});
+
+describe("buildExportMeta", () => {
+  it("builds localized metadata with chapter count and product type", () => {
+    const meta = buildExportMeta(
+      "## 1. Ringkasan\nIsi.\n\n## 2. Masalah\nIsi.",
+      "Mobile App",
+      "id",
+      new Date("2026-11-23T12:00:00Z"),
+    );
+    expect(meta.title).toContain("Mobile App");
+    expect(meta.chapterCount).toBe(2);
+    expect(meta.subtitle).toContain("2 Bab");
   });
 });
