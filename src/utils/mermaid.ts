@@ -36,7 +36,20 @@ export function sanitizeMermaid(chart: string): string {
   // ── MRD-17: ERD sanitization — AI often outputs SQL keywords invalid in Mermaid ──
   // Only run this pass on erDiagram charts.
   if (/^\s*erDiagram\b/m.test(sanitized)) {
+    const erRelNoLabelRe =
+      /^(\s*)(?:"([^"]+)"|([\w-]+))\s+(\|\||\|o|o\||\}o|\}\||o\{|\|\{)(--|\.\.)(\|\||\|o|o\||\}o|\}\||o\{|\|\{)\s+(?:"([^"]+)"|([\w-]+))\s*$/;
     sanitized = sanitized.split("\n").map(line => {
+      // Fix relationship lines missing `: label` (Mermaid erDiagram grammar requires `: label`)
+      const relMatch = line.match(erRelNoLabelRe);
+      if (relMatch) {
+        const [, indent, qLeft, uLeft, leftCard, lineType, rightCard, qRight, uRight] = relMatch;
+        const leftRaw = qLeft ?? uLeft;
+        const rightRaw = qRight ?? uRight;
+        const leftEnt = /^[\w-]+$/.test(leftRaw) ? leftRaw : `"${leftRaw}"`;
+        const rightEnt = /^[\w-]+$/.test(rightRaw) ? rightRaw : `"${rightRaw}"`;
+        return `${indent}${leftEnt} ${leftCard}${lineType}${rightCard} ${rightEnt} : ""`;
+      }
+
       // Skip non-attribute lines (entity declarations, relationships, comments)
       if (!/^\s+(int|integer|bigint|smallint|tinyint|float|double|decimal|numeric|real|varchar|char|text|string|boolean|bool|date|datetime|timestamp|time|uuid|json|jsonb|blob|enum|bit|binary|varbinary)\s/i.test(line)) {
         return line;

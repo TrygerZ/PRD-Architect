@@ -1,12 +1,14 @@
 <div align="center">
-  <img src="https://raw.githubusercontent.com/lucide-icons/lucide/main/icons/terminal.svg" width="60" height="60" alt="Terminal Icon">
+  <img src="assets/brand-mark.svg" width="64" height="64" alt="PRD Architect BrandMark" />
   <h1 align="center">PRD Architect</h1>
 
   <p align="center">
-    <strong>An intelligent, AI-powered generator for creating comprehensive Product Requirements Documents.</strong>
+    <strong>An intelligent, AI-powered architectural workbench for creating comprehensive Product Requirements Documents.</strong>
     <br />
     <br />
     <a href="#overview">Explore Features</a>
+    ·
+    <a href="#screenshots">Screenshots</a>
     ·
     <a href="https://prd-architect.onrender.com/">Live Demo</a>
     ·
@@ -16,10 +18,11 @@
   </p>
 
   <p align="center">
-    <img src="https://img.shields.io/badge/React-20232A?style=for-the-badge&logo=react&logoColor=61DAFB" alt="React" />
+    <img src="https://img.shields.io/badge/React_19-20232A?style=for-the-badge&logo=react&logoColor=61DAFB" alt="React 19" />
     <img src="https://img.shields.io/badge/TypeScript-007ACC?style=for-the-badge&logo=typescript&logoColor=white" alt="TypeScript" />
-    <img src="https://img.shields.io/badge/Tailwind_CSS-38B2AC?style=for-the-badge&logo=tailwind-css&logoColor=white" alt="Tailwind" />
-    <img src="https://img.shields.io/badge/Express.js-404D59?style=for-the-badge" alt="Express" />
+    <img src="https://img.shields.io/badge/Tailwind_CSS_v4-38B2AC?style=for-the-badge&logo=tailwind-css&logoColor=white" alt="Tailwind CSS v4" />
+    <img src="https://img.shields.io/badge/Express.js-404D59?style=for-the-badge&logo=express&logoColor=white" alt="Express.js" />
+    <img src="https://img.shields.io/badge/Vitest-6E9F18?style=for-the-badge&logo=vitest&logoColor=white" alt="Vitest" />
   </p>
 </div>
 
@@ -27,74 +30,87 @@
 
 ## Overview
 
-**PRD Architect** is a modern, full-stack application designed to dramatically accelerate the product planning phase. By taking a simple product idea as input, it automatically generates a highly structured, enterprise-grade Product Requirements Document (PRD), Technical Specification Document, or a streamlined Simple PRD for early-stage projects.
+**PRD Architect** is a full-stack application designed to accelerate product planning from raw idea to structured specification. Given a product idea and optional reference files, it streams a structured Product Requirements Document (PRD), Technical Specification, MVP Brief, or Custom Blueprint with live Mermaid diagrams, an interactive WBS Canvas, version history, and multi-format exports.
 
-It features a **Tri-Mode** generation engine, each with comprehensively enhanced chapters:
+It supports **four generation modes**:
 
-- **Simple PRD Mode (6 Chapters)**: Designed for early-stage MVPs and solo developers. Covers Problem Statement, Feature Scope (MoSCoW), Out of Scope Rules & Boundaries, User Stories & Core Workflows, detailed Feature Specifications (input fields, business logic, error states, integrations), and Open Questions with Success Metrics & Timeline. No market analysis, no technical architecture. Pure MVP focus.
-- **Business & Investor Mode (12 Chapters)**: Covers Stakeholder Analysis, Problem Statement, Assumptions & Constraints, Non-Goals, TAM/SAM/SOM, MoSCoW scoping, Enhanced User Stories (Given/When/Then format + Epic hierarchy), Classified NFRs (Performance/Scalability/Security/Usability/Availability), Baseline-backed KPIs, GTM Strategy, Risk Register with scoring, 12-week roadmap, and Regulatory Compliance.
-- **Technical & AI Agent Mode (9 Chapters)**: Covers System Context Diagram, Alternatives Considered, Non-Goals, Data Models with ERD, API Contracts with full Error Responses (400/401/403/404/409/500), Frontend Architecture with Data Flow Diagrams, Testing Pyramid Strategy, Classified NFRs, Retry Strategy with exponential backoff, and AI Agent Implementation Guidelines with structured templates.
+- **Simple PRD Mode (6 Chapters)**: Designed for early-stage MVPs and solo builders. Covers Problem Statement, Feature Scope (MoSCoW), Out of Scope Rules & Boundaries, User Stories & Core Workflows, detailed Feature Specifications (input fields, business logic, error states, integrations), and Open Questions with Success Metrics & Timeline.
+- **Business & Investor Mode (12 Chapters)**: Covers Stakeholder Analysis, Problem Statement, Assumptions & Constraints, Non-Goals, TAM/SAM/SOM, MoSCoW scoping, Enhanced User Stories (Given/When/Then + Epic hierarchy), Classified NFRs (Performance, Scalability, Security, Usability, Availability), Baseline-backed KPIs, GTM Strategy, Risk Register with scoring, 12-week roadmap, and Regulatory Compliance.
+- **Technical & AI Agent Mode (9 Chapters)**: Covers System Context Diagram, Alternatives Considered, Non-Goals, Data Models with ERD, API Contracts with full Error Responses (`400`/`401`/`403`/`404`/`409`/`500`), Frontend Architecture with Data Flow Diagrams, Testing Pyramid Strategy, Classified NFRs, Retry Strategy with exponential backoff, and AI Agent Implementation Guidelines.
+- **Custom PRD Builder (Up to 20 Chapters from 29 Modular Blocks)**: Assemble a tailored document outline from 29 curated blocks across **Product & Business** and **Technical** categories, reorder selected chapters via drag-and-drop, and review live dependency-order suggestions before generation.
+
+## Screenshots
+
+### Dual-Mode Workspace (Obsidian Hero & Anti-Glare Titanium)
+
+| Dark Mode (Obsidian Hero) | Light Mode (Anti-Glare Titanium) |
+| :---: | :---: |
+| ![PRD Architect Welcome Screen in Dark Mode](assets/screenshots/welcome-dark.png) | ![PRD Architect Welcome Screen in Light Mode](assets/screenshots/welcome-light.png) |
+
+### Custom PRD Workbench (29 Modular Blocks & Order Validation)
+
+![PRD Architect Custom PRD Workbench](assets/screenshots/custom-builder-dark.png)
+
+### AI Provider & Model Settings (BYOM & httpOnly Key Storage)
+
+![PRD Architect AI Provider and Model Settings Modal](assets/screenshots/settings-dark.png)
 
 ## Features
 
-- **Tri-Mode Generation**: Clean toggle between Simple PRD (early-stage MVP), Business/Investor strategies, and deep Technical specifications.
-- **Bring Your Own Model (BYOM)**: Seamlessly switch between AI providers (DeepSeek, Gemini, OpenCode Zen, **9router / Custom Proxy**) and select specific models via the in-app Settings UI.
-- **Custom Endpoint Support**: 9router option allows entering custom endpoint URLs, API keys, and custom model names.
-- **Free AI Models**: OpenCode Zen provides 5 free models (deepseek-v4-flash-free, nemotron-3-ultra-free, mimo-v2.5-free, north-mini-code-free, big-pickle), with no credit card required.
-- **Live Mermaid Diagrams**: Generated PRDs include rich, interactive diagrams rendered in real-time, including System Context (graph), Entity Relationships (ERD), User Journeys (journey), Gantt Roadmaps (gantt), and Data Flows (sequenceDiagram).
-- **Auto-Sanitized Mermaid Syntax**: AI-generated diagram syntax is automatically fixed (parentheses in labels, commas, edge labels), ensuring diagrams always render without errors.
-- **Highly Stable Real-time Streaming**: Built with robust connection handling that supports infinite generation times, which makes it perfect for deep reasoning models (R1) without arbitrary timeouts.
-- **Precision Markdown Parsing**: Accurately segregates and renders complex Markdown documents in the UI purely based on primary chapter headings.
-- **WBS Canvas View**: Visualize any generated PRD as an interactive Work Breakdown Structure (React Flow), with features and sub-features parsed straight from the markdown, color-coded by MoSCoW priority, with zoom/pan and click-to-inspect detail panels.
-- **Interactive Revisions**: Leave feedback on the generated document to incrementally refine and polish the PRD, complete with a version control system to switch between generation attempts.
-- **Advanced File Context Support**: Upload reference files (PDF, DOCX, XLSX, Excel, CSV, text, and Images) to provide robust additional context and enrich the generated document.
-- **Bilingual Support & Quick Prompts**: Full generation, system prompts, and pre-built quick prompt starters supported seamlessly in both English and Indonesian.
-- **Minimalist UI**: A sleek, dark-themed interface built for focus, speed, and aesthetics with Lucide React icons replacing standard emojis.
-- **Export Ready**: Instantly copy to clipboard, download as Markdown (`.md`), or print directly to PDF.
+- **Four-Mode Generation Engine**: Switch cleanly between Simple (6 chapters), Business & Investor (12 chapters), Technical & AI Agent (9 chapters), and Custom PRD Builder (up to 20 chapters chosen from 29 modular blocks with drag-and-drop ordering).
+- **Obsidian Atelier Dual-Mode UI**: Focused, low-glare interface offering **Dark (Obsidian Hero)** and **Light (Anti-Glare Titanium, capped at matte `#F2F3F5` surfaces)** modes, self-hosted Inter and JetBrains Mono typography, and `motion` transitions that respect `prefers-reduced-motion`.
+- **Collapsible Sidebar & Live Chapter Outline**: Spring-animated navigation rail with live chapter tracking, streaming chapter pulse indicators, per-chapter comment badges, and version history switching.
+- **Bring Your Own Model (BYOM)**: Switch between **DeepSeek** (`deepseek-v4-flash`, `deepseek-v4-pro`), **Google Gemini** (`gemini-2.5-flash`, `gemini-2.5-pro`), **OpenCode Zen** (5 free models: `deepseek-v4-flash-free`, `nemotron-3-ultra-free`, `mimo-v2.5-free`, `north-mini-code-free`, `big-pickle`), and **9Router / Custom OpenAI-Compatible Proxy**, complete with live connection testing.
+- **Real-Time SSE Streaming, Auto-Continue & Reasoning Drawer**: Abortable, timeout-free SSE streaming suited for deep-reasoning models, with automatic multi-call continuation, SSE heartbeats, structural mid-output truncation detection, continuation seam repair, a one-click `Continue` fallback if a stream stops early, and a collapsible `ReasoningPanel` displaying live elapsed thinking time and stream progress.
+- **Dual-Theme Live Mermaid Diagrams**: Renders System Context (`graph`), Entity Relationships (`erDiagram` with automatic relationship-label and identifier sanitization), User Journeys (`journey`), Roadmaps (`gantt`), and Sequence Flows (`sequenceDiagram`) with automatic syntax sanitization, Dark/Light theme adaptation, and a toolbar for `Source`, `Copy`, and full-screen `Zoom`.
+- **Inline Chapter Notes, Sticky Revision CTA, Smart Revision Dock & Version Diff**: Attach targeted notes from any sticky chapter header (`Add note`), top inline editor, or sidebar quick-note entry, trigger multi-chapter revisions from the floating `SmartRevisionDock`, and inspect line-level diffs across versions.
+- **Interactive WBS Canvas**: Visualize any generated PRD as a React Flow Work Breakdown Structure parsed straight from markdown, with MoSCoW priority badges, ancestor-to-descendant path highlighting, and a slide-in `DetailPanel`.
+- **Reference File Context Upload**: Upload PDF, DOCX, XLSX, CSV, text/Markdown, and image files to ground generation in existing specifications and notes.
+- **Multi-Tab Local Persistence**: Autosaves versions and drafts to IndexedDB with `BroadcastChannel` cross-tab synchronization, schema validation, and storage quota alerts.
+- **Bilingual Support (EN / ID)**: Full interface copy, system prompts, and quick-prompt starters available in both English and Indonesian.
+- **Editorial Print Export Suite**: Copy Markdown to clipboard, export to Markdown (`.md`), Editorial Print Word (`.docx` with cover metadata, rasterized light-theme Mermaid diagrams, and native rowspan WBS tables), Editorial Print PDF (`.pdf` with embedded Unicode Inter and JetBrains Mono TTF fonts, FlateDecode stream and image compression, cover page, running headers/footers, dynamic column weighting, and smart page-break/orphan guards), structured JSON (`.json`), or print via a theme-independent paper layout, all using clean derived product filenames (`PRD_<ProductName>_*`).
 
 ## WBS Canvas
 
-Once a PRD has been generated, switch from **Document** to **WBS Canvas** using the tabs in the header. The canvas renders the PRD as an interactive Work Breakdown Structure tree, with modules, features, and sub-features parsed from the markdown, color-coded by MoSCoW priority, laid out as a hierarchical tree.
+Once a PRD has been generated, switch from **Document** to **WBS Canvas** in the header. The canvas parses the PRD markdown into an interactive Work Breakdown Structure tree showing modules, features, and sub-features color-coded by MoSCoW priority.
 
 **Interactions:**
 
-- **Zoom / Pan**: Use the mouse wheel to zoom and drag to pan (or use the controls at the bottom-left). The minimap gives an overview and supports navigation. The canvas is clamped (min zoom 0.3, initial fit max 1.2) so it never shrinks to unreadable.
-- **Modules start collapsed**: The canvas opens showing the root and module cards, each with a `+N` badge. Click the **chevron** on any node to expand or collapse its subtree (collapse state resets when you leave the tab).
-- **Click or press Enter/Space on a node**: Opens a slide-in detail panel with the node's title, priority badge, the raw markdown detail snippet from the PRD, and its sub-items.
-- **Close the detail panel**: Click the backdrop, the close button, or press `Esc`.
+- **Zoom, Pan & Floating Toolbar**: Use the mouse wheel to zoom and drag to pan, navigate with the minimap, or use the floating bottom-left toolbar for zoom (`-` / `%` / `+`), `Fit view`, `Collapse all / Expand all`, and live node count. Zoom is clamped (`0.3` minimum, `1.2` max initial fit) so layouts stay readable.
+- **Expandable Hierarchy**: The canvas opens expanded so the full breakdown is immediately scannable. Click the **chevron** on any parent node to collapse or expand its subtree (collapsed nodes display a `+N` badge), or toggle all modules at once from the toolbar.
+- **Path Highlighting & Slide-In Detail Panel**: Click (or press `Enter`/`Space` on) a node to highlight its ancestor-to-descendant path in Satin Champagne and open a `380px` spring slide-in `DetailPanel` with the node's breadcrumb, MoSCoW priority badge, clean per-feature detail snippet, sub-items, and quick `Open Document` / `Add note` actions.
+- **Close the detail panel**: Click the backdrop, click the close button, or press `Esc`.
 
-**Parsing:** features are extracted automatically from the PRD markdown:
+**Parsing:** features are extracted automatically from the PRD markdown in priority order:
 
 - **`### Feature Breakdown (WBS)` section**: hierarchical modules, features, and sub-features (all modes), merged with MoSCoW priorities via title matching.
 - **MoSCoW tables**: priority/feature source (business & technical modes).
 - **`### FEAT-XX` spec blocks**: features with feature codes (simple mode fallback).
 - **Any `###` heading**: last-resort fallback.
 
-Note that parse quality depends on how closely the LLM follows the strict output format enforced in `server.ts` (FORMATTING REQUIREMENT, which now mandates the breakdown section in every mode). When a source is missing or malformed, the canvas shows an info banner with warnings instead of failing.
-
-**Legacy PRDs** (generated before the breakdown contract) still work via the flat fallbacks, but the canvas renders wide, since every feature is a top-level sibling. Regenerating the PRD produces the breakdown section and a compact, module-collapsed canvas.
+Parse quality depends on how closely the model follows the formatting contract enforced in `server/prompts.ts` and `server/blockPrompts.ts`. When a source is missing or malformed, the canvas displays an info banner with warnings instead of failing.
 
 **Limitations:**
 
-- **Read-only view**: Node positions are computed deterministically per render and are **not** persisted. Dragging a node does not survive a re-render.
-- Parsing is heuristic and tolerant: undocumented or non-conforming PRD markdown degrades to fallback strategies with warnings.
-
-See **[docs/WBS-CANVAS.md](docs/WBS-CANVAS.md)** for the full technical reference: parser architecture, API contracts, layout algorithm, and maintenance instructions.
+- **Read-only layout**: Node positions are computed deterministically per render and are **not** persisted across re-renders.
+- Parsing is heuristic and tolerant: non-conforming markdown degrades gracefully to fallback strategies with warnings.
 
 ## Tech Stack
 
-- **Frontend**: React 19, Vite, Tailwind CSS v4, Lucide React (Icons), React Markdown, **Mermaid.js** (diagram rendering)
-- **Backend**: Node.js, Express.js
-- **Tooling**: TypeScript, esbuild
-- **Integration**: Native fetch API for OpenAI-compatible streaming, supporting **DeepSeek**, **Gemini**, and **OpenCode Zen** (including 5 free models).
+- **Frontend**: React 19, Vite, Tailwind CSS v4, `motion`, `@dnd-kit`, `@xyflow/react`, Lucide React, React Markdown (`remark-gfm`), Mermaid.js, self-hosted Inter & JetBrains Mono (`@fontsource`)
+- **Export & Diff**: `docx`, `jspdf`, `jspdf-autotable`, `diff`
+- **Persistence**: IndexedDB (`idb-keyval`) + `BroadcastChannel`
+- **Backend**: Node.js 22 (pinned in `.node-version`; `engines.node >= 18`), Express.js, Helmet, CORS, `express-rate-limit`, `cookie-parser`, Multer, `pdf-parse`, `mammoth`, `exceljs`
+- **Tooling & Testing**: TypeScript, esbuild, Vitest (`jsdom` + v8 coverage)
+- **AI Integration**: Native Fetch API for OpenAI-compatible SSE streaming across **DeepSeek**, **Google Gemini**, **OpenCode Zen**, and **9Router / Custom Proxy**
 
 ## Getting Started
 
 ### Prerequisites
 
-- Node.js (v18 or higher)
+- Node.js 22 recommended (v18 or higher supported)
 - npm or pnpm
-- API Key from your preferred AI provider (e.g., Gemini, DeepSeek)
+- API key from your preferred AI provider (DeepSeek, Google Gemini, 9Router, or OpenCode Zen free models)
 
 ### Installation
 
@@ -106,29 +122,40 @@ See **[docs/WBS-CANVAS.md](docs/WBS-CANVAS.md)** for the full technical referenc
    ```
 
 2. **Install dependencies**
+
    ```bash
    npm install
    ```
 
 ### Configuration
 
-You can fully customize the AI provider and model directly from the application's **Settings (gear icon)** within the UI. You can choose from **DeepSeek**, **Gemini**, or **OpenCode Zen** (5 free models) and specify exact models (e.g., `deepseek-v4-flash`, `gemini-2.5-pro`, `deepseek-v4-flash-free`).
+You can configure the AI provider, model, and custom endpoint directly from the **Settings** modal in the app. Supported providers include **DeepSeek**, **Google Gemini**, **OpenCode Zen** (5 free models), and **9Router Proxy** (custom OpenAI-compatible URL and model name).
 
 #### API Key Setup
 
 Provide your API keys through one of two methods:
 
-**Method A: Environment Variables (.env)** _(Recommended for local dev)_
-Create a `.env` file in the root of the project to set default values for the backend proxy:
+**Method A: Environment Variables (`.env`)** *(Recommended for local dev)*
+
+Copy `.env.example` to `.env` in the project root:
 
 ```env
 DEEPSEEK_API_KEY=your_deepseek_key
 GEMINI_API_KEY=your_gemini_key
 OPENCODE_API_KEY=your_opencode_key
+NINE_ROUTER_API_KEY=your_9router_key
+
+# Keep false on public instances; set true only on trusted private/local installs
+# that intentionally share server-side API keys when clients omit their own key.
+ALLOW_SERVER_KEY_FALLBACK=false
+
+# Required in production (comma-separated origins for CORS)
+ALLOWED_ORIGINS=https://prd-architect.example.com
 ```
 
 **Method B: In-App UI**
-Click the **Settings (gear icon)** inside the app to paste your Custom API Key. This stores the key in a secure httpOnly cookie via the backend, which will be used for subsequent API requests.
+
+Open **Settings** inside the app and paste your API key. The backend stores it in a secure `httpOnly` cookie for subsequent API requests, and you can verify connectivity immediately with **Test Connection**.
 
 ### Running the App
 
@@ -140,6 +167,16 @@ npm run dev
 
 The application will be available at [http://localhost:3000](http://localhost:3000).
 
+### Verification & Tests
+
+Run typechecking and the unit test suite:
+
+```bash
+npm run typecheck
+npm test
+npm run test:coverage
+```
+
 ## Building for Production
 
 Create a production build spanning the React SPA and Express backend:
@@ -149,7 +186,7 @@ npm run build
 npm run start
 ```
 
-The server will bind to `0.0.0.0:3000` and serve the optimized static frontend alongside the API.
+The server binds to `0.0.0.0:3000` (or `PORT`) and serves the optimized static frontend alongside the API.
 
 ## License
 

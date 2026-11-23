@@ -20,16 +20,27 @@ import { registerAuthRoutes } from "./server/auth";
 import { resolveEndpoint, endpointErrorMessage, resolveApiKey, allowServerKeyFallback } from "./server/endpoint";
 import { isBlockedStaticPath } from "./server/staticPathGuard";
 import { startKeepWarm } from "./server/keepWarm";
+import {
+  MAX_EXISTING_CONTENT_CHARS,
+  maxContinuationsFor,
+  extractFinishReason,
+  getExpectedChapterHeadings,
+  decideContinuation,
+  buildContinuationMessages,
+  createSeamDeduplicator,
+  type ChatMessage,
+  type UpstreamSSEPayload,
+} from "./server/continuation";
 
 // Wave 7 — Track A: Union types for type safety (TS-04 to TS-07)
 // Shared with the frontend via /shared/types.ts (single source of truth)
-import type { AIProvider, PRDMode, ProductType } from "./shared/types";
+import type { AIProvider, PRDMode, ProductType, TruncationInfo } from "./shared/types";
 import { PROVIDER_MODELS } from "./shared/models";
 
 // Wave 7 — Track A: Typed chat request body (TS-03)
 interface ChatRequest {
   model: string;
-  messages: Array<{ role: "system" | "user"; content: string }>;
+  messages: ChatMessage[];
   stream: boolean;
   max_tokens: number;
   temperature: number;
@@ -43,26 +54,6 @@ interface SafeError extends Error {
 
 function markSafe(error: Error): SafeError {
   return Object.assign(error, { __safe: true as const });
-}
-
-interface SSEChunk {
-  text?: string;
-  reasoning?: string;
-  error?: string;
-  // Raw API response fields (for type-safe parsing)
-  choices?: Array<{
-    delta?: {
-      content?: string;
-      reasoning_content?: string;
-    };
-  }>;
-  candidates?: Array<{
-    content?: {
-      parts?: Array<{
-        text?: string;
-      }>;
-    };
-  }>;
 }
 
 dotenv.config();
@@ -368,6 +359,26 @@ app.post("/api/generate-prd", async (req, res) => {
     customIds = validation.ids;
   }
 
+  const rawBody = req.body as Record<string, unknown>;
+  const rawMode = rawBody?.mode;
+  const rawExistingContent = rawBody?.existingContent;
+  if (rawMode === "continue") {
+    if (typeof rawExistingContent !== "string" || rawExistingContent.trim().length === 0) {
+      return res.status(400).json({
+        error: language === "en"
+          ? "existingContent is required for continue mode."
+          : "existingContent wajib diisi untuk mode lanjutkan.",
+      });
+    }
+    if (rawExistingContent.length > MAX_EXISTING_CONTENT_CHARS) {
+      return res.status(400).json({
+        error: language === "en"
+          ? `existingContent too long (max ${MAX_EXISTING_CONTENT_CHARS} characters).`
+          : `existingContent terlalu panjang (maksimal ${MAX_EXISTING_CONTENT_CHARS} karakter).`,
+      });
+    }
+  }
+
   res.setHeader("Content-Type", "text/event-stream");
   res.setHeader("Cache-Control", "no-cache");
   res.setHeader("Connection", "keep-alive");
@@ -377,10 +388,11 @@ app.post("/api/generate-prd", async (req, res) => {
   // CRIT-03 fix: Hoist idle timer vars before try so catch/finally can access them
   let idleTimer: ReturnType<typeof setTimeout> | null = null;
   let idleTimedOut = false;
+  let heartbeatTimer: ReturnType<typeof setInterval> | null = null;
   // Wave 3 — Task 3.7: Hoist flushTimeout for defensive cleanup in finally block
   let flushTimeout: ReturnType<typeof setTimeout> | null = null;
   try {
-    const { prompt, provider: rawProvider = 'deepseek', model = 'deepseek-v4-flash', customEndpoint, productType, uploadedFiles, mode = 'initial', prdMode: rawPrdMode = 'business' } = req.body;
+    const { prompt, provider: rawProvider = 'deepseek', model = 'deepseek-v4-flash', customEndpoint, productType, uploadedFiles, mode = 'initial', prdMode: rawPrdMode = 'business', existingContent } = req.body;
     // Wave 7 — Track A: Narrow types from req.body (TS-04 to TS-07)
     const provider = rawProvider as AIProvider;
     const prdMode = rawPrdMode as PRDMode;
@@ -524,8 +536,8 @@ app.post("/api/generate-prd", async (req, res) => {
       const customSystem = composeCustomSystemPrompt(customIds, language);
       // Prepend industry context if present
       const withIndustry = industryPrompt ? customSystem + '\n' + industryPrompt : customSystem;
-      finalPrompt = mode === 'initial' ? withIndustry : withIndustry + '\n\n' + modeInstructions;
-    } else if (mode === 'initial') {
+      finalPrompt = mode === 'initial' || mode === 'continue' ? withIndustry : withIndustry + '\n\n' + modeInstructions;
+    } else if (mode === 'initial' || mode === 'continue') {
       finalPrompt = getSystemPrompt(language, industryPrompt, productType, prdMode);
     } else {
       // Gabungkan: full system prompt + mode instructions di akhir
@@ -548,9 +560,20 @@ app.post("/api/generate-prd", async (req, res) => {
     res.on("close", () => {
       if (isClosed) return;
       isClosed = true;
+      if (heartbeatTimer) {
+        clearInterval(heartbeatTimer);
+        heartbeatTimer = null;
+      }
       log('INFO', "CLIENT DISCONNECTED. Aborting fetch...");
       abortController?.abort();
     });
+
+    // SSE keep-alive comment every 20s so reverse proxies do not drop long multi-call streams.
+    heartbeatTimer = setInterval(() => {
+      if (!res.writableEnded && !isClosed) {
+        res.write(": keep-alive\n\n");
+      }
+    }, 20_000);
 
     // 1. Konfigurasi semua header terlebih dahulu
     const fetchHeaders: Record<string, string> = {
@@ -558,36 +581,29 @@ app.post("/api/generate-prd", async (req, res) => {
       "Authorization": "Bearer " + apiKey,
     };
 
-    // 2. Siapkan body request
-    let fetchBody: ChatRequest;
+    // 2. Helper body request & batas token
     const maxTokens = providerConfig.maxTokens ?? 16384;
-
-    if (provider === "gemini") {
-      fetchBody = {
+    const buildFetchBody = (messages: ChatMessage[]): ChatRequest => {
+      if (provider === "gemini") {
+        return {
+          model: modelName,
+          messages,
+          stream: true,
+          max_tokens: maxTokens,
+          temperature: 0.1,
+        };
+      }
+      return {
         model: modelName,
-        messages: [
-          { role: "system", content: finalPrompt },
-          { role: "user", content: finalUserPrompt }
-        ],
-        stream: true,
-        max_tokens: maxTokens,
-        temperature: 0.1,
-      };
-    } else {
-      fetchBody = {
-        model: modelName,
-        messages: [
-          { role: "system", content: finalPrompt },
-          { role: "user", content: finalUserPrompt }
-        ],
+        messages,
         stream: true,
         max_tokens: maxTokens,
         temperature: 0.1,
         top_p: 0.1,
       };
-    }
+    };
 
-    // 3. Buat fetchOptions SETELAH semua header dan body selesai dikonfigurasi
+    // 3. Idle timeout (reset per chunk dari upstream)
     // CRIT-03 fix: Replace absolute 120s deadline with idle timeout (reset per chunk)
     const IDLE_TIMEOUT = 120_000; // 120 seconds of no activity
 
@@ -608,37 +624,6 @@ app.post("/api/generate-prd", async (req, res) => {
         }
       }, IDLE_TIMEOUT);
     };
-
-    // Start idle timer before fetch
-    resetIdleTimer();
-
-    const fetchOptions: RequestInit = {
-      method: "POST",
-      headers: fetchHeaders,
-      signal: abortController?.signal,
-      body: JSON.stringify(fetchBody),
-    };
-
-    const response = await fetch(endpoint, fetchOptions);
-
-    if (!response.ok) {
-      // Wave 3 — Task 3.3: Use safe error messages map, log full details server-side only
-      const status = response.status;
-      const safeMsg = safeErrorMessages[status] || GENERIC_UPSTREAM_ERROR;
-      const errorMsg = language === 'en' ? safeMsg.en : safeMsg.id;
-      // Body upstream HANYA untuk log server-side — jangan pernah dikirim ke client.
-      const body = await readUpstreamErrorBody(response);
-      log('ERROR', `Upstream API error (status ${status} ${response.statusText}) endpoint=${endpoint} model=${modelName} body=${body}`);
-      const safeError = markSafe(new Error(errorMsg)); // Mark as pre-sanitized
-      throw safeError;
-    }
-
-    const reader = response.body?.getReader();
-    if (!reader) throw new Error("No response body from provider");
-
-    const decoder = new TextDecoder();
-    let buffer = '';
-    let consecutiveParseErrors = 0;
 
     // BUG 4.4: Helper untuk SSE write dengan backpressure handling
     // Wave 3 — Task 3.6: Added timeout + close-event guard to prevent Promise hang
@@ -680,68 +665,268 @@ app.post("/api/generate-prd", async (req, res) => {
       });
     };
 
-    while (true) {
-      // Wave 3 — Task 3.5: Do NOT reset consecutiveParseErrors here — it must only reset on successful parse (inside try block)
-      const { done, value } = await reader.read();
-      if (done) break;
+    const expectedHeadings = getExpectedChapterHeadings(prdMode, language, customIds);
+    const maxContinuations = maxContinuationsFor(expectedHeadings.length);
+    let accumulatedText = mode === "continue" && typeof existingContent === "string" ? existingContent : "";
+    let isContinuationTurn = mode === "continue";
+    let continuationAttempt = 0;
 
-      // CRIT-03 fix: Reset idle timer on every chunk received from upstream
+    let currentMessages: ChatMessage[];
+    if (mode === "continue") {
+      const seedDecision = decideContinuation({
+        accumulatedText,
+        finishReason: "length",
+        expectedHeadings,
+      });
+      if (seedDecision.shouldContinue) {
+        currentMessages = buildContinuationMessages({
+          systemPrompt: finalPrompt,
+          userPrompt: finalUserPrompt,
+          accumulatedText,
+          decision: seedDecision,
+          expectedHeadings,
+          language,
+        });
+      } else {
+        currentMessages = [
+          { role: "system", content: finalPrompt },
+          { role: "user", content: finalUserPrompt },
+        ];
+      }
+    } else {
+      currentMessages = [
+        { role: "system", content: finalPrompt },
+        { role: "user", content: finalUserPrompt },
+      ];
+    }
+
+    const streamSingleTurn = async (
+      messages: ChatMessage[],
+      applySeamDedup: boolean,
+    ): Promise<{ turnText: string; finishReason: string | null; sawDone: boolean }> => {
       resetIdleTimer();
 
-      buffer += decoder.decode(value, { stream: true });
-      const lines = buffer.split('\n');
-      buffer = lines.pop() || '';
+      const fetchOptions: RequestInit = {
+        method: "POST",
+        headers: fetchHeaders,
+        signal: abortController?.signal,
+        body: JSON.stringify(buildFetchBody(messages)),
+      };
 
-      for (const line of lines) {
-        if (line.trim() === '') continue;
-        if (line.startsWith('data: ')) {
-          const dataStr = line.slice(6);
-          if (dataStr === '[DONE]') {
-            continue;
-          }
-          try {
-            const data: SSEChunk = JSON.parse(dataStr);
-            consecutiveParseErrors = 0;
-            const contentText = data.choices?.[0]?.delta?.content || data.candidates?.[0]?.content?.parts?.[0]?.text || "";
-            const reasoningText = data.choices?.[0]?.delta?.reasoning_content || "";
+      const response = await fetch(endpoint, fetchOptions);
 
-            if (contentText || reasoningText) {
-              await writeChunk(`data: ${JSON.stringify({ text: contentText, reasoning: reasoningText })}\n\n`);
-            }
-          } catch (e) {
-            log('WARN', "Custom provider parse error", e instanceof Error ? e.message : e);
-            consecutiveParseErrors++;
-            if (consecutiveParseErrors > 5) {
-              const parseError = markSafe(new Error(language === 'en'
-                ? 'Too many malformed chunks from server. Stream aborted.'
-                : 'Terlalu banyak chunk rusak dari server. Stream dibatalkan.'));
-              throw parseError;
-            }
-          }
-        }
+      if (!response.ok) {
+        // Wave 3 — Task 3.3: Use safe error messages map, log full details server-side only
+        const status = response.status;
+        const safeMsg = safeErrorMessages[status] || GENERIC_UPSTREAM_ERROR;
+        const errorMsg = language === 'en' ? safeMsg.en : safeMsg.id;
+        // Body upstream HANYA untuk log server-side — jangan pernah dikirim ke client.
+        const body = await readUpstreamErrorBody(response);
+        log('ERROR', `Upstream API error (status ${status} ${response.statusText}) endpoint=${endpoint} model=${modelName} body=${body}`);
+        const safeError = markSafe(new Error(errorMsg)); // Mark as pre-sanitized
+        throw safeError;
       }
-    }
 
-    // Flush residual buffer content (BUG B5)
-    if (buffer.trim()) {
+      const reader = response.body?.getReader();
+      if (!reader) throw new Error("No response body from provider");
+
+      const decoder = new TextDecoder();
+      let buffer = '';
+      let consecutiveParseErrors = 0;
+      let finishReason: string | null = null;
+      let sawDone = false;
+      let turnText = '';
+      const seamDedup = applySeamDedup ? createSeamDeduplicator(accumulatedText) : null;
+
+      const emitContent = async (chunkText: string) => {
+        if (!chunkText) return;
+        const out = seamDedup ? seamDedup.feed(chunkText) : chunkText;
+        if (!out) return;
+        turnText += out;
+        await writeChunk(`data: ${JSON.stringify({ text: out, reasoning: "" })}\n\n`);
+      };
+
+      const handleParsedPayload = async (data: UpstreamSSEPayload) => {
+        const chunkFinish = extractFinishReason(data);
+        if (chunkFinish) {
+          finishReason = chunkFinish;
+        }
+        const contentText = data.choices?.[0]?.delta?.content || data.candidates?.[0]?.content?.parts?.[0]?.text || "";
+        const reasoningText = data.choices?.[0]?.delta?.reasoning_content || "";
+
+        if (reasoningText) {
+          await writeChunk(`data: ${JSON.stringify({ text: "", reasoning: reasoningText })}\n\n`);
+        }
+        if (contentText) {
+          await emitContent(contentText);
+        }
+      };
+
       try {
-        // Strip prefix `data: ` agar konsisten dengan client (aiService.ts)
-        const trimmed = buffer.trim();
-        const dataStr = trimmed.startsWith('data: ') ? trimmed.slice(6) : trimmed;
-        if (dataStr !== '[DONE]') {
-          const data = JSON.parse(dataStr);
-          const contentText = data.choices?.[0]?.delta?.content || data.candidates?.[0]?.content?.parts?.[0]?.text || "";
-          if (contentText) {
-            await writeChunk(`data: ${JSON.stringify({ text: contentText })}\n\n`);
+        while (true) {
+          // Wave 3 — Task 3.5: Do NOT reset consecutiveParseErrors here — it must only reset on successful parse (inside try block)
+          const { done, value } = await reader.read();
+          if (done) break;
+
+          // CRIT-03 fix: Reset idle timer on every chunk received from upstream
+          resetIdleTimer();
+
+          buffer += decoder.decode(value, { stream: true });
+          const lines = buffer.split('\n');
+          buffer = lines.pop() || '';
+
+          for (const line of lines) {
+            if (line.trim() === '') continue;
+            if (line.startsWith('data:')) {
+              const dataStr = line.slice(5).trim();
+              if (!dataStr) {
+                continue;
+              }
+              if (dataStr === '[DONE]') {
+                sawDone = true;
+                continue;
+              }
+              try {
+                const data = JSON.parse(dataStr) as UpstreamSSEPayload;
+                consecutiveParseErrors = 0;
+                await handleParsedPayload(data);
+              } catch (e) {
+                log('WARN', "Custom provider parse error", e instanceof Error ? e.message : e);
+                consecutiveParseErrors++;
+                if (consecutiveParseErrors > 5) {
+                  const parseError = markSafe(new Error(language === 'en'
+                    ? 'Too many malformed chunks from server. Stream aborted.'
+                    : 'Terlalu banyak chunk rusak dari server. Stream dibatalkan.'));
+                  throw parseError;
+                }
+              }
+            }
           }
         }
-      } catch {
-        // Partial/incomplete — silently ignore
+
+        // Flush residual buffer content (BUG B5)
+        if (buffer.trim()) {
+          try {
+            const trimmed = buffer.trim();
+            const dataStr = trimmed.startsWith('data:') ? trimmed.slice(5).trim() : trimmed;
+            if (dataStr === '[DONE]') {
+              sawDone = true;
+            } else if (dataStr) {
+              const data = JSON.parse(dataStr) as UpstreamSSEPayload;
+              await handleParsedPayload(data);
+            }
+          } catch {
+            // Partial/incomplete — silently ignore
+          }
+        }
+
+        // Flush any buffered continuation seam probe when the turn ended before SEAM_PROBE_CHARS.
+        if (seamDedup) {
+          const tail = seamDedup.flush();
+          if (tail) {
+            turnText += tail;
+            await writeChunk(`data: ${JSON.stringify({ text: tail, reasoning: "" })}\n\n`);
+          }
+        }
+      } finally {
+        reader.cancel().catch(() => {});
       }
+
+      return { turnText, finishReason, sawDone };
+    };
+
+    // Server-side auto-continue loop: seamlessly stitches multi-call completions
+    // when an upstream model hits its output cap or stops before all chapters finish.
+    let finalTruncation: TruncationInfo | null = null;
+
+    while (true) {
+      if (isClosed || abortController.signal.aborted) break;
+
+      const { turnText, finishReason, sawDone } = await streamSingleTurn(
+        currentMessages,
+        isContinuationTurn,
+      );
+
+      if (turnText.length > 0) {
+        accumulatedText += turnText;
+      }
+
+      // Zero-progress guard: stop looping if a continuation call added no new text.
+      if (isContinuationTurn && turnText.trim().length === 0) {
+        const stillIncomplete = decideContinuation({
+          accumulatedText,
+          finishReason,
+          expectedHeadings,
+          sawDone,
+        });
+        if (stillIncomplete.shouldContinue) {
+          finalTruncation = {
+            reason: stillIncomplete.reason,
+            finishReason,
+            detectedChapters: stillIncomplete.detectedChapters,
+            expectedChapters: stillIncomplete.expectedChapters,
+          };
+        }
+        log('WARN', `Auto-continue halted after zero progress at attempt ${continuationAttempt}`);
+        break;
+      }
+
+      const decision = decideContinuation({
+        accumulatedText,
+        finishReason,
+        expectedHeadings,
+        sawDone,
+      });
+
+      if (!decision.shouldContinue) {
+        break;
+      }
+
+      if (continuationAttempt >= maxContinuations) {
+        finalTruncation = {
+          reason: decision.reason,
+          finishReason,
+          detectedChapters: decision.detectedChapters,
+          expectedChapters: decision.expectedChapters,
+        };
+        log(
+          'WARN',
+          `Max continuations (${maxContinuations}) reached (reason=${decision.reason}, chapters=${decision.detectedChapters}/${decision.expectedChapters})`,
+        );
+        break;
+      }
+
+      continuationAttempt++;
+      log(
+        'INFO',
+        `Auto-continuing PRD generation (attempt ${continuationAttempt}/${maxContinuations}, reason=${decision.reason}, finishReason=${finishReason ?? 'none'}, sawDone=${sawDone}, chapters=${decision.detectedChapters}/${decision.expectedChapters})`,
+      );
+
+      await writeChunk(
+        `data: ${JSON.stringify({
+          continuing: { attempt: continuationAttempt, maxAttempts: maxContinuations },
+        })}\n\n`,
+      );
+
+      currentMessages = buildContinuationMessages({
+        systemPrompt: finalPrompt,
+        userPrompt: finalUserPrompt,
+        accumulatedText,
+        decision,
+        expectedHeadings,
+        language,
+      });
+      isContinuationTurn = true;
     }
 
-    await writeChunk(`data: [DONE]\n\n`);
-    res.end();
+    if (finalTruncation && !res.writableEnded && !isClosed) {
+      await writeChunk(`data: ${JSON.stringify({ truncated: finalTruncation })}\n\n`);
+    }
+
+    if (!res.writableEnded && !isClosed) {
+      await writeChunk(`data: [DONE]\n\n`);
+      res.end();
+    }
 
   } catch (error) {
     if (error instanceof Error && error.name === 'AbortError') {
@@ -777,6 +962,10 @@ app.post("/api/generate-prd", async (req, res) => {
     if (idleTimer) {
       clearTimeout(idleTimer);
       idleTimer = null;
+    }
+    if (heartbeatTimer) {
+      clearInterval(heartbeatTimer);
+      heartbeatTimer = null;
     }
     // Wave 3 — Task 3.7: Clean up flushTimeout to prevent memory leaks or writes after response end
     if (flushTimeout) {

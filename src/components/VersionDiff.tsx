@@ -1,10 +1,12 @@
 import { useMemo, useState, useEffect } from "react";
 import { X, GitCompare } from "lucide-react";
 import { diffLines, type Change } from "diff";
+import { AnimatePresence, motion } from "motion/react";
 import { PRDVersion } from "../types";
 import { formatDate } from "../utils/format";
+import { MODAL_SLIDE_UP, POPOVER_FADE } from "../utils/motion";
 
-interface VersionDiffProps {
+export interface VersionDiffProps {
   isOpen: boolean;
   onClose: () => void;
   versions: PRDVersion[];
@@ -25,7 +27,6 @@ export function VersionDiff({
   const [leftId, setLeftId] = useState<string>(defaultLeft);
   const [rightId, setRightId] = useState<string>(defaultRight);
 
-  // Reset pilihan saat panel dibuka agar mengikuti versi aktif terbaru
   useEffect(() => {
     if (isOpen) {
       setRightId(activeVersionId ?? versions[versions.length - 1]?.id ?? "");
@@ -55,118 +56,166 @@ export function VersionDiff({
     let removed = 0;
     for (const c of changes) {
       // c.value biasanya diakhiri "\n"; buang satu trailing newline agar tak
-      // over-count +1 per hunk. value "" → 0, "a\n" → 1, "a\nb" → 2.
-      const count = c.count ?? (c.value === "" ? 0 : (c.value.endsWith("\n") ? c.value.slice(0, -1) : c.value).split("\n").length);
+      // over-count +1 per hunk. value "" -> 0, "a\n" -> 1, "a\nb" -> 2.
+      const count =
+        c.count ??
+        (c.value === ""
+          ? 0
+          : (c.value.endsWith("\n") ? c.value.slice(0, -1) : c.value).split("\n").length);
       if (c.added) added += count;
       else if (c.removed) removed += count;
     }
     return { added, removed };
   }, [changes]);
 
-  if (!isOpen) return null;
-
   const versionLabel = (v: PRDVersion) => {
     const idx = versions.findIndex((x) => x.id === v.id);
-    const base = language === "en" ? `Version ${idx + 1}` : `Versi ${idx + 1}`;
+    const base = language === "en" ? `v${idx + 1}` : `v${idx + 1}`;
     return `${base} · ${formatDate(v.timestamp, language)}`;
   };
 
   return (
-    <div
-      className="fixed inset-0 z-[90] flex items-center justify-center bg-[var(--color-bg)]/80 p-4 backdrop-blur-sm no-print"
-      onClick={onClose}
-    >
-      <div
-        role="dialog"
-        aria-modal="true"
-        aria-labelledby="diff-dialog-title"
-        className="w-full max-w-[900px] max-h-[85vh] bg-[var(--color-surface)] border border-[var(--color-border)] rounded-md shadow-2xl flex flex-col"
-        onClick={(e) => e.stopPropagation()}
-      >
-        <div className="flex items-center justify-between px-6 py-4 border-b border-[var(--color-border)]">
-          <h2 id="diff-dialog-title" className="text-[16px] font-semibold text-[var(--color-text-primary)] flex items-center gap-2">
-            <GitCompare size={16} strokeWidth={1.5} className="text-[var(--color-text-secondary)]" />
-            {language === "en" ? "Compare Versions" : "Bandingkan Versi"}
-          </h2>
-          <button
-            onClick={onClose}
-            aria-label={language === "en" ? "Close" : "Tutup"}
-            className="text-[var(--color-text-muted)] hover:text-[var(--color-text-primary)] p-2 rounded-sm hover:bg-[var(--color-surface-elevated)] transition-colors focus-visible:ring-2 focus-visible:ring-[var(--color-interactive)] focus-visible:outline-none"
+    <AnimatePresence>
+      {isOpen && (
+        <motion.div
+          initial={{ opacity: 0 }}
+          animate={{ opacity: 1 }}
+          exit={{ opacity: 0 }}
+          transition={POPOVER_FADE}
+          className="fixed inset-0 z-[90] flex items-center justify-center bg-[var(--oa-scrim)] p-4 backdrop-blur-xs no-print"
+          onClick={onClose}
+        >
+          <motion.div
+            initial={{ opacity: 0, y: 12, scale: 0.98 }}
+            animate={{ opacity: 1, y: 0, scale: 1 }}
+            exit={{ opacity: 0, y: 8, scale: 0.98 }}
+            transition={MODAL_SLIDE_UP}
+            role="dialog"
+            aria-modal="true"
+            aria-labelledby="diff-dialog-title"
+            className="oa-elev-popover w-full max-w-[740px] max-h-[85vh] rounded-2xl flex flex-col overflow-hidden"
+            onClick={(e) => e.stopPropagation()}
           >
-            <X size={18} strokeWidth={1.5} />
-          </button>
-        </div>
-
-        <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-3 px-6 py-3 border-b border-[var(--color-border)]">
-          <div className="flex-1">
-            <label className="block text-[11px] font-mono text-[var(--color-text-muted)] mb-1 uppercase tracking-wider">
-              {language === "en" ? "Base (old)" : "Dasar (lama)"}
-            </label>
-            <select
-              value={leftId}
-              onChange={(e) => setLeftId(e.target.value)}
-              className="w-full bg-[var(--color-bg)] border border-[var(--color-border)] rounded-sm px-3 py-2 text-[13px] text-[var(--color-text-primary)] focus:outline-none focus:border-[var(--color-interactive)]"
-            >
-              {versions.map((v) => (
-                <option key={v.id} value={v.id} className="bg-[var(--color-bg)]">
-                  {versionLabel(v)}
-                </option>
-              ))}
-            </select>
-          </div>
-          <div className="flex-1">
-            <label className="block text-[11px] font-mono text-[var(--color-text-muted)] mb-1 uppercase tracking-wider">
-              {language === "en" ? "Compare (new)" : "Banding (baru)"}
-            </label>
-            <select
-              value={rightId}
-              onChange={(e) => setRightId(e.target.value)}
-              className="w-full bg-[var(--color-bg)] border border-[var(--color-border)] rounded-sm px-3 py-2 text-[13px] text-[var(--color-text-primary)] focus:outline-none focus:border-[var(--color-interactive)]"
-            >
-              {versions.map((v) => (
-                <option key={v.id} value={v.id} className="bg-[var(--color-bg)]">
-                  {versionLabel(v)}
-                </option>
-              ))}
-            </select>
-          </div>
-        </div>
-
-        <div className="flex items-center gap-4 px-6 py-2 border-b border-[var(--color-border)] text-[12px] font-mono">
-          <span className="text-[var(--color-success)]">+{stats.added} {language === "en" ? "added" : "tambah"}</span>
-          <span className="text-[var(--color-error)]">-{stats.removed} {language === "en" ? "removed" : "hapus"}</span>
-        </div>
-
-        <div className="flex-1 overflow-y-auto p-4 font-mono text-[12px] leading-[1.6]">
-          {leftId === rightId ? (
-            <p className="text-[var(--color-text-muted)] text-center py-8">
-              {language === "en"
-                ? "Select two different versions to compare."
-                : "Pilih dua versi berbeda untuk dibandingkan."}
-            </p>
-          ) : (
-            changes.map((part, i) => {
-              const lines = part.value.replace(/\n$/, "").split("\n");
-              const bg = part.added
-                ? "bg-[var(--color-success)]/10 text-[var(--color-success)]"
-                : part.removed
-                  ? "bg-[var(--color-error)]/10 text-[var(--color-error)]"
-                  : "text-[var(--color-text-muted)]";
-              const sign = part.added ? "+" : part.removed ? "-" : " ";
-              return (
-                <div key={i} className={bg}>
-                  {lines.map((line, j) => (
-                    <div key={j} className="whitespace-pre-wrap break-words px-2">
-                      <span className="select-none opacity-60 mr-2">{sign}</span>
-                      {line || "\u00A0"}
-                    </div>
-                  ))}
+            {/* Header */}
+            <div className="flex items-center justify-between gap-3 px-5 py-4 border-b border-[var(--oa-border-subtle)] bg-[var(--oa-bg-surface)] shrink-0">
+              <div className="flex items-center gap-2.5 min-w-0">
+                <span className="oa-recessed-well w-8 h-8 rounded-xl flex items-center justify-center text-[var(--oa-accent-champagne)] shrink-0">
+                  <GitCompare size={15} strokeWidth={1.6} aria-hidden="true" />
+                </span>
+                <h2
+                  id="diff-dialog-title"
+                  className="text-[15.5px] font-semibold text-[var(--oa-text-primary)] truncate"
+                >
+                  {language === "en" ? "Compare Versions" : "Bandingkan Versi"}
+                </h2>
+                <div className="oa-recessed-well hidden sm:inline-flex items-center gap-2 px-2.5 py-0.5 rounded-full text-[11px] font-mono shrink-0">
+                  <span className="text-[var(--oa-signal-sage)]">
+                    +{stats.added}
+                  </span>
+                  <span className="text-[var(--oa-border-strong)]">/</span>
+                  <span className="text-[var(--oa-signal-garnet)]">
+                    -{stats.removed}
+                  </span>
                 </div>
-              );
-            })
-          )}
-        </div>
-      </div>
-    </div>
+              </div>
+
+              <button
+                type="button"
+                onClick={onClose}
+                aria-label={language === "en" ? "Close" : "Tutup"}
+                className="text-[var(--oa-text-muted)] hover:text-[var(--oa-text-primary)] p-1.5 rounded-lg hover:bg-[var(--oa-bg-hover)]/60 transition-colors cursor-pointer focus-visible:ring-2 focus-visible:ring-[var(--oa-accent-champagne)] focus-visible:outline-none shrink-0"
+              >
+                <X size={16} strokeWidth={1.6} aria-hidden="true" />
+              </button>
+            </div>
+
+            {/* Version Pickers */}
+            <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-3 px-5 py-3 border-b border-[var(--oa-border-subtle)] bg-[var(--oa-bg-surface)]/50 shrink-0">
+              <div className="flex-1">
+                <label
+                  htmlFor="diff-base-version"
+                  className="block text-[10.5px] font-mono text-[var(--oa-text-muted)] mb-1 uppercase tracking-[0.06em]"
+                >
+                  {language === "en" ? "Base (old)" : "Dasar (lama)"}
+                </label>
+                <select
+                  id="diff-base-version"
+                  value={leftId}
+                  onChange={(e) => setLeftId(e.target.value)}
+                  className="oa-recessed-well w-full rounded-xl px-3 py-2 text-[12.5px] font-mono text-[var(--oa-text-primary)] border-[var(--oa-border-default)] focus:outline-none focus:border-[var(--oa-border-champagne)] cursor-pointer"
+                >
+                  {versions.map((v) => (
+                    <option
+                      key={v.id}
+                      value={v.id}
+                      className="bg-[var(--oa-bg-elevated)] text-[var(--oa-text-primary)]"
+                    >
+                      {versionLabel(v)}
+                    </option>
+                  ))}
+                </select>
+              </div>
+              <div className="flex-1">
+                <label
+                  htmlFor="diff-compare-version"
+                  className="block text-[10.5px] font-mono text-[var(--oa-text-muted)] mb-1 uppercase tracking-[0.06em]"
+                >
+                  {language === "en" ? "Compare (new)" : "Banding (baru)"}
+                </label>
+                <select
+                  id="diff-compare-version"
+                  value={rightId}
+                  onChange={(e) => setRightId(e.target.value)}
+                  className="oa-recessed-well w-full rounded-xl px-3 py-2 text-[12.5px] font-mono text-[var(--oa-text-primary)] border-[var(--oa-border-default)] focus:outline-none focus:border-[var(--oa-border-champagne)] cursor-pointer"
+                >
+                  {versions.map((v) => (
+                    <option
+                      key={v.id}
+                      value={v.id}
+                      className="bg-[var(--oa-bg-elevated)] text-[var(--oa-text-primary)]"
+                    >
+                      {versionLabel(v)}
+                    </option>
+                  ))}
+                </select>
+              </div>
+            </div>
+
+            {/* Unified Diff Canvas */}
+            <div className="flex-1 overflow-y-auto bg-[var(--oa-bg-recessed)] p-4 font-mono text-[12px] leading-[1.65]">
+              {leftId === rightId ? (
+                <p className="text-[var(--oa-text-muted)] text-center py-10">
+                  {language === "en"
+                    ? "Select two different versions to compare."
+                    : "Pilih dua versi berbeda untuk dibandingkan."}
+                </p>
+              ) : (
+                <div className="rounded-xl border border-[var(--oa-border-subtle)] overflow-hidden">
+                  {changes.map((part, i) => {
+                    const lines = part.value.replace(/\n$/, "").split("\n");
+                    const rowClass = part.added
+                      ? "bg-[var(--oa-signal-sage-tint)] text-[var(--oa-signal-sage)]"
+                      : part.removed
+                        ? "bg-[var(--oa-signal-garnet-tint)] text-[var(--oa-signal-garnet)]"
+                        : "text-[var(--oa-text-muted)]";
+                    const sign = part.added ? "+" : part.removed ? "-" : " ";
+                    return (
+                      <div key={i} className={rowClass}>
+                        {lines.map((line, j) => (
+                          <div key={j} className="whitespace-pre-wrap break-words px-3 py-0.5">
+                            <span className="select-none opacity-65 mr-2.5">{sign}</span>
+                            {line || "\u00A0"}
+                          </div>
+                        ))}
+                      </div>
+                    );
+                  })}
+                </div>
+              )}
+            </div>
+          </motion.div>
+        </motion.div>
+      )}
+    </AnimatePresence>
   );
 }

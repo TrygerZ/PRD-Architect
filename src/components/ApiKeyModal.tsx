@@ -1,12 +1,26 @@
 import { useState, useEffect, useRef } from "react";
-import { Key, X, Check, AlertTriangle, Loader2, PlugZap, XCircle } from "lucide-react";
+import {
+  Key,
+  X,
+  Check,
+  Shield,
+  Loader2,
+  PlugZap,
+  XCircle,
+  Eye,
+  EyeOff,
+  ChevronDown,
+  AlertCircle,
+} from "lucide-react";
 import { motion, AnimatePresence } from "motion/react";
 
 import { AIProvider } from "../types";
 import { MODELS_BY_PROVIDER, PROVIDER_MODELS } from "../../shared/models";
 import { safeGetLocalStorage, safeSetLocalStorage } from "../utils/storage";
+import { MODAL_SLIDE_UP, POPOVER_FADE } from "../utils/motion";
+import { useT } from "../hooks/useT";
 
-interface ApiKeyModalProps {
+export interface ApiKeyModalProps {
   isOpen: boolean;
   onClose: () => void;
   onSave: (key: string, provider: AIProvider, model: string, endpoint?: string) => void;
@@ -15,6 +29,38 @@ interface ApiKeyModalProps {
   initialModel?: string;
   initialEndpoint?: string;
 }
+
+const PROVIDER_TILES: Array<{
+  id: AIProvider;
+  title: string;
+  subtitleEn: string;
+  subtitleId: string;
+}> = [
+  {
+    id: "deepseek",
+    title: "DeepSeek",
+    subtitleEn: "Reasoning & Flash",
+    subtitleId: "Penalaran & Flash",
+  },
+  {
+    id: "gemini",
+    title: "Google Gemini",
+    subtitleEn: "2.5 Flash & Pro",
+    subtitleId: "2.5 Flash & Pro",
+  },
+  {
+    id: "opencode",
+    title: "OpenCode Zen",
+    subtitleEn: "Curated free models",
+    subtitleId: "Model gratis terkurasi",
+  },
+  {
+    id: "nine_router",
+    title: "9Router Proxy",
+    subtitleEn: "Custom OpenAI endpoint",
+    subtitleId: "Endpoint OpenAI kustom",
+  },
+];
 
 export function ApiKeyModal({
   isOpen,
@@ -25,62 +71,85 @@ export function ApiKeyModal({
   initialModel = PROVIDER_MODELS.deepseek.defaultModel,
   initialEndpoint = "",
 }: ApiKeyModalProps) {
+  const t = useT(language);
   const [apiKey, setApiKey] = useState("");
+  const [showApiKey, setShowApiKey] = useState(false);
   const [provider, setProvider] = useState<AIProvider>(initialProvider);
   const [model, setModel] = useState<string>(initialModel);
   const [endpoint, setEndpoint] = useState<string>(initialEndpoint);
   const [saved, setSaved] = useState(false);
+  const [saveError, setSaveError] = useState<string | null>(null);
   const [testState, setTestState] = useState<"idle" | "testing" | "success" | "error">("idle");
   const [testMessage, setTestMessage] = useState("");
 
   const modalRef = useRef<HTMLDivElement>(null);
   const isBackdropMouseDown = useRef(false);
+  const closeTimerRef = useRef<ReturnType<typeof setTimeout> | undefined>(undefined);
 
   const MODELS = MODELS_BY_PROVIDER;
 
   useEffect(() => {
-    if (isOpen) {
-      const storedProv = safeGetLocalStorage("PRD_AI_PROVIDER") as AIProvider;
-      const validProviders = Object.keys(MODELS_BY_PROVIDER) as AIProvider[];
-      const resolvedProvider = storedProv && validProviders.includes(storedProv) ? storedProv : initialProvider;
+    return () => {
+      clearTimeout(closeTimerRef.current);
+    };
+  }, []);
 
-      const storedModel = safeGetLocalStorage("PRD_AI_MODEL");
-      const validModels = MODELS_BY_PROVIDER[resolvedProvider] ?? [];
-      const resolvedModel = storedModel && (resolvedProvider === "nine_router" || validModels.includes(storedModel))
+  useEffect(() => {
+    if (!isOpen) {
+      setShowApiKey(false);
+      setSaveError(null);
+      return;
+    }
+
+    const storedProv = safeGetLocalStorage("PRD_AI_PROVIDER") as AIProvider;
+    const validProviders = Object.keys(MODELS_BY_PROVIDER) as AIProvider[];
+    const resolvedProvider =
+      storedProv && validProviders.includes(storedProv) ? storedProv : initialProvider;
+
+    const storedModel = safeGetLocalStorage("PRD_AI_MODEL");
+    const validModels = MODELS_BY_PROVIDER[resolvedProvider] ?? [];
+    const resolvedModel =
+      storedModel && (resolvedProvider === "nine_router" || validModels.includes(storedModel))
         ? storedModel
         : (PROVIDER_MODELS[resolvedProvider]?.defaultModel ?? initialModel);
 
-      const storedEndpoint = safeGetLocalStorage("PRD_CUSTOM_ENDPOINT") || "";
+    const storedEndpoint = safeGetLocalStorage("PRD_CUSTOM_ENDPOINT") || "";
 
-      setApiKey("");
-      setProvider(resolvedProvider);
-      setModel(resolvedModel);
-      setEndpoint(storedEndpoint || initialEndpoint || PROVIDER_MODELS[resolvedProvider]?.endpoint || "");
-      setSaved(false);
+    setApiKey("");
+    setShowApiKey(false);
+    setProvider(resolvedProvider);
+    setModel(resolvedModel);
+    setEndpoint(
+      storedEndpoint || initialEndpoint || PROVIDER_MODELS[resolvedProvider]?.endpoint || "",
+    );
+    setSaved(false);
+    setSaveError(null);
 
-      // Auto focus modal container on open
-      requestAnimationFrame(() => {
-        const firstInput = modalRef.current?.querySelector<HTMLElement>('select, input, button');
-        firstInput?.focus();
-      });
-    }
+    // Auto focus modal container on open
+    requestAnimationFrame(() => {
+      const firstInput = modalRef.current?.querySelector<HTMLElement>(
+        "button, select, input",
+      );
+      firstInput?.focus();
+    });
   }, [isOpen, initialProvider, initialModel, initialEndpoint]);
 
-  // Reset hasil test saat modal dibuka atau konfigurasi berubah
+  // Reset test diagnostics when modal opens or config changes
   useEffect(() => {
     setTestState("idle");
     setTestMessage("");
-  }, [isOpen, provider, model, endpoint]);
+    setSaveError(null);
+  }, [isOpen, provider, model, endpoint, apiKey]);
 
   const handleKeyDown = (e: React.KeyboardEvent) => {
-    if (e.key === 'Escape') {
+    if (e.key === "Escape") {
       e.stopPropagation();
       onClose();
       return;
     }
-    if (e.key === 'Tab' && modalRef.current) {
+    if (e.key === "Tab" && modalRef.current) {
       const focusables = modalRef.current.querySelectorAll<HTMLElement>(
-        'button, [href], input, select, textarea, [tabindex]:not([tabindex="-1"])'
+        'button, [href], input, select, textarea, [tabindex]:not([tabindex="-1"])',
       );
       if (!focusables.length) return;
       const first = focusables[0];
@@ -108,81 +177,121 @@ export function ApiKeyModal({
   };
 
   const handleSave = async () => {
+    setSaveError(null);
     const isNineRouter = provider === "nine_router";
-    const finalEndpoint = isNineRouter ? (endpoint.trim() || PROVIDER_MODELS.nine_router.endpoint) : "";
+    const finalEndpoint = isNineRouter
+      ? endpoint.trim() || PROVIDER_MODELS.nine_router.endpoint
+      : "";
 
     if (!apiKey.trim()) {
-      // Field key kosong = tidak diubah. Penghapusan key HANYA via tombol "Clear Key".
+      // Empty field leaves existing httpOnly key untouched (explicit Clear Key removes it).
       safeSetLocalStorage("PRD_AI_PROVIDER", provider);
       safeSetLocalStorage("PRD_AI_MODEL", model.trim());
       if (isNineRouter) safeSetLocalStorage("PRD_CUSTOM_ENDPOINT", finalEndpoint);
       onSave("", provider, model.trim(), finalEndpoint);
       setSaved(true);
-      setTimeout(() => {
+      clearTimeout(closeTimerRef.current);
+      closeTimerRef.current = setTimeout(() => {
         onClose();
-      }, 500);
+      }, 450);
       return;
     }
+
     try {
-      await fetch("/api/auth/set-key", {
+      const res = await fetch("/api/auth/set-key", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ apiKey: apiKey.trim(), language }),
       });
+      if (!res.ok) {
+        const errBody = (await res.json().catch(() => ({}))) as { error?: string };
+        throw new Error(errBody.error || `Server error ${res.status}`);
+      }
       safeSetLocalStorage("PRD_AI_PROVIDER", provider);
       safeSetLocalStorage("PRD_AI_MODEL", model.trim());
       if (isNineRouter) safeSetLocalStorage("PRD_CUSTOM_ENDPOINT", finalEndpoint);
       onSave(apiKey.trim(), provider, model.trim(), finalEndpoint);
       setSaved(true);
-      setTimeout(() => {
+      clearTimeout(closeTimerRef.current);
+      closeTimerRef.current = setTimeout(() => {
         onClose();
-      }, 1000);
+      }, 750);
     } catch (err) {
       console.error("Failed to save API key:", err);
-      alert(language === "en"
-        ? "Failed to save API key. Please check your connection."
-        : "Gagal menyimpan API key. Periksa koneksi Anda.");
+      setSaveError(
+        err instanceof Error
+          ? err.message
+          : language === "en"
+            ? "Failed to save API key. Please check your connection."
+            : "Gagal menyimpan API key. Periksa koneksi Anda.",
+      );
     }
   };
 
   const handleTest = async () => {
     setTestState("testing");
     setTestMessage("");
+    setSaveError(null);
     const isNineRouter = provider === "nine_router";
-    const finalEndpoint = isNineRouter ? (endpoint.trim() || PROVIDER_MODELS.nine_router.endpoint) : "";
+    const finalEndpoint = isNineRouter
+      ? endpoint.trim() || PROVIDER_MODELS.nine_router.endpoint
+      : "";
     try {
-      // Key baru harus tersimpan lebih dulu agar test memakai key tersebut.
+      // Persist newly entered key into httpOnly cookie first so test uses it
       if (apiKey.trim()) {
-        await fetch("/api/auth/set-key", {
+        const setRes = await fetch("/api/auth/set-key", {
           method: "POST",
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({ apiKey: apiKey.trim(), language }),
         });
+        if (!setRes.ok) {
+          const errBody = (await setRes.json().catch(() => ({}))) as { error?: string };
+          throw new Error(errBody.error || `Server error ${setRes.status}`);
+        }
       }
       const res = await fetch("/api/test-connection", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ provider, model: model.trim(), customEndpoint: finalEndpoint || undefined, language }),
+        body: JSON.stringify({
+          provider,
+          model: model.trim(),
+          customEndpoint: finalEndpoint || undefined,
+          language,
+        }),
       });
-      const data = await res.json();
+      const data = (await res.json()) as {
+        ok?: boolean;
+        model?: string;
+        latencyMs?: number;
+        error?: string;
+      };
       if (data?.ok) {
         setTestState("success");
-        setTestMessage(language === "en"
-          ? `Connected to ${data.model} (${data.latencyMs}ms)`
-          : `Terhubung ke ${data.model} (${data.latencyMs}ms)`);
+        setTestMessage(
+          language === "en"
+            ? `Connected to ${data.model} (${data.latencyMs}ms)`
+            : `Terhubung ke ${data.model} (${data.latencyMs}ms)`,
+        );
       } else {
         setTestState("error");
-        setTestMessage(data?.error || (language === "en" ? "Connection failed." : "Koneksi gagal."));
+        setTestMessage(
+          data?.error || (language === "en" ? "Connection failed." : "Koneksi gagal."),
+        );
       }
-    } catch {
+    } catch (err) {
       setTestState("error");
-      setTestMessage(language === "en"
-        ? "Could not reach the server. Check your connection."
-        : "Tidak dapat menghubungi server. Periksa koneksi Anda.");
+      setTestMessage(
+        err instanceof Error
+          ? err.message
+          : language === "en"
+            ? "Could not reach the server. Check your connection."
+            : "Tidak dapat menghubungi server. Periksa koneksi Anda.",
+      );
     }
   };
 
   const handleClear = async () => {
+    setSaveError(null);
     try {
       await fetch("/api/auth/clear-key", { method: "POST" });
     } catch (err) {
@@ -195,8 +304,12 @@ export function ApiKeyModal({
   return (
     <AnimatePresence>
       {isOpen && (
-        <div
-          className="fixed inset-0 z-[100] flex items-center justify-center bg-black/70 p-4 print:hidden backdrop-blur-sm"
+        <motion.div
+          initial={{ opacity: 0 }}
+          animate={{ opacity: 1 }}
+          exit={{ opacity: 0 }}
+          transition={POPOVER_FADE}
+          className="fixed inset-0 z-[100] flex items-center justify-center bg-[var(--oa-scrim)] backdrop-blur-xs p-4 print:hidden"
           onKeyDown={handleKeyDown}
           onMouseDown={(e) => {
             isBackdropMouseDown.current = e.target === e.currentTarget;
@@ -210,65 +323,101 @@ export function ApiKeyModal({
         >
           <motion.div
             ref={modalRef}
-            initial={{ opacity: 0, scale: 0.96, y: 8 }}
-            animate={{ opacity: 1, scale: 1, y: 0 }}
-            exit={{ opacity: 0, scale: 0.96, y: 8 }}
-            transition={{ duration: 0.2, ease: [0.16, 1, 0.3, 1] }}
+            initial={{ opacity: 0, y: 12, scale: 0.98 }}
+            animate={{ opacity: 1, y: 0, scale: 1 }}
+            exit={{ opacity: 0, y: 8, scale: 0.98 }}
+            transition={MODAL_SLIDE_UP}
             role="dialog"
             aria-modal="true"
             aria-labelledby="modal-settings-title"
-            className="w-full max-w-[480px] bg-[var(--color-surface)] p-6 sm:p-7 border border-[var(--color-border)] rounded-2xl shadow-floating relative"
-            onClick={e => e.stopPropagation()}
-            onMouseDown={e => e.stopPropagation()}
+            className="oa-elev-popover w-full max-w-[520px] max-h-[90vh] overflow-y-auto rounded-2xl p-5 sm:p-6 relative"
+            onClick={(e) => e.stopPropagation()}
+            onMouseDown={(e) => e.stopPropagation()}
           >
-            <button
-              onClick={onClose}
-              aria-label={language === "en" ? "Close settings" : "Tutup pengaturan"}
-              className="absolute top-5 right-5 text-[var(--color-text-muted)] hover:text-[var(--color-text-primary)] transition-all p-2 rounded-lg hover:bg-[var(--color-surface-elevated)] cursor-pointer"
-            >
-              <X size={18} strokeWidth={1.5} aria-hidden="true" />
-            </button>
-
-            <div className="flex items-center gap-3 mb-6 pb-4 border-b border-[var(--color-border)]">
-              <div className="w-8 h-8 rounded-xl bg-[var(--color-surface-elevated)] border border-[var(--color-border)] flex items-center justify-center text-[var(--color-interactive)]">
-                <Key size={15} strokeWidth={1.5} />
-              </div>
-              <div>
-                <h2 id="modal-settings-title" className="text-[16px] font-semibold text-[var(--color-text-primary)]">
-                  {language === "en" ? "Studio Settings" : "Pengaturan Studio"}
-                </h2>
-                <p className="text-[12px] text-[var(--color-text-muted)]">
-                  {language === "en" ? "Configure AI provider and custom access keys" : "Konfigurasi provider AI dan API key"}
-                </p>
-              </div>
-            </div>
-
-            <div className="space-y-4">
-              <div>
-                <label htmlFor="ai-provider" className="block text-[12.5px] font-medium text-[var(--color-text-secondary)] mb-1.5">
-                  {language === "en" ? "AI Provider" : "Penyedia AI"}
-                </label>
-                <div className="relative">
-                  <select
-                    id="ai-provider"
-                    value={provider}
-                    onChange={(e) => handleProviderChange(e.target.value as AIProvider)}
-                    className="w-full bg-[var(--color-surface-elevated)] border border-[var(--color-border)] p-2.5 rounded-xl text-[var(--color-text-primary)] text-[13px] focus:border-[var(--color-interactive)] focus:outline-none transition-colors appearance-none pr-10 cursor-pointer"
+            {/* Header */}
+            <div className="flex items-start justify-between gap-3 mb-5 pb-4 border-b border-[var(--oa-border-subtle)]">
+              <div className="flex items-center gap-3 min-w-0">
+                <div className="oa-recessed-well w-9 h-9 rounded-xl flex items-center justify-center text-[var(--oa-accent-champagne)] shrink-0">
+                  <Key size={15} strokeWidth={1.6} aria-hidden="true" />
+                </div>
+                <div className="min-w-0">
+                  <h2
+                    id="modal-settings-title"
+                    className="text-[15.5px] font-semibold text-[var(--oa-text-primary)] truncate"
                   >
-                    <option value="gemini" className="bg-[var(--color-surface-elevated)]">Gemini (Google)</option>
-                    <option value="deepseek" className="bg-[var(--color-surface-elevated)]">DeepSeek</option>
-                    <option value="opencode" className="bg-[var(--color-surface-elevated)]">OpenCode Zen</option>
-                    <option value="nine_router" className="bg-[var(--color-surface-elevated)]">9router (Custom / Proxy)</option>
-                  </select>
-                  <div className="absolute right-3 top-1/2 -translate-y-1/2 pointer-events-none text-[var(--color-text-muted)]">
-                    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"><path d="m6 9 6 6 6-6"/></svg>
-                  </div>
+                    {t.settings.title}
+                  </h2>
+                  <p className="text-[12px] text-[var(--oa-text-muted)] truncate">
+                    {t.settings.subtitle}
+                  </p>
                 </div>
               </div>
 
+              <button
+                type="button"
+                onClick={onClose}
+                aria-label={language === "en" ? "Close settings" : "Tutup pengaturan"}
+                className="p-1.5 rounded-lg text-[var(--oa-text-muted)] hover:text-[var(--oa-text-primary)] hover:bg-[var(--oa-bg-hover)]/60 transition-colors cursor-pointer shrink-0 focus-visible:ring-2 focus-visible:ring-[var(--oa-accent-champagne)] focus-visible:outline-none"
+              >
+                <X size={16} strokeWidth={1.6} aria-hidden="true" />
+              </button>
+            </div>
+
+            <div className="space-y-4">
+              {/* 2x2 Tactile Provider Tile Grid */}
+              <div>
+                <span className="block text-[11px] font-mono uppercase tracking-[0.06em] text-[var(--oa-text-muted)] mb-2">
+                  {language === "en" ? "AI Provider" : "Penyedia AI"}
+                </span>
+                <div
+                  role="radiogroup"
+                  aria-label={language === "en" ? "AI Provider" : "Penyedia AI"}
+                  className="grid grid-cols-2 gap-2"
+                >
+                  {PROVIDER_TILES.map((tile) => {
+                    const active = provider === tile.id;
+                    return (
+                      <button
+                        key={tile.id}
+                        type="button"
+                        role="radio"
+                        aria-checked={active}
+                        onClick={() => handleProviderChange(tile.id)}
+                        className={`p-3 rounded-xl border text-left transition-colors cursor-pointer focus-visible:ring-2 focus-visible:ring-[var(--oa-accent-champagne)] focus-visible:outline-none ${
+                          active
+                            ? "bg-[var(--oa-bg-elevated)] border-[var(--oa-border-champagne)] shadow-subtle"
+                            : "oa-recessed-well hover:border-[var(--oa-border-default)]"
+                        }`}
+                      >
+                        <div className="flex items-center justify-between gap-2 mb-0.5">
+                          <span className="text-[12.5px] font-semibold text-[var(--oa-text-primary)] truncate">
+                            {tile.title}
+                          </span>
+                          <span
+                            className={`w-2 h-2 rounded-full shrink-0 ${
+                              active
+                                ? "bg-[var(--oa-accent-champagne)]"
+                                : "bg-[var(--oa-border-strong)]"
+                            }`}
+                            aria-hidden="true"
+                          />
+                        </div>
+                        <span className="block text-[11px] text-[var(--oa-text-muted)] truncate">
+                          {language === "en" ? tile.subtitleEn : tile.subtitleId}
+                        </span>
+                      </button>
+                    );
+                  })}
+                </div>
+              </div>
+
+              {/* Custom Endpoint (9Router) */}
               {provider === "nine_router" && (
                 <div>
-                  <label htmlFor="custom-endpoint" className="block text-[12.5px] font-medium text-[var(--color-text-secondary)] mb-1.5">
+                  <label
+                    htmlFor="custom-endpoint"
+                    className="block text-[11px] font-mono uppercase tracking-[0.06em] text-[var(--oa-text-muted)] mb-1.5"
+                  >
                     {language === "en" ? "Custom Endpoint URL" : "URL Endpoint Kustom"}
                   </label>
                   <input
@@ -277,38 +426,39 @@ export function ApiKeyModal({
                     value={endpoint}
                     onChange={(e) => setEndpoint(e.target.value)}
                     placeholder="https://api.9router.com/v1/chat/completions"
-                    className="w-full bg-[var(--color-surface-elevated)] border border-[var(--color-border)] p-2.5 rounded-xl text-[var(--color-text-primary)] font-mono text-[13px] focus:border-[var(--color-interactive)] focus:outline-none transition-colors placeholder:text-[var(--color-text-muted)]"
+                    className="oa-recessed-well w-full px-3 py-2.5 rounded-xl border-[var(--oa-border-default)] focus:border-[var(--oa-border-champagne)] focus:outline-none text-[var(--oa-text-primary)] font-mono text-[12.5px] placeholder:text-[var(--oa-text-muted)] transition-colors"
                   />
-                  <p className="mt-1 text-[11px] text-[var(--color-text-muted)]">
-                    {language === "en" ? "OpenAI-compatible chat completions endpoint" : "Endpoint chat completions standar OpenAI"}
-                  </p>
                 </div>
               )}
 
+              {/* Model Selector */}
               <div>
-                <label htmlFor="ai-model" className="block text-[12.5px] font-medium text-[var(--color-text-secondary)] mb-1.5">
-                  {language === "en" ? "AI Model" : "Model AI"}
+                <label
+                  htmlFor="ai-model"
+                  className="block text-[11px] font-mono uppercase tracking-[0.06em] text-[var(--oa-text-muted)] mb-1.5"
+                >
+                  {language === "en" ? "Model" : "Model"}
                 </label>
                 {provider === "nine_router" ? (
-                  <div className="space-y-1.5">
+                  <div className="space-y-2">
                     <input
                       id="ai-model"
                       type="text"
                       value={model}
                       onChange={(e) => setModel(e.target.value)}
-                      placeholder="e.g. gpt-4o, claude-3-5-sonnet, deepseek-v3"
-                      className="w-full bg-[var(--color-surface-elevated)] border border-[var(--color-border)] p-2.5 rounded-xl text-[var(--color-text-primary)] font-mono text-[13px] focus:border-[var(--color-interactive)] focus:outline-none transition-colors placeholder:text-[var(--color-text-muted)]"
+                      placeholder="e.g. gpt-4o-mini, claude-3-5-sonnet, deepseek-v3"
+                      className="oa-recessed-well w-full px-3 py-2.5 rounded-xl border-[var(--oa-border-default)] focus:border-[var(--oa-border-champagne)] focus:outline-none text-[var(--oa-text-primary)] font-mono text-[12.5px] placeholder:text-[var(--oa-text-muted)] transition-colors"
                     />
-                    <div className="flex flex-wrap gap-1.5 pt-1">
+                    <div className="flex flex-wrap gap-1.5">
                       {(MODELS.nine_router ?? []).map((m) => (
                         <button
                           key={m}
                           type="button"
                           onClick={() => setModel(m)}
-                          className={`text-[11px] px-2 py-0.5 rounded-md border transition-colors cursor-pointer ${
+                          className={`text-[11px] font-mono px-2 py-0.5 rounded-md border transition-colors cursor-pointer focus-visible:ring-2 focus-visible:ring-[var(--oa-accent-champagne)] focus-visible:outline-none ${
                             model === m
-                              ? "bg-[var(--color-interactive)] text-white border-[var(--color-interactive)]"
-                              : "bg-[var(--color-surface-elevated)] text-[var(--color-text-secondary)] border-[var(--color-border)] hover:border-[var(--color-interactive)]"
+                              ? "bg-[var(--oa-accent-champagne-tint)] text-[var(--oa-text-champagne)] border-[var(--oa-border-champagne)]"
+                              : "oa-recessed-well text-[var(--oa-text-secondary)] hover:border-[var(--oa-border-default)]"
                           }`}
                         >
                           {m}
@@ -322,113 +472,180 @@ export function ApiKeyModal({
                       id="ai-model"
                       value={model}
                       onChange={(e) => setModel(e.target.value)}
-                      className="w-full bg-[var(--color-surface-elevated)] border border-[var(--color-border)] p-2.5 rounded-xl text-[var(--color-text-primary)] text-[13px] focus:border-[var(--color-interactive)] focus:outline-none transition-colors appearance-none pr-10 cursor-pointer"
+                      className="oa-recessed-well w-full px-3 py-2.5 pr-9 rounded-xl border-[var(--oa-border-default)] focus:border-[var(--oa-border-champagne)] focus:outline-none text-[var(--oa-text-primary)] font-mono text-[12.5px] transition-colors appearance-none cursor-pointer"
                     >
                       {(MODELS[provider] ?? []).map((m) => (
-                        <option key={m} value={m} className="bg-[var(--color-surface-elevated)]">
+                        <option
+                          key={m}
+                          value={m}
+                          className="bg-[var(--oa-bg-elevated)] text-[var(--oa-text-primary)]"
+                        >
                           {m}
                         </option>
                       ))}
                     </select>
-                    <div className="absolute right-3 top-1/2 -translate-y-1/2 pointer-events-none text-[var(--color-text-muted)]">
-                      <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"><path d="m6 9 6 6 6-6"/></svg>
-                    </div>
+                    <ChevronDown
+                      size={14}
+                      strokeWidth={1.6}
+                      className="absolute right-3 top-1/2 -translate-y-1/2 pointer-events-none text-[var(--oa-text-muted)]"
+                      aria-hidden="true"
+                    />
                   </div>
                 )}
               </div>
 
+              {/* Masked API Key with Eye/EyeOff toggle */}
               <div>
-                <label htmlFor="custom-api-key" className="block text-[12.5px] font-medium text-[var(--color-text-secondary)] mb-1.5">
+                <label
+                  htmlFor="custom-api-key"
+                  className="block text-[11px] font-mono uppercase tracking-[0.06em] text-[var(--oa-text-muted)] mb-1.5"
+                >
                   {provider === "nine_router"
-                    ? (language === "en" ? "API Key" : "API Key 9router")
-                    : (language === "en" ? "Custom API Key (Optional)" : "API Key Kustom (Opsional)")}
+                    ? language === "en"
+                      ? "API Key"
+                      : "API Key 9Router"
+                    : language === "en"
+                      ? "Custom API Key (Optional)"
+                      : "API Key Kustom (Opsional)"}
                 </label>
-                <input
-                  id="custom-api-key"
-                  type="password"
-                  value={apiKey}
-                  onChange={(e) => setApiKey(e.target.value)}
-                  autoComplete="off"
-                  placeholder={
-                    provider === "nine_router"
-                      ? (language === "en" ? "Enter your 9router API key..." : "Masukkan API key 9router...")
-                      : (language === "en" ? "Leave blank to use system key..." : "Kosongkan untuk pakai key bawaan...")
-                  }
-                  className="w-full bg-[var(--color-surface-elevated)] border border-[var(--color-border)] p-2.5 rounded-xl text-[var(--color-text-primary)] font-mono text-[13px] focus:border-[var(--color-interactive)] focus:outline-none transition-colors placeholder:text-[var(--color-text-muted)]"
-                />
-                <div className="mt-2.5 bg-[var(--color-surface-elevated)]/60 border border-[var(--color-border-subtle)] rounded-xl p-2.5 flex gap-2 items-start">
-                  <AlertTriangle
-                    size={14}
-                    strokeWidth={1.5}
-                    className="shrink-0 mt-0.5 text-[var(--color-warning)]"
+                <div className="relative flex items-center">
+                  <input
+                    id="custom-api-key"
+                    type={showApiKey ? "text" : "password"}
+                    value={apiKey}
+                    onChange={(e) => setApiKey(e.target.value)}
+                    autoComplete="off"
+                    placeholder={
+                      provider === "nine_router"
+                        ? language === "en"
+                          ? "Enter your 9Router API key..."
+                          : "Masukkan API key 9Router..."
+                        : language === "en"
+                          ? "Leave blank to keep existing or use system key..."
+                          : "Kosongkan untuk mempertahankan key..."
+                    }
+                    className="oa-recessed-well w-full px-3 py-2.5 pr-10 rounded-xl border-[var(--oa-border-default)] focus:border-[var(--oa-border-champagne)] focus:outline-none text-[var(--oa-text-primary)] font-mono text-[12.5px] placeholder:text-[var(--oa-text-muted)] transition-colors"
                   />
-                  <p className="text-[11.5px] text-[var(--color-text-secondary)] leading-relaxed">
-                    {language === "en"
-                      ? "Custom key will be securely saved in httpOnly cookie and never exposed to browser scripts."
-                      : "Key disimpan aman di cookie httpOnly (tidak disimpan di localStorage dan tidak bisa diakses oleh skrip browser)."}
+                  <button
+                    type="button"
+                    onClick={() => setShowApiKey((prev) => !prev)}
+                    aria-label={
+                      showApiKey
+                        ? language === "en"
+                          ? "Hide API key"
+                          : "Sembunyikan API key"
+                        : language === "en"
+                          ? "Show API key"
+                          : "Tampilkan API key"
+                    }
+                    className="absolute right-2 p-1.5 rounded-lg text-[var(--oa-text-muted)] hover:text-[var(--oa-text-primary)] hover:bg-[var(--oa-bg-hover)]/60 transition-colors cursor-pointer focus-visible:ring-2 focus-visible:ring-[var(--oa-accent-champagne)] focus-visible:outline-none"
+                  >
+                    {showApiKey ? (
+                      <EyeOff size={14} strokeWidth={1.6} aria-hidden="true" />
+                    ) : (
+                      <Eye size={14} strokeWidth={1.6} aria-hidden="true" />
+                    )}
+                  </button>
+                </div>
+
+                {/* Shield httpOnly security callout */}
+                <div className="oa-recessed-well mt-2.5 rounded-xl p-2.5 flex gap-2.5 items-start">
+                  <Shield
+                    size={14}
+                    strokeWidth={1.6}
+                    className="shrink-0 mt-0.5 text-[var(--oa-signal-sage)]"
+                    aria-hidden="true"
+                  />
+                  <p className="text-[11.5px] text-[var(--oa-text-secondary)] leading-relaxed">
+                    {t.settings.httpOnlyNotice}
                   </p>
                 </div>
               </div>
 
-              <div>
+              {/* Live Test Connection + Diagnostics */}
+              <div className="space-y-2">
                 <button
                   type="button"
                   onClick={handleTest}
                   disabled={testState === "testing"}
-                  aria-label={language === "en" ? "Test Connection" : "Tes Koneksi"}
-                  className="flex items-center gap-1.5 text-[12.5px] font-medium px-3 py-2 rounded-xl transition-all bg-[var(--color-surface-elevated)] border border-[var(--color-border)] text-[var(--color-text-secondary)] hover:border-[var(--color-interactive)] hover:text-[var(--color-text-primary)] disabled:opacity-50 disabled:cursor-not-allowed cursor-pointer focus-visible:ring-2 focus-visible:ring-[var(--color-interactive)] focus-visible:outline-none"
+                  className="inline-flex items-center gap-1.5 text-[12px] font-medium px-3 py-2 rounded-xl transition-colors bg-[var(--oa-bg-elevated)] border border-[var(--oa-border-default)] text-[var(--oa-text-secondary)] hover:border-[var(--oa-border-champagne)] hover:text-[var(--oa-text-primary)] disabled:opacity-50 disabled:cursor-not-allowed cursor-pointer focus-visible:ring-2 focus-visible:ring-[var(--oa-accent-champagne)] focus-visible:outline-none"
                 >
                   {testState === "testing" ? (
-                    <Loader2 size={14} strokeWidth={1.5} className="animate-spin" aria-hidden="true" />
+                    <Loader2 size={14} strokeWidth={1.6} className="animate-spin" aria-hidden="true" />
                   ) : (
-                    <PlugZap size={14} strokeWidth={1.5} aria-hidden="true" />
+                    <PlugZap size={14} strokeWidth={1.6} aria-hidden="true" />
                   )}
-                  <span>{language === "en" ? "Test Connection" : "Tes Koneksi"}</span>
+                  <span>{t.settings.testConnection}</span>
                 </button>
 
                 <div role="status" aria-live="polite">
                   {testState !== "idle" && testState !== "testing" && (
-                    <div className="mt-2 flex gap-2 items-start text-[11.5px] leading-relaxed">
+                    <div
+                      className={`flex gap-2 items-start rounded-xl border px-3 py-2 text-[11.5px] leading-relaxed ${
+                        testState === "success"
+                          ? "bg-[var(--oa-signal-sage-tint)] border-[var(--oa-signal-sage)]/35 text-[var(--oa-signal-sage)]"
+                          : "bg-[var(--oa-signal-garnet-tint)] border-[var(--oa-signal-garnet)]/35 text-[var(--oa-signal-garnet)]"
+                      }`}
+                    >
                       {testState === "success" ? (
-                        <Check size={14} strokeWidth={2} className="shrink-0 mt-0.5 text-[var(--color-success)]" aria-hidden="true" />
+                        <Check size={14} strokeWidth={2} className="shrink-0 mt-0.5" aria-hidden="true" />
                       ) : (
-                        <XCircle size={14} strokeWidth={1.5} className="shrink-0 mt-0.5 text-[var(--color-error)]" aria-hidden="true" />
+                        <XCircle size={14} strokeWidth={1.6} className="shrink-0 mt-0.5" aria-hidden="true" />
                       )}
-                      <p className="text-[var(--color-text-secondary)]">{testMessage}</p>
+                      <span>{testMessage}</span>
                     </div>
                   )}
                 </div>
               </div>
+
+              {saveError && (
+                <div
+                  role="alert"
+                  className="flex gap-2 items-start rounded-xl border border-[var(--oa-signal-garnet)]/35 bg-[var(--oa-signal-garnet-tint)] px-3 py-2 text-[12px] text-[var(--oa-signal-garnet)]"
+                >
+                  <AlertCircle size={14} strokeWidth={1.6} className="shrink-0 mt-0.5" aria-hidden="true" />
+                  <span>{saveError}</span>
+                </div>
+              )}
             </div>
 
-            <div className="flex justify-between items-center mt-6 pt-4 border-t border-[var(--color-border)]">
+            {/* Footer */}
+            <div className="flex flex-wrap justify-between items-center gap-2 mt-6 pt-4 border-t border-[var(--oa-border-subtle)]">
               <button
+                type="button"
                 onClick={handleClear}
-                className="text-[12px] font-medium text-[var(--color-text-muted)] hover:text-[var(--color-error)] transition-colors cursor-pointer"
-                title={language === "en" ? "Clear Key" : "Hapus Key"}
+                className="text-[12px] font-medium text-[var(--oa-text-muted)] hover:text-[var(--oa-signal-garnet)] transition-colors cursor-pointer focus-visible:ring-2 focus-visible:ring-[var(--oa-accent-champagne)] focus-visible:outline-none rounded-md px-1.5 py-1"
               >
-                {language === "en" ? "Clear Key" : "Hapus Key"}
+                {t.settings.clearKey}
               </button>
 
-              <button
-                onClick={handleSave}
-                disabled={saved}
-                className="flex items-center gap-1.5 text-[12.5px] font-medium px-4 py-2 rounded-xl transition-all bg-[var(--color-interactive)] hover:bg-[var(--color-interactive-hover)] text-white disabled:opacity-50 disabled:cursor-not-allowed shadow-xs cursor-pointer focus-visible:ring-2 focus-visible:ring-[var(--color-interactive)] focus-visible:outline-none"
-              >
-                {saved ? (
-                  <>
-                    <Check size={14} strokeWidth={2} />
-                    <span>{language === "en" ? "Saved" : "Tersimpan"}</span>
-                  </>
-                ) : language === "en" ? (
-                  "Save Settings"
-                ) : (
-                  "Simpan Pengaturan"
-                )}
-              </button>
+              <div className="flex items-center gap-2">
+                <button
+                  type="button"
+                  onClick={onClose}
+                  className="px-3 py-1.5 rounded-xl text-[12px] font-medium text-[var(--oa-text-secondary)] hover:text-[var(--oa-text-primary)] hover:bg-[var(--oa-bg-hover)]/60 transition-colors cursor-pointer focus-visible:ring-2 focus-visible:ring-[var(--oa-accent-champagne)] focus-visible:outline-none"
+                >
+                  {t.settings.cancel}
+                </button>
+                <button
+                  type="button"
+                  onClick={handleSave}
+                  disabled={saved}
+                  className="oa-bevel-cta inline-flex items-center gap-1.5 text-[12px] font-semibold px-4 py-1.5 rounded-xl disabled:opacity-50 disabled:cursor-not-allowed cursor-pointer focus-visible:ring-2 focus-visible:ring-[var(--oa-accent-champagne)] focus-visible:outline-none"
+                >
+                  {saved ? (
+                    <>
+                      <Check size={13} strokeWidth={2} aria-hidden="true" />
+                      <span>{t.settings.saved}</span>
+                    </>
+                  ) : (
+                    <span>{t.settings.save}</span>
+                  )}
+                </button>
+              </div>
             </div>
           </motion.div>
-        </div>
+        </motion.div>
       )}
     </AnimatePresence>
   );

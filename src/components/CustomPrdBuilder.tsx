@@ -59,14 +59,26 @@ import {
   RotateCcw,
   Library,
   Layers2,
+  Sliders,
+  Plus,
+  Check,
 } from "lucide-react";
-import { CHAPTER_BLOCKS, MAX_CUSTOM_BLOCKS, findOrderIssues, getChapterBlock } from "../../shared/chapterBlocks";
+import {
+  CHAPTER_BLOCKS,
+  MAX_CUSTOM_BLOCKS,
+  findOrderIssues,
+  getChapterBlock,
+} from "../../shared/chapterBlocks";
 import type { ChapterBlock } from "../../shared/chapterBlocks";
 import { safeSetLocalStorage } from "../utils/storage";
+import { EXPO_MORPH } from "../utils/motion";
 import { useT } from "../hooks/useT";
 
-// icon map explicit for every registry icon (unknown names fall back to FileText)
-const ICON_MAP: Record<string, React.ComponentType<{ size?: number; className?: string; strokeWidth?: number }>> = {
+// Explicit icon map for every registry icon (unknown names fall back to FileText)
+const ICON_MAP: Record<
+  string,
+  React.ComponentType<{ size?: number; className?: string; strokeWidth?: number }>
+> = {
   BookOpen,
   UserRound,
   Link2,
@@ -101,14 +113,17 @@ const ICON_MAP: Record<string, React.ComponentType<{ size?: number; className?: 
 const STORAGE_KEY_BLOCKS = "PRD_CUSTOM_BLOCKS";
 const STORAGE_DEBOUNCE_MS = 400;
 
+type CategoryFilter = "all" | "product" | "technical";
+
 function BlockIcon({ name, size = 14 }: { name: string; size?: number }) {
   const Cmp = ICON_MAP[name] ?? FileText;
-  return <Cmp size={size} strokeWidth={1.7} className="shrink-0" aria-hidden="true" />;
+  return <Cmp size={size} strokeWidth={1.65} className="shrink-0" aria-hidden="true" />;
 }
 
-function categoryLabel(block: ChapterBlock, lang: "en" | "id") {
-  if (lang === "en") return block.category === "product" ? "Product" : "Technical";
-  return block.category === "product" ? "Produk" : "Teknis";
+function getCategoryDotClass(category: ChapterBlock["category"]): string {
+  return category === "product"
+    ? "bg-[var(--oa-signal-ochre)]"
+    : "bg-[var(--oa-signal-steel)]";
 }
 
 function DroppablePanel({
@@ -128,26 +143,30 @@ function DroppablePanel({
   );
 }
 
-// -- Library card (draggable + clickable) --
+// -- Library card (draggable + clickable when unselected and under limit) --
 
 function LibraryCard({
   block,
   lang,
-  disabled,
+  isSelected,
+  isFull,
   onAdd,
   lastDragEndRef,
 }: {
   block: ChapterBlock;
   lang: "en" | "id";
-  disabled: boolean;
+  isSelected: boolean;
+  isFull: boolean;
   onAdd: () => void;
   lastDragEndRef: React.MutableRefObject<number>;
 }) {
-  const { attributes, listeners, setNodeRef, transform, transition, isDragging } = useSortable({
-    id: `lib-${block.id}`,
-    data: { type: "library", blockId: block.id },
-    disabled,
-  });
+  const disabled = isSelected || isFull;
+  const { attributes, listeners, setNodeRef, transform, transition, isDragging } =
+    useSortable({
+      id: `lib-${block.id}`,
+      data: { type: "library", blockId: block.id },
+      disabled,
+    });
 
   const title = lang === "en" ? block.titleEn : block.titleId;
   const desc = lang === "en" ? block.descEn : block.descId;
@@ -155,7 +174,7 @@ function LibraryCard({
   const style: React.CSSProperties = {
     transform: CSS.Transform.toString(transform),
     transition,
-    opacity: isDragging ? 0.35 : disabled ? 0.45 : 1,
+    opacity: isDragging ? 0.35 : isSelected ? 0.55 : isFull ? 0.45 : 1,
   };
 
   return (
@@ -163,73 +182,104 @@ function LibraryCard({
       ref={setNodeRef}
       style={style}
       {...(!disabled ? listeners : {})}
-      {...attributes}
+      {...(!disabled ? attributes : {})}
       role="button"
       tabIndex={disabled ? -1 : 0}
-      aria-label={lang === "en" ? `Add ${title}` : `Tambah ${title}`}
+      aria-label={
+        isSelected
+          ? lang === "en"
+            ? `${title} selected`
+            : `${title} terpilih`
+          : lang === "en"
+            ? `Add ${title}`
+            : `Tambah ${title}`
+      }
       aria-disabled={disabled}
       onClick={() => {
         if (disabled) return;
         if (Date.now() - lastDragEndRef.current < 250) return;
         onAdd();
       }}
-      className={`group relative flex flex-col gap-1.5 rounded-xl border bg-[var(--color-surface)] p-3 text-left transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--color-interactive)] ${
+      onKeyDown={(e) => {
+        if (disabled) return;
+        if (e.key === "Enter" || e.key === " ") {
+          e.preventDefault();
+          onAdd();
+        }
+      }}
+      className={`group relative flex items-center gap-2.5 rounded-xl border p-2.5 text-left transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--oa-accent-champagne)] ${
         disabled
-          ? "border-[var(--color-border)] cursor-not-allowed"
-          : "border-[var(--color-border)] hover:border-[var(--color-border-hover)] hover:bg-[var(--color-surface-elevated)] cursor-grab active:cursor-grabbing"
+          ? "border-[var(--oa-border-subtle)] bg-[var(--oa-bg-surface)]/70 cursor-default"
+          : "border-[var(--oa-border-default)] bg-[var(--oa-bg-surface)] hover:border-[var(--oa-border-champagne)]/70 hover:bg-[var(--oa-bg-elevated)] cursor-grab active:cursor-grabbing"
       }`}
     >
-      <div className="pointer-events-none relative z-10 flex items-start justify-between gap-2">
-        <span
-          className="pointer-events-none relative z-10 flex h-7 w-7 items-center justify-center rounded-lg border bg-[var(--color-surface-elevated)] text-[var(--color-text-secondary)] group-hover:text-[var(--color-text-primary)]"
-          aria-hidden="true"
-        >
-          <BlockIcon name={block.icon} size={13} />
-        </span>
-        <span
-          className={`shrink-0 rounded-full border px-1.5 py-0.5 text-[9px] font-mono uppercase tracking-wider ${
-            block.category === "product"
-              ? "border-[var(--color-mode-business)]/20 bg-[var(--color-mode-business-bg)] text-[var(--color-mode-business)]"
-              : "border-[var(--color-mode-technical)]/20 bg-[var(--color-mode-technical-bg)] text-[var(--color-mode-technical)]"
-          }`}
-        >
-          {categoryLabel(block, lang)}
-        </span>
+      <span
+        className={`w-1.5 h-1.5 rounded-full shrink-0 ${getCategoryDotClass(block.category)}`}
+        aria-hidden="true"
+      />
+      <span
+        className="flex h-7 w-7 shrink-0 items-center justify-center rounded-lg border border-[var(--oa-border-subtle)] bg-[var(--oa-bg-elevated)] text-[var(--oa-text-secondary)] group-hover:text-[var(--oa-text-primary)]"
+        aria-hidden="true"
+      >
+        <BlockIcon name={block.icon} size={13} />
+      </span>
+
+      <div className="min-w-0 flex-1 pointer-events-none">
+        <div className="text-[12.5px] font-medium leading-snug text-[var(--oa-text-primary)] truncate">
+          {title}
+        </div>
+        <div className="text-[11px] leading-snug text-[var(--oa-text-secondary)] truncate">
+          {desc}
+        </div>
       </div>
-      <span className="pointer-events-none text-[12.5px] font-medium leading-snug text-[var(--color-text-primary)] line-clamp-2">
-        {title}
+
+      <span className="shrink-0 flex items-center justify-center w-6 h-6 rounded-md pointer-events-none">
+        {isSelected ? (
+          <Check
+            size={13}
+            strokeWidth={2}
+            className="text-[var(--oa-signal-sage)]"
+            aria-hidden="true"
+          />
+        ) : (
+          <Plus
+            size={13}
+            strokeWidth={1.75}
+            className="text-[var(--oa-text-muted)] group-hover:text-[var(--oa-accent-champagne)] transition-colors"
+            aria-hidden="true"
+          />
+        )}
       </span>
-      <span className="pointer-events-none text-[11px] leading-snug text-[var(--color-text-secondary)] line-clamp-2">
-        {desc}
-      </span>
-      {!disabled && (
-        <span className="pointer-events-none absolute bottom-2 right-2 text-[var(--color-text-muted)] opacity-40 group-hover:opacity-100 transition-opacity">
-          <GripVertical size={12} strokeWidth={1.5} />
-        </span>
-      )}
     </div>
   );
 }
 
-// -- Selected card (sortable, numbered, removable) --
+// -- Selected card (sortable, numbered, explicit remove + drop indicator) --
 
 function SelectedCard({
   block,
   index,
   lang,
+  isFlagged,
+  orderBadgeLabel,
+  showDropLine,
   onRemove,
   lastDragEndRef,
 }: {
   block: ChapterBlock;
   index: number;
   lang: "en" | "id";
+  isFlagged: boolean;
+  orderBadgeLabel: string;
+  showDropLine: boolean;
   onRemove: () => void;
   lastDragEndRef: React.MutableRefObject<number>;
 }) {
-  const { attributes, listeners, setNodeRef, transform, transition, isDragging } = useSortable({
-    id: `sel-${block.id}`,
-    data: { type: "selected", blockId: block.id },
-  });
+  const { attributes, listeners, setNodeRef, transform, transition, isDragging } =
+    useSortable({
+      id: `sel-${block.id}`,
+      data: { type: "selected", blockId: block.id },
+    });
 
   const title = lang === "en" ? block.titleEn : block.titleId;
   const desc = lang === "en" ? block.descEn : block.descId;
@@ -237,67 +287,124 @@ function SelectedCard({
   const style: React.CSSProperties = {
     transform: CSS.Transform.toString(transform),
     transition,
-    opacity: isDragging ? 0.4 : 1,
+    opacity: isDragging ? 0.35 : 1,
   };
 
   return (
     <div
       ref={setNodeRef}
       style={style}
-      onClick={() => {
-        if (Date.now() - lastDragEndRef.current < 250) return;
-        onRemove();
-      }}
-      className={`group relative flex gap-3 rounded-xl border bg-[var(--color-surface-elevated)] p-3 text-left shadow-subtle transition-colors hover:border-[var(--color-border-hover)] focus-within:ring-2 focus-within:ring-[var(--color-interactive)] cursor-pointer ${isDragging ? "border-[var(--color-interactive)]/40 ring-1 ring-[var(--color-interactive)]/20" : "border-[var(--color-border)]"}`}
+      className={`group relative flex items-center gap-2.5 rounded-xl border bg-[var(--oa-bg-elevated)] p-2.5 text-left shadow-subtle transition-colors hover:border-[var(--oa-border-strong)] ${
+        isDragging
+          ? "border-[var(--oa-border-champagne)] ring-1 ring-[var(--oa-border-champagne)]/40"
+          : "border-[var(--oa-border-default)]"
+      }`}
     >
-      <span className="flex h-7 w-7 shrink-0 items-center justify-center rounded-lg bg-[var(--color-interactive)] text-[11px] font-mono font-bold text-[#080809]">
-        {String(index + 1).padStart(2, "0")}
-      </span>
+      {showDropLine && (
+        <div
+          className="absolute -top-1.5 left-2 right-2 h-[2px] rounded-full bg-[var(--oa-accent-champagne)] pointer-events-none z-20"
+          aria-hidden="true"
+        />
+      )}
+
       <button
         type="button"
         {...attributes}
         {...listeners}
-        className="absolute inset-0 rounded-xl cursor-grab active:cursor-grabbing focus-visible:outline-none"
-        aria-label={lang === "en" ? `Drag to reorder ${title}` : `Seret untuk ubah urutan ${title}`}
+        aria-label={
+          lang === "en"
+            ? `Drag to reorder ${title}`
+            : `Seret untuk ubah urutan ${title}`
+        }
+        className="flex h-7 w-5 shrink-0 items-center justify-center rounded-md text-[var(--oa-text-muted)] hover:text-[var(--oa-text-primary)] cursor-grab active:cursor-grabbing focus-visible:ring-2 focus-visible:ring-[var(--oa-accent-champagne)] focus-visible:outline-none"
+      >
+        <GripVertical size={13} strokeWidth={1.6} aria-hidden="true" />
+      </button>
+
+      <span className="flex h-6 w-6 shrink-0 items-center justify-center rounded-md bg-[var(--oa-bg-recessed)] border border-[var(--oa-border-subtle)] text-[10.5px] font-mono font-medium text-[var(--oa-text-champagne)]">
+        {String(index + 1).padStart(2, "0")}
+      </span>
+
+      <span
+        className={`w-1.5 h-1.5 rounded-full shrink-0 ${getCategoryDotClass(block.category)}`}
+        aria-hidden="true"
       />
-      <div className="pointer-events-none min-w-0 flex-1">
-        <div className="flex items-center gap-1.5">
-          <span className="text-[var(--color-text-muted)]">
-            <BlockIcon name={block.icon} size={12} />
+
+      <span
+        className="flex h-6 w-6 shrink-0 items-center justify-center rounded-md text-[var(--oa-text-secondary)]"
+        aria-hidden="true"
+      >
+        <BlockIcon name={block.icon} size={13} />
+      </span>
+
+      <div className="min-w-0 flex-1">
+        <div className="flex items-center gap-1.5 min-w-0">
+          <span className="truncate text-[12.5px] font-medium text-[var(--oa-text-primary)]">
+            {title}
           </span>
-          <span className="truncate text-[12.5px] font-medium text-[var(--color-text-primary)]">{title}</span>
+          {isFlagged && (
+            <span className="shrink-0 rounded-md border border-[var(--oa-signal-ochre)]/35 bg-[var(--oa-signal-ochre-tint)] px-1.5 py-0.5 text-[9.5px] font-mono uppercase tracking-[0.05em] text-[var(--oa-signal-ochre)]">
+              {orderBadgeLabel}
+            </span>
+          )}
         </div>
-        <span className="mt-1 line-clamp-2 block text-[11px] leading-snug text-[var(--color-text-secondary)]">{desc}</span>
+        <span className="block truncate text-[11px] leading-snug text-[var(--oa-text-secondary)]">
+          {desc}
+        </span>
       </div>
+
       <button
         type="button"
         onClick={(e) => {
           e.stopPropagation();
+          if (Date.now() - lastDragEndRef.current < 250) return;
           onRemove();
         }}
         aria-label={lang === "en" ? `Remove ${title}` : `Hapus ${title}`}
-        className="pointer-events-auto relative z-10 flex h-7 w-7 shrink-0 items-center justify-center rounded-lg border border-transparent bg-[var(--color-surface)] text-[var(--color-text-muted)] opacity-100 sm:opacity-60 transition-all hover:bg-[var(--color-error-bg)] hover:text-[var(--color-error)] hover:opacity-100 focus-visible:opacity-100 focus-visible:ring-2 focus-visible:ring-[var(--color-interactive)] sm:group-hover:opacity-100 cursor-pointer touch-manipulation"
+        className="flex h-7 w-7 shrink-0 items-center justify-center rounded-lg border border-transparent text-[var(--oa-text-muted)] hover:bg-[var(--oa-signal-garnet-tint)] hover:text-[var(--oa-signal-garnet)] transition-colors cursor-pointer focus-visible:ring-2 focus-visible:ring-[var(--oa-accent-champagne)] focus-visible:outline-none touch-manipulation"
       >
-        <X size={12} strokeWidth={2} />
+        <X size={13} strokeWidth={1.75} aria-hidden="true" />
       </button>
     </div>
   );
 }
 
-function OverlayCard({ block, lang }: { block: ChapterBlock; lang: "en" | "id" }) {
+function OverlayCard({
+  block,
+  lang,
+  movingLabel,
+}: {
+  block: ChapterBlock;
+  lang: "en" | "id";
+  movingLabel: string;
+}) {
   const title = lang === "en" ? block.titleEn : block.titleId;
   return (
-    <div className="flex items-center gap-2 rounded-xl border border-[var(--color-interactive)]/40 bg-[var(--color-surface-elevated)] px-3 py-2.5 shadow-floating rotate-[1deg]">
-      <span className="flex h-7 w-7 items-center justify-center rounded-lg bg-[var(--color-surface)] text-[var(--color-text-secondary)]">
+    <div className="oa-elev-popover flex items-center gap-2.5 rounded-xl border-[var(--oa-border-champagne)] px-3 py-2.5 rotate-[1deg]">
+      <span className="flex h-7 w-7 items-center justify-center rounded-lg bg-[var(--oa-bg-recessed)] border border-[var(--oa-border-subtle)] text-[var(--oa-text-secondary)]">
         <BlockIcon name={block.icon} size={13} />
       </span>
-      <span className="max-w-[200px] truncate text-[12px] font-medium text-[var(--color-text-primary)]">{title}</span>
+      <span className="max-w-[200px] truncate text-[12px] font-medium text-[var(--oa-text-primary)]">
+        {title}
+      </span>
+      <span className="ml-1 rounded-md border border-[var(--oa-border-champagne)] bg-[var(--oa-accent-champagne-tint)] px-1.5 py-0.5 text-[9.5px] font-mono uppercase tracking-[0.06em] text-[var(--oa-text-champagne)]">
+        {movingLabel}
+      </span>
     </div>
   );
 }
 
-export function CustomPrdBuilder({ language, selectedIds, onChangeSelectedIds }: { language: "en" | "id"; selectedIds: string[]; onChangeSelectedIds: (ids: string[]) => void }) {
+export function CustomPrdBuilder({
+  language,
+  selectedIds,
+  onChangeSelectedIds,
+}: {
+  language: "en" | "id";
+  selectedIds: string[];
+  onChangeSelectedIds: (ids: string[]) => void;
+}) {
   const t = useT(language);
+  const [categoryFilter, setCategoryFilter] = useState<CategoryFilter>("all");
   const [activeId, setActiveId] = useState<string | null>(null);
   const [overId, setOverId] = useState<string | null>(null);
   const [confirmReset, setConfirmReset] = useState(false);
@@ -328,19 +435,35 @@ export function CustomPrdBuilder({ language, selectedIds, onChangeSelectedIds }:
   }, []);
 
   const selectedBlocks = useMemo(
-    () => selectedIds.map((id) => getChapterBlock(id)).filter((b): b is ChapterBlock => Boolean(b)),
+    () =>
+      selectedIds
+        .map((id) => getChapterBlock(id))
+        .filter((b): b is ChapterBlock => Boolean(b)),
     [selectedIds],
   );
 
   const selectedSet = useMemo(() => new Set(selectedIds), [selectedIds]);
 
-  const libraryGroups = useMemo(() => {
-    const available = CHAPTER_BLOCKS.filter((b) => !selectedSet.has(b.id));
+  const filteredLibraryGroups = useMemo(() => {
     return {
-      product: available.filter((b) => b.category === "product"),
-      technical: available.filter((b) => b.category === "technical"),
+      product:
+        categoryFilter === "all" || categoryFilter === "product"
+          ? CHAPTER_BLOCKS.filter((b) => b.category === "product")
+          : [],
+      technical:
+        categoryFilter === "all" || categoryFilter === "technical"
+          ? CHAPTER_BLOCKS.filter((b) => b.category === "technical")
+          : [],
     };
-  }, [selectedSet]);
+  }, [categoryFilter]);
+
+  const visibleLibraryItems = useMemo(
+    () => [
+      ...filteredLibraryGroups.product.map((b) => `lib-${b.id}`),
+      ...filteredLibraryGroups.technical.map((b) => `lib-${b.id}`),
+    ],
+    [filteredLibraryGroups],
+  );
 
   const isFull = selectedIds.length >= MAX_CUSTOM_BLOCKS;
 
@@ -354,21 +477,29 @@ export function CustomPrdBuilder({ language, selectedIds, onChangeSelectedIds }:
     [selectedIds, onChangeSelectedIds],
   );
 
-  const removeBlock = useCallback((id: string) => {
-    onChangeSelectedIds(selectedIds.filter((x) => x !== id));
-  }, [selectedIds, onChangeSelectedIds]);
+  const removeBlock = useCallback(
+    (id: string) => {
+      onChangeSelectedIds(selectedIds.filter((x) => x !== id));
+    },
+    [selectedIds, onChangeSelectedIds],
+  );
 
-  const handleReset = useCallback(() => {
-    if (!confirmReset) {
-      setConfirmReset(true);
-      if (confirmTimerRef.current) window.clearTimeout(confirmTimerRef.current);
-      confirmTimerRef.current = window.setTimeout(() => setConfirmReset(false), 3000);
-      return;
-    }
+  const startConfirmReset = useCallback(() => {
+    setConfirmReset(true);
+    if (confirmTimerRef.current) window.clearTimeout(confirmTimerRef.current);
+    confirmTimerRef.current = window.setTimeout(() => setConfirmReset(false), 3000);
+  }, []);
+
+  const cancelConfirmReset = useCallback(() => {
+    setConfirmReset(false);
+    if (confirmTimerRef.current) window.clearTimeout(confirmTimerRef.current);
+  }, []);
+
+  const executeReset = useCallback(() => {
     onChangeSelectedIds([]);
     setConfirmReset(false);
     if (confirmTimerRef.current) window.clearTimeout(confirmTimerRef.current);
-  }, [confirmReset, onChangeSelectedIds]);
+  }, [onChangeSelectedIds]);
 
   const parseId = (raw: string): { kind: "lib" | "sel"; blockId: string } | null => {
     if (raw.startsWith("lib-")) return { kind: "lib", blockId: raw.slice(4) };
@@ -411,7 +542,12 @@ export function CustomPrdBuilder({ language, selectedIds, onChangeSelectedIds }:
           if (overIndex === -1) {
             addBlock(a.blockId);
           } else {
-            if (selectedIds.includes(a.blockId) || selectedIds.length >= MAX_CUSTOM_BLOCKS) return;
+            if (
+              selectedIds.includes(a.blockId) ||
+              selectedIds.length >= MAX_CUSTOM_BLOCKS
+            ) {
+              return;
+            }
             const next = [...selectedIds];
             next.splice(overIndex, 0, a.blockId);
             onChangeSelectedIds(next);
@@ -451,79 +587,114 @@ export function CustomPrdBuilder({ language, selectedIds, onChangeSelectedIds }:
 
   const counterText = `${selectedIds.length}/${MAX_CUSTOM_BLOCKS}`;
 
+  const orderIssues = useMemo(
+    () => findOrderIssues(selectedIds),
+    [selectedIds],
+  );
+
+  const flaggedIds = useMemo(
+    () => new Set(orderIssues.map((issue) => issue.blockId)),
+    [orderIssues],
+  );
+
   const orderWarnings = useMemo(() => {
     const titleOf = (id: string) => {
       const b = getChapterBlock(id);
       return b ? (language === "en" ? b.titleEn : b.titleId) : id;
     };
-    return findOrderIssues(selectedIds).map((issue) =>
+    return orderIssues.map((issue) =>
       t.builder.orderWarningItem
         .replace("{block}", titleOf(issue.blockId))
         .replace("{sources}", issue.sourceIds.map(titleOf).join(", ")),
     );
-  }, [selectedIds, language, t]);
+  }, [orderIssues, language, t]);
+
+  const filterOptions: Array<{ key: CategoryFilter; label: string }> = [
+    { key: "all", label: `${t.builder.filterAll} (${CHAPTER_BLOCKS.length})` },
+    { key: "product", label: t.builder.productGroup },
+    { key: "technical", label: t.builder.technicalGroup },
+  ];
+
+  const availableCount = [
+    ...filteredLibraryGroups.product,
+    ...filteredLibraryGroups.technical,
+  ].filter((b) => !selectedSet.has(b.id)).length;
 
   return (
-    <div className="w-full">
-      {/* Toolbar */}
-      <div className="mb-3 flex flex-wrap items-center justify-between gap-2 rounded-xl border border-[var(--color-border)] bg-[var(--color-surface)] px-3 py-2.5">
-        <div className="flex items-center gap-2.5">
-          <span className="flex h-7 items-center gap-1.5 rounded-full border border-[var(--color-border)] bg-[var(--color-surface-elevated)] px-2.5 text-[11px] font-mono font-medium text-[var(--color-text-secondary)]">
-            <Layers2 size={12} strokeWidth={1.5} />
-            {counterText}
+    <div className="w-full space-y-3">
+      {/* Workbench Header Bar */}
+      <div className="oa-elev-sheet rounded-2xl px-3.5 py-2.5 flex flex-wrap items-center justify-between gap-2.5">
+        <div className="flex items-center gap-2.5 min-w-0">
+          <span className="flex h-7 w-7 shrink-0 items-center justify-center rounded-lg bg-[var(--oa-bg-recessed)] border border-[var(--oa-border-subtle)] text-[var(--oa-accent-champagne)]">
+            <Sliders size={14} strokeWidth={1.6} aria-hidden="true" />
           </span>
-          <span className="hidden text-[11px] text-[var(--color-text-muted)] sm:inline">
-            {language === "en"
-              ? isFull
-                ? `Limit reached — remove a block to add more.`
-                : `${MAX_CUSTOM_BLOCKS - selectedIds.length} slots left`
-              : isFull
-                ? `Batas tercapai — hapus blok untuk menambah lagi.`
-                : `Sisa ${MAX_CUSTOM_BLOCKS - selectedIds.length} slot`}
+          <span className="text-[13px] font-semibold text-[var(--oa-text-primary)] truncate">
+            {t.builder.selectedTitle}
           </span>
-          <span className="hidden h-1.5 w-20 overflow-hidden rounded-full bg-[var(--color-surface-highlight)] sm:block" aria-hidden="true">
-            <span
-              className="block h-full rounded-full bg-[var(--color-interactive)] transition-all duration-300"
-              style={{ width: `${(selectedIds.length / MAX_CUSTOM_BLOCKS) * 100}%` }}
-            />
+          <span className="inline-flex items-center rounded-full border border-[var(--oa-border-champagne)] bg-[var(--oa-accent-champagne-tint)] px-2.5 py-0.5 text-[10.5px] font-mono font-medium text-[var(--oa-text-champagne)] shrink-0">
+            {selectedIds.length} / {MAX_CUSTOM_BLOCKS} {t.builder.chaptersUnit}
           </span>
         </div>
-        <div className="flex items-center gap-2">
-          <span className="text-[11px] text-[var(--color-text-muted)] sm:hidden">
-            {isFull ? (language === "en" ? "Full" : "Penuh") : language === "en" ? `${MAX_CUSTOM_BLOCKS - selectedIds.length} left` : `Sisa ${MAX_CUSTOM_BLOCKS - selectedIds.length}`}
-          </span>
-          <button
-            type="button"
-            onClick={handleReset}
-            disabled={selectedIds.length === 0}
-            className={`inline-flex items-center gap-1.5 rounded-lg border px-2.5 py-1.5 text-[11.5px] font-medium transition-colors focus-visible:ring-2 focus-visible:ring-[var(--color-interactive)] focus-visible:outline-none cursor-pointer ${
-              confirmReset
-                ? "border-[var(--color-error)] bg-[var(--color-error-bg)] text-[var(--color-error)]"
-                : "border-[var(--color-border)] bg-[var(--color-surface-elevated)] text-[var(--color-text-secondary)] hover:text-[var(--color-text-primary)] disabled:opacity-40 disabled:cursor-not-allowed"
-            }`}
+
+        <div className="flex flex-wrap items-center gap-2">
+          {/* Category Segmented Filter */}
+          <div
+            role="tablist"
+            aria-label={t.builder.libraryTitle}
+            className="oa-recessed-well flex items-center gap-0.5 p-0.5 rounded-lg"
           >
-            <RotateCcw size={12} strokeWidth={1.5} />
-            {confirmReset ? (language === "en" ? "Tap again to clear" : "Ketuk lagi untuk kosongkan") : t.builder.reset}
-          </button>
+            {filterOptions.map((opt) => {
+              const isSelected = categoryFilter === opt.key;
+              return (
+                <button
+                  key={opt.key}
+                  type="button"
+                  role="tab"
+                  aria-selected={isSelected}
+                  onClick={() => setCategoryFilter(opt.key)}
+                  className={`px-2.5 py-1 rounded-md text-[11px] font-medium transition-colors cursor-pointer focus-visible:ring-2 focus-visible:ring-[var(--oa-accent-champagne)] focus-visible:outline-none ${
+                    isSelected
+                      ? "bg-[var(--oa-bg-elevated)] text-[var(--oa-text-primary)] shadow-subtle"
+                      : "text-[var(--oa-text-muted)] hover:text-[var(--oa-text-secondary)]"
+                  }`}
+                >
+                  {opt.label}
+                </button>
+              );
+            })}
+          </div>
+
+          {/* Inline Garnet Reset Confirmation */}
+          {confirmReset ? (
+            <div className="inline-flex items-center gap-1 rounded-lg border border-[var(--oa-signal-garnet)]/45 bg-[var(--oa-signal-garnet-tint)] p-0.5">
+              <button
+                type="button"
+                onClick={executeReset}
+                className="px-2.5 py-1 rounded-md text-[11px] font-medium text-[var(--oa-signal-garnet)] hover:bg-[var(--oa-signal-garnet)] hover:text-[#F2F3F5] transition-colors cursor-pointer focus-visible:ring-2 focus-visible:ring-[var(--oa-signal-garnet)] focus-visible:outline-none"
+              >
+                {t.builder.confirmReset}
+              </button>
+              <button
+                type="button"
+                onClick={cancelConfirmReset}
+                className="px-2 py-1 rounded-md text-[11px] font-medium text-[var(--oa-text-secondary)] hover:text-[var(--oa-text-primary)] hover:bg-[var(--oa-bg-hover)]/60 transition-colors cursor-pointer focus-visible:ring-2 focus-visible:ring-[var(--oa-accent-champagne)] focus-visible:outline-none"
+              >
+                {t.builder.cancel}
+              </button>
+            </div>
+          ) : (
+            <button
+              type="button"
+              onClick={startConfirmReset}
+              disabled={selectedIds.length === 0}
+              className="inline-flex items-center gap-1.5 rounded-lg border border-[var(--oa-border-default)] bg-[var(--oa-bg-elevated)] px-2.5 py-1.5 text-[11.5px] font-medium text-[var(--oa-text-secondary)] hover:text-[var(--oa-text-primary)] hover:border-[var(--oa-border-strong)] disabled:opacity-40 disabled:cursor-not-allowed transition-colors cursor-pointer focus-visible:ring-2 focus-visible:ring-[var(--oa-accent-champagne)] focus-visible:outline-none"
+            >
+              <RotateCcw size={12} strokeWidth={1.6} aria-hidden="true" />
+              <span>{t.builder.reset}</span>
+            </button>
+          )}
         </div>
       </div>
-
-      {orderWarnings.length > 0 && (
-        <div
-          role="status"
-          className="mb-3 rounded-xl border border-[var(--color-warning)]/30 bg-[var(--color-surface)] px-3 py-2.5 text-[11.5px] leading-snug text-[var(--color-text-secondary)]"
-        >
-          <p className="mb-1 flex items-center gap-1.5 font-medium text-[var(--color-warning)]">
-            <AlertTriangle size={12} strokeWidth={1.7} aria-hidden="true" />
-            {t.builder.orderWarningTitle}
-          </p>
-          <ul className="list-disc space-y-0.5 pl-5">
-            {orderWarnings.map((text) => (
-              <li key={text}>{text}</li>
-            ))}
-          </ul>
-        </div>
-      )}
 
       <DndContext
         sensors={sensors}
@@ -534,113 +705,147 @@ export function CustomPrdBuilder({ language, selectedIds, onChangeSelectedIds }:
         modifiers={[restrictToWindowEdges]}
       >
         <div className="grid grid-cols-1 gap-3 lg:grid-cols-2 lg:items-start">
-          {/* Left: library */}
+          {/* Left: Recessed Library Well */}
           <DroppablePanel
             id="panel-library"
-            className={`rounded-2xl border bg-[var(--color-surface-elevated)] p-3 shadow-subtle transition-colors ${overId === "panel-library" ? "border-[var(--color-interactive)]/40" : "border-[var(--color-border)]"}`}
+            className={`oa-recessed-well rounded-2xl p-3.5 transition-colors ${
+              overId === "panel-library" ? "border-[var(--oa-border-champagne)]" : ""
+            }`}
           >
-            <div className="mb-3 flex items-center gap-2 px-1">
-              <span className="flex h-7 w-7 items-center justify-center rounded-lg bg-[var(--color-surface)] text-[var(--color-text-muted)]">
-                <Library size={13} strokeWidth={1.5} />
+            <div className="mb-3 flex items-center gap-2 px-0.5">
+              <span className="flex h-6 w-6 items-center justify-center rounded-md bg-[var(--oa-bg-surface)] border border-[var(--oa-border-subtle)] text-[var(--oa-text-muted)]">
+                <Library size={12} strokeWidth={1.6} aria-hidden="true" />
               </span>
-              <h3 className="text-[12px] font-semibold tracking-wide uppercase text-[var(--color-text-primary)]">
+              <h3 className="text-[11.5px] font-mono uppercase tracking-[0.06em] text-[var(--oa-text-primary)]">
                 {t.builder.libraryTitle}
               </h3>
-              <span className="ml-auto text-[11px] font-mono text-[var(--color-text-muted)]">
-                {libraryGroups.product.length + libraryGroups.technical.length} {language === "en" ? "available" : "tersedia"}
+              <span className="ml-auto text-[11px] font-mono text-[var(--oa-text-muted)]">
+                {availableCount} {language === "en" ? "available" : "tersedia"}
               </span>
             </div>
 
             <SortableContext
               id="library-sortable"
-              items={CHAPTER_BLOCKS.filter((b) => !selectedSet.has(b.id)).map((b) => `lib-${b.id}`)}
+              items={visibleLibraryItems}
               strategy={verticalListSortingStrategy}
             >
               <div className="space-y-4">
-                <div>
-                  <div className="mb-2 flex items-center gap-2 px-1">
-                    <span className="h-px flex-1 bg-[var(--color-border)]" aria-hidden="true" />
-                    <span className="text-[10px] font-mono uppercase tracking-widest text-[var(--color-text-muted)]">
-                      {t.builder.productGroup}
-                    </span>
-                    <span className="h-px flex-1 bg-[var(--color-border)]" aria-hidden="true" />
-                  </div>
-                  <div className="grid grid-cols-1 gap-2 sm:grid-cols-2 lg:grid-cols-1 xl:grid-cols-2">
-                    {libraryGroups.product.map((block) => (
-                      <LibraryCard
-                        key={block.id}
-                        block={block}
-                        lang={language}
-                        disabled={isFull}
-                        onAdd={() => addBlock(block.id)}
-                        lastDragEndRef={lastDragEndRef}
+                {filteredLibraryGroups.product.length > 0 && (
+                  <div>
+                    <div className="mb-2 flex items-center gap-2 px-0.5">
+                      <span
+                        className="w-1.5 h-1.5 rounded-full bg-[var(--oa-signal-ochre)]"
+                        aria-hidden="true"
                       />
-                    ))}
-                    {libraryGroups.product.length === 0 && (
-                      <p className="col-span-full rounded-lg border border-dashed border-[var(--color-border)] bg-[var(--color-surface)] px-3 py-4 text-center text-[11px] text-[var(--color-text-muted)]">
-                        {language === "en" ? "All Product blocks selected." : "Semua blok Produk sudah terpilih."}
-                      </p>
-                    )}
+                      <span className="text-[10.5px] font-mono uppercase tracking-[0.06em] text-[var(--oa-text-muted)]">
+                        {t.builder.productGroup}
+                      </span>
+                      <span className="h-px flex-1 bg-[var(--oa-border-subtle)]" aria-hidden="true" />
+                    </div>
+                    <div className="grid grid-cols-1 gap-2">
+                      {filteredLibraryGroups.product.map((block) => (
+                        <LibraryCard
+                          key={block.id}
+                          block={block}
+                          lang={language}
+                          isSelected={selectedSet.has(block.id)}
+                          isFull={isFull}
+                          onAdd={() => addBlock(block.id)}
+                          lastDragEndRef={lastDragEndRef}
+                        />
+                      ))}
+                    </div>
                   </div>
-                </div>
+                )}
 
-                <div>
-                  <div className="mb-2 flex items-center gap-2 px-1">
-                    <span className="h-px flex-1 bg-[var(--color-border)]" aria-hidden="true" />
-                    <span className="text-[10px] font-mono uppercase tracking-widest text-[var(--color-text-muted)]">
-                      {t.builder.technicalGroup}
-                    </span>
-                    <span className="h-px flex-1 bg-[var(--color-border)]" aria-hidden="true" />
-                  </div>
-                  <div className="grid grid-cols-1 gap-2 sm:grid-cols-2 lg:grid-cols-1 xl:grid-cols-2">
-                    {libraryGroups.technical.map((block) => (
-                      <LibraryCard
-                        key={block.id}
-                        block={block}
-                        lang={language}
-                        disabled={isFull}
-                        onAdd={() => addBlock(block.id)}
-                        lastDragEndRef={lastDragEndRef}
+                {filteredLibraryGroups.technical.length > 0 && (
+                  <div>
+                    <div className="mb-2 flex items-center gap-2 px-0.5">
+                      <span
+                        className="w-1.5 h-1.5 rounded-full bg-[var(--oa-signal-steel)]"
+                        aria-hidden="true"
                       />
-                    ))}
-                    {libraryGroups.technical.length === 0 && (
-                      <p className="col-span-full rounded-lg border border-dashed border-[var(--color-border)] bg-[var(--color-surface)] px-3 py-4 text-center text-[11px] text-[var(--color-text-muted)]">
-                        {language === "en" ? "All Technical blocks selected." : "Semua blok Teknis sudah terpilih."}
-                      </p>
-                    )}
+                      <span className="text-[10.5px] font-mono uppercase tracking-[0.06em] text-[var(--oa-text-muted)]">
+                        {t.builder.technicalGroup}
+                      </span>
+                      <span className="h-px flex-1 bg-[var(--oa-border-subtle)]" aria-hidden="true" />
+                    </div>
+                    <div className="grid grid-cols-1 gap-2">
+                      {filteredLibraryGroups.technical.map((block) => (
+                        <LibraryCard
+                          key={block.id}
+                          block={block}
+                          lang={language}
+                          isSelected={selectedSet.has(block.id)}
+                          isFull={isFull}
+                          onAdd={() => addBlock(block.id)}
+                          lastDragEndRef={lastDragEndRef}
+                        />
+                      ))}
+                    </div>
                   </div>
-                </div>
+                )}
               </div>
             </SortableContext>
 
             {isFull && (
-              <p className="mt-3 rounded-lg border border-amber-500/20 bg-amber-500/10 px-3 py-2 text-[11px] leading-snug text-amber-600 dark:text-amber-400">
+              <p className="mt-3 rounded-xl border border-[var(--oa-signal-ochre)]/35 bg-[var(--oa-signal-ochre-tint)] px-3 py-2 text-[11.5px] leading-snug text-[var(--oa-signal-ochre)]">
                 {t.builder.limitHint}
               </p>
             )}
-            <p className="mt-2 px-1 text-[11px] leading-snug text-[var(--color-text-muted)]">{t.builder.libraryHint}</p>
+            <p className="mt-2.5 px-0.5 text-[11px] leading-snug text-[var(--oa-text-muted)]">
+              {t.builder.libraryHint}
+            </p>
           </DroppablePanel>
 
-          {/* Right: canvas selected */}
+          {/* Right: Selected Ordered Chapters Sheet */}
           <DroppablePanel
             id="panel-selected"
-            className={`rounded-2xl border p-3 shadow-subtle transition-colors min-h-[320px] ${
-              overId === "panel-selected" || Boolean(activeId?.startsWith("lib-") && overId?.startsWith("sel-"))
-                ? "border-[var(--color-interactive)]/40 bg-[var(--color-surface)]"
-                : "border-[var(--color-border)] bg-[var(--color-surface-elevated)]"
+            className={`oa-elev-sheet rounded-2xl p-3.5 min-h-[340px] transition-colors ${
+              overId === "panel-selected" ||
+              Boolean(activeId?.startsWith("lib-") && overId?.startsWith("sel-"))
+                ? "border-[var(--oa-border-champagne)]"
+                : ""
             }`}
           >
-            <div className="mb-3 flex items-center gap-2 px-1">
-              <span className="flex h-7 w-7 items-center justify-center rounded-lg bg-[var(--color-interactive)] text-[#080809]">
-                <Layers2 size={13} strokeWidth={1.7} />
-              </span>
-              <h3 className="text-[12px] font-semibold tracking-wide uppercase text-[var(--color-text-primary)]">
-                {t.builder.selectedTitle}
-              </h3>
-              <span className="ml-auto rounded-full bg-[var(--color-surface)] px-2 py-0.5 text-[11px] font-mono text-[var(--color-text-secondary)]">
-                {counterText}
-              </span>
+            <div className="mb-3 space-y-2">
+              <div className="flex items-center gap-2 px-0.5">
+                <span className="flex h-6 w-6 items-center justify-center rounded-md bg-[var(--oa-accent-champagne-tint)] border border-[var(--oa-border-champagne)] text-[var(--oa-text-champagne)]">
+                  <Layers2 size={12} strokeWidth={1.7} aria-hidden="true" />
+                </span>
+                <h3 className="text-[11.5px] font-mono uppercase tracking-[0.06em] text-[var(--oa-text-primary)]">
+                  {t.builder.selectedTitle}
+                </h3>
+                <span className="ml-auto rounded-full bg-[var(--oa-bg-recessed)] border border-[var(--oa-border-subtle)] px-2 py-0.5 text-[11px] font-mono text-[var(--oa-text-secondary)]">
+                  {counterText}
+                </span>
+              </div>
+              <div className="h-1 w-full rounded-full bg-[var(--oa-bg-recessed)] border border-[var(--oa-border-subtle)] overflow-hidden">
+                <div
+                  className="h-full rounded-full bg-[var(--oa-accent-champagne)] transition-[width] duration-300"
+                  style={{
+                    width: `${Math.min(100, (selectedIds.length / MAX_CUSTOM_BLOCKS) * 100)}%`,
+                  }}
+                />
+              </div>
             </div>
+
+            {orderWarnings.length > 0 && (
+              <div
+                role="status"
+                className="mb-3 rounded-xl border border-[var(--oa-signal-ochre)]/35 bg-[var(--oa-signal-ochre-tint)] px-3 py-2.5 text-[11.5px] leading-snug text-[var(--oa-signal-ochre)]"
+              >
+                <p className="mb-1 flex items-center gap-1.5 font-medium">
+                  <AlertTriangle size={12} strokeWidth={1.75} aria-hidden="true" />
+                  <span>{t.builder.orderWarningTitle}</span>
+                </p>
+                <ul className="list-disc space-y-0.5 pl-5 text-[var(--oa-text-secondary)]">
+                  {orderWarnings.map((text) => (
+                    <li key={text}>{text}</li>
+                  ))}
+                </ul>
+              </div>
+            )}
 
             <SortableContext
               id="selected-sortable"
@@ -656,25 +861,42 @@ export function CustomPrdBuilder({ language, selectedIds, onChangeSelectedIds }:
                       initial={{ opacity: 0, y: 6, scale: 0.98 }}
                       animate={{ opacity: 1, y: 0, scale: 1 }}
                       exit={{ opacity: 0, y: -6, scale: 0.98 }}
-                      transition={{ duration: 0.2, ease: [0.16, 1, 0.3, 1] }}
+                      transition={EXPO_MORPH}
                     >
-                      <SelectedCard block={block} index={idx} lang={language} onRemove={() => removeBlock(block.id)} lastDragEndRef={lastDragEndRef} />
+                      <SelectedCard
+                        block={block}
+                        index={idx}
+                        lang={language}
+                        isFlagged={flaggedIds.has(block.id)}
+                        orderBadgeLabel={t.builder.orderBadge}
+                        showDropLine={Boolean(
+                          activeId &&
+                            overId === `sel-${block.id}` &&
+                            activeId !== `sel-${block.id}`,
+                        )}
+                        onRemove={() => removeBlock(block.id)}
+                        lastDragEndRef={lastDragEndRef}
+                      />
                     </motion.div>
                   ))}
                 </AnimatePresence>
 
                 {selectedBlocks.length === 0 && (
-                  <div className="flex flex-col items-center justify-center rounded-xl border border-dashed border-[var(--color-border)] bg-[var(--color-surface)] px-6 py-10 text-center">
-                    <span className="mb-2 flex h-9 w-9 items-center justify-center rounded-full bg-[var(--color-surface-elevated)] text-[var(--color-text-muted)]">
-                      <Layers size={16} strokeWidth={1.5} />
+                  <div className="flex flex-col items-center justify-center rounded-xl border border-dashed border-[var(--oa-border-default)] bg-[var(--oa-bg-recessed)]/50 px-6 py-10 text-center">
+                    <span className="mb-2 flex h-9 w-9 items-center justify-center rounded-full bg-[var(--oa-bg-elevated)] border border-[var(--oa-border-subtle)] text-[var(--oa-text-muted)]">
+                      <Layers size={16} strokeWidth={1.5} aria-hidden="true" />
                     </span>
-                    <p className="max-w-[260px] text-[12.5px] font-medium text-[var(--color-text-primary)]">{t.builder.emptyTitle}</p>
-                    <p className="mt-1 max-w-[260px] text-[11.5px] leading-snug text-[var(--color-text-secondary)]">{t.builder.emptyDesc}</p>
+                    <p className="max-w-[260px] text-[12.5px] font-medium text-[var(--oa-text-primary)]">
+                      {t.builder.emptyTitle}
+                    </p>
+                    <p className="mt-1 max-w-[260px] text-[11.5px] leading-snug text-[var(--oa-text-secondary)]">
+                      {t.builder.emptyDesc}
+                    </p>
                   </div>
                 )}
 
                 {activeId?.startsWith("lib-") && selectedBlocks.length > 0 && (
-                  <div className="rounded-xl border border-dashed border-[var(--color-interactive)]/30 bg-[var(--color-interactive-subtle)] px-3 py-2 text-center text-[11px] text-[var(--color-text-muted)]">
+                  <div className="rounded-xl border border-dashed border-[var(--oa-border-champagne)] bg-[var(--oa-accent-champagne-tint)] px-3 py-2 text-center text-[11px] font-mono text-[var(--oa-text-champagne)]">
                     {t.builder.dropHint}
                   </div>
                 )}
@@ -682,13 +904,27 @@ export function CustomPrdBuilder({ language, selectedIds, onChangeSelectedIds }:
             </SortableContext>
 
             {selectedBlocks.length > 0 && (
-              <p className="mt-3 px-1 text-[11px] leading-snug text-[var(--color-text-muted)]">{t.builder.canvasHint}</p>
+              <p className="mt-3 px-0.5 text-[11px] leading-snug text-[var(--oa-text-muted)]">
+                {t.builder.canvasHint}
+              </p>
             )}
           </DroppablePanel>
         </div>
 
-        <DragOverlay modifiers={[snapCenterToCursor]} dropAnimation={{ duration: 180, easing: "cubic-bezier(0.16,1,0.3,1)" }}>
-          {activeBlock ? <OverlayCard block={activeBlock} lang={language} /> : null}
+        <DragOverlay
+          modifiers={[snapCenterToCursor]}
+          dropAnimation={{
+            duration: 180,
+            easing: "cubic-bezier(0.16, 1, 0.3, 1)",
+          }}
+        >
+          {activeBlock ? (
+            <OverlayCard
+              block={activeBlock}
+              lang={language}
+              movingLabel={t.builder.movingBadge}
+            />
+          ) : null}
         </DragOverlay>
       </DndContext>
     </div>

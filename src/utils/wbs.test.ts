@@ -543,6 +543,70 @@ Q.`;
     expect(feat.priority).toBe("Must-have");
     expect(feat.detail).toContain("Signup");
   });
+
+  it("extracts ONLY the matched feature description without neighboring MoSCoW rows or raw pipe soup", () => {
+    const prd = `## 4. Ringkasan Solusi & Cakupan (MoSCoW)
+
+| Prioritas | Fitur | Deskripsi |
+|---|---|---|
+| Must-have | Konversi Video ke Model 3D | Pipeline AI mengubah video menjadi model 3D GLB/GLTF |
+| Must-have | Validasi Dimensi & Harga Produk | Form merchant mengisi dimensi, harga, dan kategori |
+| Must-have | Katalog Produk dengan Filter | Daftar produk dengan filter gaya, budget, kategori |
+| Must-have | Pemindaian Area Ruang | Input foto/video singkat + dimensi ruangan pembeli |
+| Must-have | AI Interior Consultant | Chat NLP merekomendasikan furnitur berdasarkan preferensi |
+| Must-have | AR Placement dengan Ground-Plane Snapping | Render model 3D ke kamera dengan penempatan presisi |
+| Must-have | Kontak Penjual via WhatsApp | Tombol deep-link WA dengan template pesan otomatis |
+
+### Feature Breakdown (WBS)
+- **Modul Discovery & AI**
+  - Pemindaian Area Ruang
+    - Guided capture foto
+    - Input dimensi ruang
+    - Estimasi skala & pencahayaan`;
+
+    const tree = extractWbs(prd, "business");
+    const feat = tree.root.children[0].children[0];
+    expect(feat.title).toBe("Pemindaian Area Ruang");
+    expect(feat.priority).toBe("Must-have");
+    expect(feat.detail).toContain("Input foto/video singkat + dimensi ruangan pembeli");
+    expect(feat.detail).not.toContain("Konversi Video ke Model 3D");
+    expect(feat.detail).not.toContain("Kontak Penjual via WhatsApp");
+    expect(feat.detail).not.toContain("| Must-have |");
+  });
+
+  it("enriches breakdown feature with matching FEAT-XX code, Purpose prose, and valid spec table", () => {
+    const prd = `## 4. Solution Overview & Scope (MoSCoW)
+
+**Must-have**
+
+| Feature | Description |
+|---|---|
+| Room Capture & CV Analysis | Capture a placement area and estimate scale |
+
+### Feature Breakdown (WBS)
+- **Spatial Capture & AR**
+  - Room Capture & CV Analysis
+    - Photo capture
+    - Dimension input
+
+## 5. Feature Specification & Logic
+
+### FEAT-05. Room Capture & CV Analysis
+Purpose: Estimates floor area and lighting from a short phone photo so buyers verify fit.
+
+| Field | Type | Required? |
+|---|---|---|
+| Room Photo | Image | Yes |
+| Width | Number | Yes |`;
+
+    const tree = extractWbs(prd, "business");
+    const feat = tree.root.children[0].children[0];
+    expect(feat.code).toBe("FEAT-05");
+    expect(feat.priority).toBe("Must-have");
+    expect(feat.detail).toContain("Estimates floor area and lighting");
+    expect(feat.detail).toContain("| Field | Type | Required? |");
+    expect(feat.detail).toContain("| Room Photo | Image | Yes |");
+  });
 });
 
 describe("parseBulletTree", () => {

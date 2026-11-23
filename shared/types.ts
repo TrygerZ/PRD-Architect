@@ -22,11 +22,27 @@ export interface UploadedFile {
   charCount: number;
 }
 
+export type TruncationReason = "length" | "missing_chapters";
+
+export interface ContinuationStatus {
+  attempt: number;
+  maxAttempts: number;
+}
+
+export interface TruncationInfo {
+  reason: TruncationReason;
+  finishReason?: string | null;
+  detectedChapters: number;
+  expectedChapters: number;
+}
+
 // Streaming chunk shape exchanged over SSE (subset shared between FE/BE).
 export interface SSEChunk {
   text?: string;
   reasoning?: string;
   error?: string;
+  continuing?: ContinuationStatus;
+  truncated?: TruncationInfo;
 }
 
 // Generate PRD request payload (shared between FE & BE).
@@ -39,7 +55,9 @@ export interface GeneratePRDRequest {
   customEndpoint?: string;
   productType?: string;
   uploadedFiles?: UploadedFile[];
-  mode?: "initial" | "revision" | "append";
+  mode?: "initial" | "revision" | "append" | "continue";
   prdMode?: PRDMode;
   customChapterIds?: string[];
+  /** Existing partial PRD content when mode === "continue". */
+  existingContent?: string;
 }

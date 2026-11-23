@@ -89,5 +89,18 @@ describe("sanitizeMermaid", () => {
       const out = sanitizeMermaid(chart);
       expect(out).toContain("USER ||--o{ ORDER : places");
     });
+
+    it("adds empty label to erDiagram relationship lines missing `: label` and unquotes plain entity names", () => {
+      const erd = [
+        "erDiagram",
+        '    "users" ||--|| "space_preferences"',
+        '    "users" ||--o{ "ar_sessions"',
+        '    "asset_3d" ||--|| "generation_jobs"',
+      ].join("\n");
+      const out = sanitizeMermaid(erd);
+      expect(out).toContain('users ||--|| space_preferences : ""');
+      expect(out).toContain('users ||--o{ ar_sessions : ""');
+      expect(out).toContain('asset_3d ||--|| generation_jobs : ""');
+    });
   });
 });

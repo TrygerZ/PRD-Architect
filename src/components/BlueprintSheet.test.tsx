@@ -1,0 +1,224 @@
+// @vitest-environment jsdom
+import React, { act } from "react";
+import { describe, it, expect, vi, afterEach } from "vitest";
+import { createRoot, type Root } from "react-dom/client";
+import { BlueprintSheet } from "./BlueprintSheet";
+import type { PRDVersion } from "../types";
+import { getSectionId } from "../utils/outline";
+
+(globalThis as Record<string, unknown>).IS_REACT_ACT_ENVIRONMENT = true;
+
+describe("BlueprintSheet continuation and truncation UI", () => {
+  let root: Root | null = null;
+  let container: HTMLDivElement | null = null;
+
+  afterEach(() => {
+    if (root) {
+      act(() => {
+        root?.unmount();
+      });
+      root = null;
+    }
+    if (container) {
+      container.remove();
+      container = null;
+    }
+  });
+
+  const baseVersion: PRDVersion = {
+    id: "v1",
+    timestamp: Date.now(),
+    content: "## 1. Executive Summary\nBody 1\n\n## 2. Problem\nBody 2",
+    prompt: "Build RuangReka",
+    productType: "Mobile App",
+    prdMode: "business",
+    customChapterIds: Array.from({ length: 15 }, (_, i) => `block-${i + 1}`),
+  };
+
+  it("shows continuing attempt pill while streaming auto-continuation", () => {
+    container = document.createElement("div");
+    document.body.appendChild(container);
+    root = createRoot(container);
+
+    act(() => {
+      root?.render(
+        <BlueprintSheet
+          content={baseVersion.content}
+          versions={[baseVersion]}
+          activeVersionId="v1"
+          isGenerating={true}
+          continuingStatus={{ attempt: 2, maxAttempts: 5 }}
+          language="en"
+        />,
+      );
+    });
+
+    expect(container.textContent).toContain("CONTINUING (2/5)");
+    expect(container.textContent).not.toContain("Continue Generating");
+  });
+
+  it("renders incomplete banner and invokes onContinue when document stops early", () => {
+    container = document.createElement("div");
+    document.body.appendChild(container);
+    root = createRoot(container);
+    const onContinue = vi.fn();
+
+    act(() => {
+      root?.render(
+        <BlueprintSheet
+          content={baseVersion.content}
+          versions={[baseVersion]}
+          activeVersionId="v1"
+          isGenerating={false}
+          truncatedInfo={{
+            reason: "length",
+            finishReason: "length",
+            detectedChapters: 2,
+            expectedChapters: 15,
+          }}
+          onContinue={onContinue}
+          language="en"
+        />,
+      );
+    });
+
+    expect(container.textContent).toContain("Document incomplete (2/15 chapters)");
+    const btn = Array.from(container.querySelectorAll("button")).find((b) =>
+      b.textContent?.includes("Continue Generating"),
+    );
+    expect(btn).toBeTruthy();
+
+    act(() => {
+      btn?.click();
+    });
+    expect(onContinue).toHaveBeenCalledOnce();
+  });
+
+  it("hides incomplete banner once all expected chapters are present without length truncation", () => {
+    container = document.createElement("div");
+    document.body.appendChild(container);
+    root = createRoot(container);
+
+    const completeVersion: PRDVersion = {
+      ...baseVersion,
+      customChapterIds: ["a", "b"],
+    };
+
+    act(() => {
+      root?.render(
+        <BlueprintSheet
+          content={completeVersion.content}
+          versions={[completeVersion]}
+          activeVersionId="v1"
+          isGenerating={false}
+          truncatedInfo={null}
+          onContinue={vi.fn()}
+          language="en"
+        />,
+      );
+    });
+
+    expect(container.textContent).not.toContain("Document incomplete");
+    expect(container.textContent).not.toContain("Continue Generating");
+  });
+
+  it("defers rendering hidden #prd-print-only markdown while isGenerating is true", () => {
+    container = document.createElement("div");
+    document.body.appendChild(container);
+    root = createRoot(container);
+
+    act(() => {
+      root?.render(
+        <BlueprintSheet
+          content={baseVersion.content}
+          versions={[baseVersion]}
+          activeVersionId="v1"
+          isGenerating={true}
+          language="en"
+        />,
+      );
+    });
+
+    const printRoot = container.querySelector("#prd-print-only");
+    expect(printRoot?.textContent).toBe("");
+
+    act(() => {
+      root?.render(
+        <BlueprintSheet
+          content={baseVersion.content}
+          versions={[baseVersion]}
+          activeVersionId="v1"
+          isGenerating={false}
+          language="en"
+        />,
+      );
+    });
+
+    expect(printRoot?.textContent).toContain("Executive Summary");
+  });
+
+  it("opens inline top revision editor on target chapter when openNoteRequest is provided", () => {
+    container = document.createElement("div");
+    document.body.appendChild(container);
+    root = createRoot(container);
+
+    const targetId = getSectionId("2. Problem", 1);
+    const onCommentChange = vi.fn();
+    act(() => {
+      root?.render(
+        <BlueprintSheet
+          content={baseVersion.content}
+          comments={{}}
+          onCommentChange={onCommentChange}
+          openNoteRequest={{ sectionId: targetId, nonce: 1 }}
+          versions={[baseVersion]}
+          activeVersionId="v1"
+          isGenerating={false}
+          language="en"
+        />,
+      );
+    });
+
+    const targetCard = container.querySelector(`#prd-section-${targetId}`);
+    expect(targetCard).toBeTruthy();
+    expect(targetCard?.querySelector("textarea")).toBeTruthy();
+    expect(targetCard?.textContent).toContain("Revision note / Ch. 02");
+  });
+
+  it("shows Continue fallback banner when the final chapter ends mid-table even if truncatedInfo is null", () => {
+    container = document.createElement("div");
+    document.body.appendChild(container);
+    root = createRoot(container);
+
+    const cutFinalVersion: PRDVersion = {
+      ...baseVersion,
+      customChapterIds: ["a", "b"],
+      content: [
+        "## 1. Executive Summary",
+        "Done.",
+        "",
+        "## 2. Open Questions",
+        "| Question | Impact | Deadline | Owner |",
+        "|---|---|---|---|",
+        "| Does QRIS require a legal entity",
+      ].join("\n"),
+    };
+
+    act(() => {
+      root?.render(
+        <BlueprintSheet
+          content={cutFinalVersion.content}
+          versions={[cutFinalVersion]}
+          activeVersionId="v1"
+          isGenerating={false}
+          truncatedInfo={null}
+          onContinue={vi.fn()}
+          language="en"
+        />,
+      );
+    });
+
+    expect(container.textContent).toContain("Document incomplete (2/2 chapters)");
+    expect(container.textContent).toContain("Continue Generating");
+  });
+});
