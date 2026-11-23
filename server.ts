@@ -21,8 +21,8 @@ import { resolveEndpoint, endpointErrorMessage, resolveApiKey, allowServerKeyFal
 import { isBlockedStaticPath } from "./server/staticPathGuard";
 import { startKeepWarm } from "./server/keepWarm";
 import {
-  MAX_CONTINUATIONS,
   MAX_EXISTING_CONTENT_CHARS,
+  maxContinuationsFor,
   extractFinishReason,
   getExpectedChapterHeadings,
   decideContinuation,
@@ -666,6 +666,7 @@ app.post("/api/generate-prd", async (req, res) => {
     };
 
     const expectedHeadings = getExpectedChapterHeadings(prdMode, language, customIds);
+    const maxContinuations = maxContinuationsFor(expectedHeadings.length);
     let accumulatedText = mode === "continue" && typeof existingContent === "string" ? existingContent : "";
     let isContinuationTurn = mode === "continue";
     let continuationAttempt = 0;
@@ -702,7 +703,7 @@ app.post("/api/generate-prd", async (req, res) => {
     const streamSingleTurn = async (
       messages: ChatMessage[],
       applySeamDedup: boolean,
-    ): Promise<{ turnText: string; finishReason: string | null }> => {
+    ): Promise<{ turnText: string; finishReason: string | null; sawDone: boolean }> => {
       resetIdleTimer();
 
       const fetchOptions: RequestInit = {
@@ -733,6 +734,7 @@ app.post("/api/generate-prd", async (req, res) => {
       let buffer = '';
       let consecutiveParseErrors = 0;
       let finishReason: string | null = null;
+      let sawDone = false;
       let turnText = '';
       const seamDedup = applySeamDedup ? createSeamDeduplicator(accumulatedText) : null;
 
@@ -777,7 +779,11 @@ app.post("/api/generate-prd", async (req, res) => {
             if (line.trim() === '') continue;
             if (line.startsWith('data:')) {
               const dataStr = line.slice(5).trim();
-              if (!dataStr || dataStr === '[DONE]') {
+              if (!dataStr) {
+                continue;
+              }
+              if (dataStr === '[DONE]') {
+                sawDone = true;
                 continue;
               }
               try {
@@ -803,7 +809,9 @@ app.post("/api/generate-prd", async (req, res) => {
           try {
             const trimmed = buffer.trim();
             const dataStr = trimmed.startsWith('data:') ? trimmed.slice(5).trim() : trimmed;
-            if (dataStr && dataStr !== '[DONE]') {
+            if (dataStr === '[DONE]') {
+              sawDone = true;
+            } else if (dataStr) {
               const data = JSON.parse(dataStr) as UpstreamSSEPayload;
               await handleParsedPayload(data);
             }
@@ -824,7 +832,7 @@ app.post("/api/generate-prd", async (req, res) => {
         reader.cancel().catch(() => {});
       }
 
-      return { turnText, finishReason };
+      return { turnText, finishReason, sawDone };
     };
 
     // Server-side auto-continue loop: seamlessly stitches multi-call completions
@@ -834,7 +842,7 @@ app.post("/api/generate-prd", async (req, res) => {
     while (true) {
       if (isClosed || abortController.signal.aborted) break;
 
-      const { turnText, finishReason } = await streamSingleTurn(
+      const { turnText, finishReason, sawDone } = await streamSingleTurn(
         currentMessages,
         isContinuationTurn,
       );
@@ -849,6 +857,7 @@ app.post("/api/generate-prd", async (req, res) => {
           accumulatedText,
           finishReason,
           expectedHeadings,
+          sawDone,
         });
         if (stillIncomplete.shouldContinue) {
           finalTruncation = {
@@ -866,13 +875,14 @@ app.post("/api/generate-prd", async (req, res) => {
         accumulatedText,
         finishReason,
         expectedHeadings,
+        sawDone,
       });
 
       if (!decision.shouldContinue) {
         break;
       }
 
-      if (continuationAttempt >= MAX_CONTINUATIONS) {
+      if (continuationAttempt >= maxContinuations) {
         finalTruncation = {
           reason: decision.reason,
           finishReason,
@@ -881,7 +891,7 @@ app.post("/api/generate-prd", async (req, res) => {
         };
         log(
           'WARN',
-          `Max continuations (${MAX_CONTINUATIONS}) reached (reason=${decision.reason}, chapters=${decision.detectedChapters}/${decision.expectedChapters})`,
+          `Max continuations (${maxContinuations}) reached (reason=${decision.reason}, chapters=${decision.detectedChapters}/${decision.expectedChapters})`,
         );
         break;
       }
@@ -889,12 +899,12 @@ app.post("/api/generate-prd", async (req, res) => {
       continuationAttempt++;
       log(
         'INFO',
-        `Auto-continuing PRD generation (attempt ${continuationAttempt}/${MAX_CONTINUATIONS}, reason=${decision.reason}, finishReason=${finishReason ?? 'none'}, chapters=${decision.detectedChapters}/${decision.expectedChapters})`,
+        `Auto-continuing PRD generation (attempt ${continuationAttempt}/${maxContinuations}, reason=${decision.reason}, finishReason=${finishReason ?? 'none'}, sawDone=${sawDone}, chapters=${decision.detectedChapters}/${decision.expectedChapters})`,
       );
 
       await writeChunk(
         `data: ${JSON.stringify({
-          continuing: { attempt: continuationAttempt, maxAttempts: MAX_CONTINUATIONS },
+          continuing: { attempt: continuationAttempt, maxAttempts: maxContinuations },
         })}\n\n`,
       );
 

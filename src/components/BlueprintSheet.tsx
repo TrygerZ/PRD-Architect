@@ -7,6 +7,7 @@ import { formatDate } from "../utils/format";
 import { SheetSection } from "./BlueprintSection";
 import { getSections } from "../utils/sections";
 import { getSectionId } from "../utils/outline";
+import { detectTrailingTruncation } from "../../shared/truncation";
 import type { ThemeMode } from "../utils/theme";
 import { estimateTokens, formatTokenCount } from "../utils/tokens";
 import { parseBulletTree } from "../utils/wbs";
@@ -184,15 +185,26 @@ export const BlueprintSheet = memo(function BlueprintSheet({
         .toUpperCase()} / ${t.revisionDock.chapterPrefix.toUpperCase()} ${streamingChapterLabel}`
     : `${t.outline.streaming.toUpperCase()} ${t.revisionDock.chapterPrefix.toUpperCase()} ${streamingChapterLabel}`;
 
+  const trailingCut = useMemo(
+    () => (!isGenerating && content.length > 0 ? detectTrailingTruncation(content) : null),
+    [isGenerating, content],
+  );
+
   const effectiveTruncation: TruncationInfo | null = !isGenerating && content.length > 0
     ? truncatedInfo ??
-      (totalSections > 0 && totalSections < expectedSections
+      (trailingCut
         ? {
-            reason: "missing_chapters",
+            reason: "length",
             detectedChapters: totalSections,
             expectedChapters: expectedSections,
           }
-        : null)
+        : totalSections > 0 && totalSections < expectedSections
+          ? {
+              reason: "missing_chapters",
+              detectedChapters: totalSections,
+              expectedChapters: expectedSections,
+            }
+          : null)
     : null;
 
   return (

@@ -184,4 +184,41 @@ describe("BlueprintSheet continuation and truncation UI", () => {
     expect(targetCard?.querySelector("textarea")).toBeTruthy();
     expect(targetCard?.textContent).toContain("Revision note / Ch. 02");
   });
+
+  it("shows Continue fallback banner when the final chapter ends mid-table even if truncatedInfo is null", () => {
+    container = document.createElement("div");
+    document.body.appendChild(container);
+    root = createRoot(container);
+
+    const cutFinalVersion: PRDVersion = {
+      ...baseVersion,
+      customChapterIds: ["a", "b"],
+      content: [
+        "## 1. Executive Summary",
+        "Done.",
+        "",
+        "## 2. Open Questions",
+        "| Question | Impact | Deadline | Owner |",
+        "|---|---|---|---|",
+        "| Does QRIS require a legal entity",
+      ].join("\n"),
+    };
+
+    act(() => {
+      root?.render(
+        <BlueprintSheet
+          content={cutFinalVersion.content}
+          versions={[cutFinalVersion]}
+          activeVersionId="v1"
+          isGenerating={false}
+          truncatedInfo={null}
+          onContinue={vi.fn()}
+          language="en"
+        />,
+      );
+    });
+
+    expect(container.textContent).toContain("Document incomplete (2/2 chapters)");
+    expect(container.textContent).toContain("Continue Generating");
+  });
 });

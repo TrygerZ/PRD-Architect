@@ -1,10 +1,26 @@
 import { getChapterBlock } from "../shared/chapterBlocks";
+import { detectTrailingTruncation } from "../shared/truncation";
 import type { PRDMode, TruncationReason } from "../shared/types";
 
 export const MAX_CONTINUATIONS = 5;
+export const MAX_CONTINUATIONS_CEILING = 12;
 export const SEAM_PROBE_CHARS = 300;
 export const MAX_ASSISTANT_CONTEXT_CHARS = 60_000;
 export const MAX_EXISTING_CONTENT_CHARS = 400_000;
+
+/**
+ * Scale auto-continue budget with expected chapter count so large 13-20 chapter
+ * custom PRDs do not exhaust retries on the final chapter.
+ */
+export function maxContinuationsFor(expectedChapters: number): number {
+  if (!Number.isFinite(expectedChapters) || expectedChapters <= 0) {
+    return MAX_CONTINUATIONS;
+  }
+  return Math.max(
+    MAX_CONTINUATIONS,
+    Math.min(MAX_CONTINUATIONS_CEILING, Math.ceil(expectedChapters * 0.75)),
+  );
+}
 
 export interface ChatMessage {
   role: "system" | "user" | "assistant";
@@ -214,8 +230,9 @@ export function decideContinuation(params: {
   accumulatedText: string;
   finishReason: string | null;
   expectedHeadings: string[];
+  sawDone?: boolean;
 }): ContinuationDecision {
-  const { accumulatedText, finishReason, expectedHeadings } = params;
+  const { accumulatedText, finishReason, expectedHeadings, sawDone = true } = params;
   if (!accumulatedText.trim()) {
     return { shouldContinue: false };
   }
@@ -228,7 +245,13 @@ export function decideContinuation(params: {
       ? expectedHeadings.slice(highestSeen)
       : [];
 
-  if (isLengthTruncated(finishReason)) {
+  // Detect mid-output truncation from explicit finish_reason, abrupt EOF without
+  // [DONE]/finish_reason, OR structural Markdown clues (mid-sentence, unclosed
+  // table row, unclosed fence, empty trailing heading). This prevents jumping to
+  // the next chapter or silently stopping mid-table on the final chapter.
+  const trailingCut = detectTrailingTruncation(accumulatedText);
+  const abruptEof = !sawDone && !finishReason;
+  if (isLengthTruncated(finishReason) || trailingCut !== null || abruptEof) {
     return {
       shouldContinue: true,
       reason: "length",
@@ -283,63 +306,89 @@ export function buildContinuationMessages(params: {
   const { systemPrompt, userPrompt, accumulatedText, decision, expectedHeadings, language } = params;
   const assistantContext = prepareAssistantContext(accumulatedText);
   const isEn = language === "en";
+  const detected = countDetectedChapters(accumulatedText);
+  const currentChapterHeading = detected.headings[detected.headings.length - 1] ?? "";
   const lastHeading = expectedHeadings[expectedHeadings.length - 1] ?? "";
   const missingList = decision.missingHeadings.join("\n");
 
   let continuePrompt: string;
   if (decision.reason === "length") {
-    const tailSnippet = accumulatedText.slice(-140).replace(/\r?\n/g, "\\n");
+    const tailSnippet = accumulatedText.slice(-160).replace(/\r?\n/g, "\\n");
     if (isEn) {
       continuePrompt = [
-        "Your previous response was cut off mid-output due to token limits.",
+        "Your previous response was cut off mid-output.",
         `It ended right after: "${tailSnippet}"`,
+        currentChapterHeading ? `Active interrupted chapter: "${currentChapterHeading}"` : "",
         "CRITICAL CONTINUATION RULES:",
         "1. Continue IMMEDIATELY from the exact next character where your previous output stopped.",
         "2. Do NOT repeat any words, sentences, headings, or table rows from before the cut-off.",
         "3. Do NOT write greetings, apologies, or meta-commentary.",
-        "4. Preserve the exact Markdown structure, open tables/lists, and numbering seamlessly.",
+        "4. Preserve the exact Markdown structure, open tables/lists/code blocks, and numbering seamlessly.",
+        currentChapterHeading
+          ? `5. Finish ALL remaining required subsections, tables, and bullets of "${currentChapterHeading}" completely before moving on.`
+          : "5. Finish the interrupted section completely before moving on.",
         missingList
-          ? `5. After finishing the interrupted chapter, generate ALL remaining chapters verbatim in order:\n${missingList}`
+          ? `6. ONLY AFTER "${currentChapterHeading || "the interrupted chapter"}" is 100% complete, generate ALL remaining chapters verbatim in order:\n${missingList}`
           : lastHeading
-            ? `5. Finish the interrupted chapter completely through ${lastHeading}.`
-            : "5. Finish the remaining content completely.",
-      ].join("\n");
+            ? `6. Finish the final chapter completely through the end of ${lastHeading}.`
+            : "6. Finish the remaining content completely.",
+      ]
+        .filter(Boolean)
+        .join("\n");
     } else {
       continuePrompt = [
-        "Respons Anda sebelumnya terpotong di tengah jalan karena batas token.",
+        "Respons Anda sebelumnya terpotong di tengah jalan.",
         `Teks terakhir berhenti tepat setelah: "${tailSnippet}"`,
+        currentChapterHeading ? `Bab aktif yang sedang terpotong: "${currentChapterHeading}"` : "",
         "ATURAN LANJUTAN KRITIS:",
         "1. Lanjutkan SEGERA tepat dari karakter berikutnya setelah titik terpotong.",
         "2. JANGAN mengulang kata, kalimat, heading, atau baris tabel yang sudah ditulis sebelumnya.",
         "3. JANGAN menulis basa-basi, permintaan maaf, atau penjelasan tambahan.",
-        "4. Pertahankan struktur Markdown, tabel/daftar yang sedang terbuka, dan penomoran secara mulus.",
+        "4. Pertahankan struktur Markdown, tabel/daftar/blok kode yang sedang terbuka, dan penomoran secara mulus.",
+        currentChapterHeading
+          ? `5. Tuntaskan dulu SEMUA sub-bagian, tabel, dan poin wajib dari "${currentChapterHeading}" sesuai instruksi sistem sebelum pindah ke bab berikutnya.`
+          : "5. Tuntaskan dulu bab yang terpotong secara penuh sebelum pindah ke bab berikutnya.",
         missingList
-          ? `5. Setelah menuntaskan bab yang terpotong, hasilkan SEMUA bab tersisa secara berurutan dengan heading persis:\n${missingList}`
+          ? `6. BARU SETELAH "${currentChapterHeading || "bab yang terpotong"}" selesai 100%, hasilkan SEMUA bab tersisa secara berurutan dengan heading persis:\n${missingList}`
           : lastHeading
-            ? `5. Tuntaskan bab yang terpotong secara lengkap sampai akhir ${lastHeading}.`
-            : "5. Tuntaskan sisa dokumen secara lengkap.",
-      ].join("\n");
+            ? `6. Tuntaskan bab terakhir secara lengkap sampai akhir ${lastHeading}.`
+            : "6. Tuntaskan sisa dokumen secara lengkap.",
+      ]
+        .filter(Boolean)
+        .join("\n");
     }
   } else {
     const firstMissing = decision.missingHeadings[0] ?? lastHeading;
     if (isEn) {
       continuePrompt = [
         `You stopped early after ${decision.detectedChapters} of ${decision.expectedChapters} required chapters.`,
+        currentChapterHeading ? `Last chapter started: "${currentChapterHeading}"` : "",
         "CRITICAL CONTINUATION RULES:",
-        `1. Start IMMEDIATELY with "${firstMissing}" and NOTHING ELSE before it.`,
-        "2. Do NOT repeat any earlier chapters already generated.",
-        "3. Do NOT write introductions, apologies, or meta-commentary.",
-        `4. Generate ALL remaining chapters completely in exact order:\n${missingList}`,
-      ].join("\n");
+        currentChapterHeading
+          ? `1. First check "${currentChapterHeading}": if any required subsections, tables, or items from the system instructions are still missing, complete them seamlessly BEFORE starting "${firstMissing}".`
+          : `1. Continue seamlessly with "${firstMissing}".`,
+        `2. If "${currentChapterHeading || "the previous chapter"}" is already 100% complete, start immediately with "${firstMissing}".`,
+        "3. Do NOT repeat any earlier text, sentences, or headings already generated.",
+        "4. Do NOT write introductions, apologies, or meta-commentary.",
+        `5. Generate ALL remaining chapters completely in exact order:\n${missingList}`,
+      ]
+        .filter(Boolean)
+        .join("\n");
     } else {
       continuePrompt = [
         `Anda berhenti terlalu awal setelah ${decision.detectedChapters} dari ${decision.expectedChapters} bab yang diwajibkan.`,
+        currentChapterHeading ? `Bab terakhir yang sedang berjalan: "${currentChapterHeading}"` : "",
         "ATURAN LANJUTAN KRITIS:",
-        `1. Mulai SEGERA dengan "${firstMissing}" dan TANPA teks apa pun sebelumnya.`,
-        "2. JANGAN mengulang bab-bab sebelumnya yang sudah dihasilkan.",
-        "3. JANGAN menulis pembukaan, permintaan maaf, atau penjelasan tambahan.",
-        `4. Hasilkan SEMUA bab tersisa secara lengkap dalam urutan persis:\n${missingList}`,
-      ].join("\n");
+        currentChapterHeading
+          ? `1. Periksa dulu "${currentChapterHeading}": jika masih ada sub-bagian, tabel, atau poin wajib dari instruksi sistem yang belum ditulis, tuntaskan dulu secara mulus SEBELUM memulai "${firstMissing}".`
+          : `1. Lanjutkan secara mulus dengan "${firstMissing}".`,
+        `2. Jika "${currentChapterHeading || "bab sebelumnya"}" sudah benar-benar lengkap 100%, mulai langsung dengan "${firstMissing}".`,
+        "3. JANGAN mengulang teks, kalimat, atau bab sebelumnya yang sudah dihasilkan.",
+        "4. JANGAN menulis pembukaan, permintaan maaf, atau penjelasan tambahan.",
+        `5. Hasilkan SEMUA bab tersisa secara lengkap dalam urutan persis:\n${missingList}`,
+      ]
+        .filter(Boolean)
+        .join("\n");
     }
   }
 

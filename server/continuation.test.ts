@@ -1,5 +1,7 @@
 import { describe, it, expect } from "vitest";
 import {
+  MAX_CONTINUATIONS,
+  maxContinuationsFor,
   extractFinishReason,
   isLengthTruncated,
   getExpectedChapterHeadings,
@@ -170,6 +172,74 @@ describe("server/continuation", () => {
         }),
       ).toEqual({ shouldContinue: false });
     });
+
+    it("classifies mid-sentence silent stop (Gambar 1) as length instead of skipping to chapter 3", () => {
+      const headings13 = Array.from({ length: 13 }, (_, i) => `## ${i + 1}. Bab ${i + 1}`);
+      const gambar1 = [
+        "## 1. Bab 1\nRingkasan selesai.",
+        "## 2. Bab 2\n4. Pencahayaan alami jarang dipertimbangkan di kamar kos.\n5. Negosiasi harga dengan pengrajin terjadi di",
+      ].join("\n\n");
+
+      const decision = decideContinuation({
+        accumulatedText: gambar1,
+        finishReason: "stop",
+        expectedHeadings: headings13,
+      });
+
+      expect(decision.shouldContinue).toBe(true);
+      if (decision.shouldContinue) {
+        expect(decision.reason).toBe("length");
+        expect(decision.missingHeadings[0]).toBe("## 3. Bab 3");
+      }
+    });
+
+    it("continues final chapter 13/13 when silently cut mid-table row (Gambar 2)", () => {
+      const headings13 = Array.from({ length: 13 }, (_, i) => `## ${i + 1}. Bab ${i + 1}`);
+      const first12 = headings13.slice(0, 12).map((h) => `${h}\nSelesai.`).join("\n\n");
+      const ch13Cut = [
+        "## 13. Bab 13",
+        "| PERTANYAAN | DAMPAK | DEADLINE | DECISION MAKER |",
+        "|---|---|---|---|",
+        "| Lisensi? | Tinggi | 2025-02-14 | Tech Lead |",
+        "| Apakah skema monetisasi Pay-per-Generation lewat QRIS memerlukan entitas badan",
+      ].join("\n");
+
+      const decision = decideContinuation({
+        accumulatedText: `${first12}\n\n${ch13Cut}`,
+        finishReason: "stop",
+        expectedHeadings: headings13,
+      });
+
+      expect(decision.shouldContinue).toBe(true);
+      if (decision.shouldContinue) {
+        expect(decision.reason).toBe("length");
+        expect(decision.detectedChapters).toBe(13);
+        expect(decision.expectedChapters).toBe(13);
+      }
+    });
+
+    it("treats abrupt EOF without [DONE] or finish_reason as length truncation", () => {
+      const complete = fifteenHeadings.map((h) => `${h}\nFull content.`).join("\n\n");
+      const decision = decideContinuation({
+        accumulatedText: complete,
+        finishReason: null,
+        expectedHeadings: fifteenHeadings,
+        sawDone: false,
+      });
+      expect(decision.shouldContinue).toBe(true);
+      if (decision.shouldContinue) {
+        expect(decision.reason).toBe("length");
+      }
+    });
+  });
+
+  describe("maxContinuationsFor", () => {
+    it("scales retry cap for larger custom PRDs while keeping minimum 5 and ceiling 12", () => {
+      expect(maxContinuationsFor(6)).toBe(MAX_CONTINUATIONS);
+      expect(maxContinuationsFor(13)).toBe(10);
+      expect(maxContinuationsFor(15)).toBe(12);
+      expect(maxContinuationsFor(20)).toBe(12);
+    });
   });
 
   describe("prepareAssistantContext", () => {
@@ -214,7 +284,7 @@ describe("server/continuation", () => {
       expect(msgs[3].content).toContain("## 3. C");
     });
 
-    it("constructs Indonesian missing-chapters continuation prompt starting at next heading", () => {
+    it("constructs Indonesian missing-chapters continuation prompt verifying active chapter before next heading", () => {
       const expected = ["## 1. A", "## 2. B"];
       const msgs = buildContinuationMessages({
         systemPrompt: "SYS",
@@ -231,7 +301,9 @@ describe("server/continuation", () => {
         language: "id",
       });
 
-      expect(msgs[3].content).toContain('Mulai SEGERA dengan "## 2. B"');
+      expect(msgs[3].content).toContain('Periksa dulu "## 1. A"');
+      expect(msgs[3].content).toContain('"## 2. B"');
+      expect(msgs[3].content).not.toContain("TANPA teks apa pun sebelumnya");
     });
   });
 
