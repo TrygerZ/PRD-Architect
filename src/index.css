@@ -18,7 +18,6 @@
 @theme inline {
   --font-body: var(--font-sans);
   --font-display: var(--font-sans);
-  --font-geist: var(--font-sans);
 
   --shadow-subtle: var(--oa-shadow-subtle);
   --shadow-card: var(--oa-shadow-card);

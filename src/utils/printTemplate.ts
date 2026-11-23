@@ -20,7 +20,7 @@ export function buildPrintHtml(productType: string, bodyHtml: string): string {
                   --color-border: #dddddd;
                 }
                 body { 
-                  font-family: 'Geist Sans', -apple-system, sans-serif; 
+                  font-family: 'Inter', -apple-system, sans-serif; 
                   line-height: 1.6; 
                   color: #333;
                   padding: 40px;
@@ -28,7 +28,7 @@ export function buildPrintHtml(productType: string, bodyHtml: string): string {
                   margin: 0 auto;
                 }
                 h1 { 
-                  font-family: 'Geist Sans', -apple-system, sans-serif; 
+                  font-family: 'Inter', -apple-system, sans-serif; 
                   font-weight: 700; 
                   color: #111; 
                   margin-top: 24px; 
@@ -45,7 +45,7 @@ export function buildPrintHtml(productType: string, bodyHtml: string): string {
                   background-color: #f4f4f5; 
                   padding: 2px 6px; 
                   border-radius: 4px; 
-                  font-family: 'Geist Mono', ui-monospace, sans-serif;
+                  font-family: 'JetBrains Mono', ui-monospace, sans-serif;
                   font-size: 0.9em;
                 }
                 blockquote {

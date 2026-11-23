@@ -382,16 +382,49 @@ interface PngResult {
   height: number;
 }
 
-// Konfigurasi dark theme yang dipakai MermaidRenderer.tsx — harus cocok agar
+// Konfigurasi tema live yang dipakai MermaidRenderer.tsx — harus cocok agar
 // restore setelah export tidak mengubah tampilan live.
 const DARK_THEME_CONFIG = {
   startOnLoad: false,
   theme: "dark" as const,
-  fontFamily: "Geist Mono",
-  securityLevel: "loose" as const,
+  fontFamily: '"JetBrains Mono", ui-monospace, monospace',
+  securityLevel: "strict" as const,
+  htmlLabels: false,
   themeVariables: {
-    primaryColor: "#1e1e2e",
-    primaryTextColor: "#cdd6f4",
+    background: "#0A0C10",
+    primaryColor: "#181C24",
+    primaryTextColor: "#EAECEF",
+    primaryBorderColor: "#B89E74",
+    lineColor: "#A6ADBA",
+    secondaryColor: "#12151B",
+    tertiaryColor: "#1F242F",
+    mainBkg: "#181C24",
+    nodeBorder: "#B89E74",
+    clusterBkg: "#12151B",
+    titleColor: "#EAECEF",
+    edgeLabelBackground: "#12151B",
+  },
+};
+
+const LIVE_LIGHT_THEME_CONFIG = {
+  startOnLoad: false,
+  theme: "neutral" as const,
+  fontFamily: '"JetBrains Mono", ui-monospace, monospace',
+  securityLevel: "strict" as const,
+  htmlLabels: false,
+  themeVariables: {
+    background: "#D8DBE2",
+    primaryColor: "#F2F3F5",
+    primaryTextColor: "#0E1015",
+    primaryBorderColor: "#7E643E",
+    lineColor: "#4D5361",
+    secondaryColor: "#EAEBEF",
+    tertiaryColor: "#F6F7F9",
+    mainBkg: "#F2F3F5",
+    nodeBorder: "#7E643E",
+    clusterBkg: "#EAEBEF",
+    titleColor: "#0E1015",
+    edgeLabelBackground: "#F2F3F5",
   },
 };
 
@@ -402,7 +435,7 @@ const DARK_THEME_CONFIG = {
 const LIGHT_THEME_CONFIG = {
   startOnLoad: false,
   theme: "default" as const,
-  fontFamily: "Geist Mono",
+  fontFamily: "JetBrains Mono",
   securityLevel: "strict" as const,
   htmlLabels: false,
   flowchart: { htmlLabels: false },
@@ -410,8 +443,8 @@ const LIGHT_THEME_CONFIG = {
 
 /**
  * Sementara beralih mermaid ke tema terang (untuk dokumen white-background),
- * jalankan fn, lalu restore tema dark. Memakai try/finally agar restore
- * selalu terjadi meski fn throw.
+ * jalankan fn, lalu restore tema live sesuai data-theme aktif. Memakai
+ * try/finally agar restore selalu terjadi meski fn throw.
  */
 async function withLightMermaid<T>(fn: () => Promise<T>): Promise<T> {
   const mermaidMod = await import("mermaid");
@@ -420,7 +453,10 @@ async function withLightMermaid<T>(fn: () => Promise<T>): Promise<T> {
   try {
     return await fn();
   } finally {
-    mermaid.initialize(DARK_THEME_CONFIG);
+    const isLight =
+      typeof document !== "undefined" &&
+      document.documentElement?.dataset?.theme === "light";
+    mermaid.initialize(isLight ? LIVE_LIGHT_THEME_CONFIG : DARK_THEME_CONFIG);
   }
 }
 
