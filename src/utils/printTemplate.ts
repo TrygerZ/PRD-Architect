@@ -1,5 +1,6 @@
 // Template HTML untuk print/download PRD + helper download Markdown.
 // Dipisah dari App.tsx agar monolit tidak membengkak (pure move, zero logic change).
+import { deriveExportSlug } from "./exportMarkdown";
 
 /**
  * Susun dokumen HTML lengkap untuk window.print() — template CSS putih
@@ -70,15 +71,16 @@ export function buildPrintHtml(productType: string, bodyHtml: string): string {
 
 /**
  * Unduh konten PRD sebagai file .md — membangun Blob & trigger download.
+ * Defer URL.revokeObjectURL agar download manager Chromium selesai membaca blob.
  */
 export function downloadMarkdown(content: string, productType: string): void {
   const blob = new Blob([content], { type: "text/markdown" });
   const url = URL.createObjectURL(blob);
   const a = document.createElement("a");
   a.href = url;
-  a.download = `PRD_${productType.replace(/ /g, "_")}_${new Date().getTime()}.md`;
+  a.download = `PRD_${deriveExportSlug(content, productType)}_${Date.now()}.md`;
   document.body.appendChild(a);
   a.click();
   document.body.removeChild(a);
-  URL.revokeObjectURL(url);
+  setTimeout(() => URL.revokeObjectURL(url), 10_000);
 }

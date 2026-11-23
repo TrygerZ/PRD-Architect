@@ -84,10 +84,11 @@ describe("exportPdf - editorial layout & embedded Unicode TTF", () => {
     expect(pdfBytes.subarray(0, 5).toString("ascii")).toBe("%PDF-");
     expect(pdfBytes.byteLength).toBeGreaterThan(20_000);
 
-    // Embedded TrueType font descriptors for Inter & JetBrainsMono must exist in PDF bytes
+    // Embedded TrueType font descriptors for Inter & JetBrainsMono and FlateDecode compression
     const rawLatin1 = pdfBytes.toString("latin1");
     expect(rawLatin1).toContain("Inter");
     expect(rawLatin1).toContain("JetBrainsMono");
+    expect(rawLatin1).toContain("/FlateDecode");
   });
 
   it("gracefully falls back to built-in helvetica/courier when font loading fails", async () => {

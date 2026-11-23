@@ -11,13 +11,13 @@ import {
   collectWbsBlock,
   computeColumnWeights,
   computeMermaidDisplaySize,
+  deriveExportSlug,
   fenceLang,
   inlineRunSpecs,
   isTableSeparator,
   isThematicBreak,
   parseListLine,
   parseTableRow,
-  sanitizeFilename,
   stripHtmlTags,
   stripInline,
   stripYamlFrontmatter,
@@ -781,5 +781,5 @@ export async function exportDocx(
   const docx = await import("docx");
   const doc = await buildDocxDocument(content, productType, language);
   const blob = await docx.Packer.toBlob(doc);
-  triggerDownload(blob, `PRD_${sanitizeFilename(productType)}_${Date.now()}.docx`);
+  triggerDownload(blob, `PRD_${deriveExportSlug(content, productType)}_${Date.now()}.docx`);
 }

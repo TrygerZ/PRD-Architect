@@ -11,6 +11,7 @@ import {
   collectWbsBlock,
   computeColumnWeights,
   computeMermaidDisplaySize,
+  deriveExportSlug,
   fenceLang,
   isTableSeparator,
   isThematicBreak,
@@ -19,7 +20,6 @@ import {
   parseListLine,
   parseTableRow,
   richCellHeight,
-  sanitizeFilename,
   stripHtmlTags,
   stripInline,
   stripYamlFrontmatter,
@@ -87,7 +87,9 @@ export async function buildPdfDocument(
   const autoTableMod = await import("jspdf-autotable");
   const autoTable = autoTableMod.default;
 
-  const doc = new jsPDF({ unit: "pt", format: "a4" });
+  // compress: true compresses page operator streams with FlateDecode (cutting
+  // multi-page PDF size by ~80-95% alongside FAST image compression below).
+  const doc = new jsPDF({ unit: "pt", format: "a4", compress: true });
   const fonts = await registerPdfFonts(doc, options.fontLoader);
   const meta = buildExportMeta(content, productType, language);
 
@@ -254,6 +256,14 @@ export async function buildPdfDocument(
     let cursor = 0;
     let showHeader = !!lang;
 
+    // Keep short code blocks (<= 14 wrapped lines) together on a single page
+    // so a closing brace `}` does not spill onto the top of the next page.
+    const fullHeaderH = showHeader ? 18 : 0;
+    const fullBoxH = fullHeaderH + padY * 2 + wrappedAll.length * codeLineH;
+    if (wrappedAll.length <= 14 && fullBoxH <= maxY - topMargin) {
+      ensureSpace(fullBoxH);
+    }
+
     while (cursor < wrappedAll.length) {
       const headerH = showHeader ? 18 : 0;
       const minBlockH = headerH + padY * 2 + codeLineH;
@@ -351,7 +361,7 @@ export async function buildPdfDocument(
           setRgbDraw(BORDER_LIGHT);
           doc.setLineWidth(0.6);
           doc.roundedRect(cardX, y, cardW, cardH, 4, 4, "FD");
-          doc.addImage(png.dataUrl, "PNG", cardX + pad, y + pad, dispW, dispH);
+          doc.addImage(png.dataUrl, "PNG", cardX + pad, y + pad, dispW, dispH, undefined, "FAST");
 
           doc.setFont(fonts.sans, "italic");
           doc.setFontSize(8);
@@ -375,7 +385,7 @@ export async function buildPdfDocument(
       const { rows: bodyRows, endIdx } = collectTableBodyRows(rawLines, i + 2);
       i = endIdx - 1;
 
-      const colWidths = computeColumnWeights(header, bodyRows, Math.floor(maxWidth), 56);
+      const colWidths = computeColumnWeights(header, bodyRows, Math.floor(maxWidth), 66);
       // Absorb A4 sub-point remainder (e.g. 0.28pt) into the widest column so
       // autoTable aligns flush with both margins and emits zero resize warnings.
       const frac = maxWidth - colWidths.reduce((a, b) => a + b, 0);
@@ -403,6 +413,21 @@ export async function buildPdfDocument(
 
       const measureCellSeg = (text: string, seg: InlineSeg) =>
         measureToken(text, seg, cellFontSize, false, false);
+
+      // Compute actual height of header + first body row so tall first rows (e.g. 7-line
+      // Q-01 rows) never leave an orphan table header alone at the bottom of a page.
+      let firstRowH = 26;
+      if (richSegs.length > 0) {
+        for (let ci = 0; ci < header.length; ci++) {
+          const segs = richSegs[0][ci];
+          if (!segs || segs.length === 0) continue;
+          const avail = Math.max(20, (colWidths[ci] ?? 80) - padH);
+          const laid = layoutInline(segs, avail, measureCellSeg, true);
+          const h = richCellHeight(Math.max(1, laid.length), cellFontSize, padV);
+          if (h > firstRowH) firstRowH = h;
+        }
+      }
+      ensureSpace(Math.min(180, 26 + firstRowH));
 
       interface RichCellMeta {
         richSegs?: InlineSeg[];
@@ -500,7 +525,7 @@ export async function buildPdfDocument(
       const size = depth === 1 ? 17 : depth === 2 ? 14 : depth === 3 ? 11.5 : 10.2;
       const headLineH = size * 1.38;
       const gapBefore = depth === 2 ? 16 : depth === 3 ? 12 : 8;
-      const orphanGuard = depth === 2 ? 52 : 38;
+      const orphanGuard = depth === 2 ? 76 : 64;
 
       if (y > topMargin + 8) {
         y += gapBefore;
@@ -529,6 +554,7 @@ export async function buildPdfDocument(
         const items = parseBulletTree(block);
         if (items.length > 0) {
           i = endIdx - 1;
+          ensureSpace(64);
           type PdfCell = string | { content: string; rowSpan: number; styles?: { fontStyle?: "bold" } };
           const body = wbsTableRows(wbsRows(items)).map((r): PdfCell[] => {
             const cells: PdfCell[] = [];
@@ -669,6 +695,12 @@ export async function buildPdfDocument(
       continue;
     }
 
+    // Keep short lead-in labels (e.g. "Response 200:", "Error:", "Flow / Alur:")
+    // attached to the code block / list / table immediately following them.
+    if (trimmed.length <= 55 && trimmed.endsWith(":")) {
+      ensureSpace(58);
+    }
+
     // Normal paragraph
     writeRichText(trimmed, 9.8, { color: INK, lineHeightRatio: 1.45 });
     y += 5;
@@ -719,5 +751,5 @@ export async function exportPdf(
   language: "id" | "en" = "id",
 ): Promise<void> {
   const { doc } = await buildPdfDocument(content, productType, language);
-  doc.save(`PRD_${sanitizeFilename(productType)}_${Date.now()}.pdf`);
+  doc.save(`PRD_${deriveExportSlug(content, productType)}_${Date.now()}.pdf`);
 }

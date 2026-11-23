@@ -260,20 +260,29 @@ export function computeColumnWeights(
 
   const effectiveMin = Math.min(minColWidth, Math.floor(totalWidth / colCount));
 
+  // Track both representative cell length AND longest unbreakable token per column
+  // so dates (2025-06-20) and identifiers (phone_number) avoid 1-char mid-word breaks.
   const scores = header.map((h, ci) => {
-    const headerLen = Math.max(4, stripInline(h).trim().length);
-    const bodyLens = rows
-      .map((r) => stripInline(r[ci] ?? "").trim().length)
-      .filter((n) => n > 0)
-      .sort((a, b) => a - b);
+    const headerClean = stripInline(h).trim();
+    const headerLen = Math.max(4, headerClean.length);
+    const bodyTexts = rows.map((r) => stripInline(r[ci] ?? "").trim()).filter(Boolean);
+    const bodyLens = bodyTexts.map((t) => t.length).sort((a, b) => a - b);
 
     const p75Len =
       bodyLens.length > 0
         ? bodyLens[Math.min(bodyLens.length - 1, Math.floor(bodyLens.length * 0.75))]
         : headerLen;
 
+    let maxTokenLen = 0;
+    for (const sample of [headerClean, ...bodyTexts.slice(0, 20)]) {
+      for (const word of sample.split(/\s+/)) {
+        if (word.length > maxTokenLen) maxTokenLen = word.length;
+      }
+    }
+    const tokenFloorLen = Math.min(18, maxTokenLen);
+
     // Damp extreme ratios so a 250-char cell doesn't crush narrow metadata columns
-    const representative = Math.max(headerLen, p75Len);
+    const representative = Math.max(headerLen, p75Len, tokenFloorLen * 1.15);
     return Math.pow(Math.min(180, Math.max(6, representative)), 0.72);
   });
 
@@ -340,6 +349,46 @@ export interface ExportDocMeta {
   chapterCount: number;
 }
 
+/**
+ * Derive a clean human-readable product/document name when `productType` is
+ * "Unknown" (e.g. Custom PRD mode), looking at explicit H1 or the opening subject
+ * of Chapter 1 ("RuangReka adalah..." / "RuangReka is...").
+ */
+export function deriveExportProductName(content: string, productType: string): string {
+  const cleanType = productType && productType !== "Unknown" ? productType.trim() : "";
+  if (cleanType) return cleanType;
+
+  const h1Match = content.match(/^#\s+(.+)$/m);
+  if (h1Match) {
+    const h1 = stripInline(h1Match[1]).trim();
+    if (h1.length >= 2 && h1.length <= 60) return h1;
+  }
+
+  // Look for a named product subject in the first body paragraph ("<Product> adalah/merupakan/is ...")
+  const lines = content.split(/\r?\n/);
+  const start = stripYamlFrontmatter(lines);
+  for (let i = start; i < Math.min(lines.length, start + 20); i++) {
+    const t = stripInline(lines[i]).trim();
+    if (!t || t.startsWith("#") || t.startsWith("|") || t.startsWith("-") || t.startsWith("```")) {
+      continue;
+    }
+    const subjectMatch = t.match(
+      /^([A-Z][A-Za-z0-9._-]*(?:\s+[A-Z][A-Za-z0-9._-]*){0,2})\s+(?:adalah|merupakan|is|enables|provides|helps)\b/,
+    );
+    if (subjectMatch && subjectMatch[1].length >= 2 && subjectMatch[1].length <= 40) {
+      return subjectMatch[1].trim();
+    }
+    break;
+  }
+
+  return "";
+}
+
+export function deriveExportSlug(content: string, productType: string): string {
+  const name = deriveExportProductName(content, productType);
+  return sanitizeFilename(name || "Document");
+}
+
 export function buildExportMeta(
   content: string,
   productType: string,
@@ -348,17 +397,17 @@ export function buildExportMeta(
 ): ExportDocMeta {
   const sections = getSections(content);
   const chapterCount = sections.length;
-  const cleanType = productType && productType !== "Unknown" ? productType.trim() : "";
+  const cleanName = deriveExportProductName(content, productType);
 
   // Check if markdown starts with an explicit H1 title
   const h1Match = content.match(/^#\s+(.+)$/m);
   const rawTitle = h1Match ? stripInline(h1Match[1]).trim() : "";
   const title =
     rawTitle ||
-    (cleanType
+    (cleanName
       ? language === "en"
-        ? `${cleanType} - Product Requirements Document`
-        : `${cleanType} - Dokumen Spesifikasi Produk (PRD)`
+        ? `${cleanName} - Product Requirements Document`
+        : `${cleanName} - Dokumen Spesifikasi Produk (PRD)`
       : language === "en"
         ? "Product Requirements Document"
         : "Dokumen Spesifikasi Produk (PRD)");
@@ -373,7 +422,7 @@ export function buildExportMeta(
     language === "en" ? "PRD ARCHITECT  |  PRODUCT SPECIFICATION" : "PRD ARCHITECT  |  SPESIFIKASI PRODUK";
 
   const parts: string[] = [];
-  if (cleanType) parts.push(cleanType);
+  if (cleanName) parts.push(cleanName);
   if (chapterCount > 0) {
     parts.push(language === "en" ? `${chapterCount} Chapters` : `${chapterCount} Bab`);
   }

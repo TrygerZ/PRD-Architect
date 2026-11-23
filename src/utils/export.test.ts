@@ -11,6 +11,8 @@ import {
   parseListLine,
   computeColumnWeights,
   computeMermaidDisplaySize,
+  deriveExportProductName,
+  deriveExportSlug,
   buildExportMeta,
 } from "./export";
 import type { InlineSeg } from "./export";
@@ -289,7 +291,7 @@ describe("layoutInline continuationWidth (hanging indent wrap)", () => {
   });
 });
 
-describe("buildExportMeta", () => {
+describe("buildExportMeta & deriveExportSlug", () => {
   it("builds localized metadata with chapter count and product type", () => {
     const meta = buildExportMeta(
       "## 1. Ringkasan\nIsi.\n\n## 2. Masalah\nIsi.",
@@ -300,5 +302,12 @@ describe("buildExportMeta", () => {
     expect(meta.title).toContain("Mobile App");
     expect(meta.chapterCount).toBe(2);
     expect(meta.subtitle).toContain("2 Bab");
+  });
+
+  it("extracts product name from opening sentence when productType is Unknown", () => {
+    const md = "## 1. Ringkasan Eksekutif\n\nRuangReka adalah aplikasi mobile-first AI & AR untuk UMKM furnitur.";
+    expect(deriveExportProductName(md, "Unknown")).toBe("RuangReka");
+    expect(deriveExportSlug(md, "Unknown")).toBe("RuangReka");
+    expect(deriveExportSlug("## 1. Intro\nGeneric text.", "Unknown")).toBe("Document");
   });
 });

@@ -2,7 +2,7 @@
 // Implementation lives in focused modules: exportMarkdown.ts, exportMermaid.ts,
 // exportDocx.ts, pdfFonts.ts, and exportPdf.ts.
 import { getSections, type Section } from "./sections";
-import { sanitizeFilename, triggerDownload } from "./exportMarkdown";
+import { deriveExportSlug, triggerDownload } from "./exportMarkdown";
 
 export {
   parseInline,
@@ -16,6 +16,8 @@ export {
   parseListLine,
   computeColumnWeights,
   computeMermaidDisplaySize,
+  deriveExportProductName,
+  deriveExportSlug,
   buildExportMeta,
   type InlineSeg,
   type RunSpec,
@@ -35,5 +37,5 @@ export function exportJson(content: string, productType: string): void {
     content: s.content,
   }));
   const blob = new Blob([JSON.stringify(payload, null, 2)], { type: "application/json" });
-  triggerDownload(blob, `PRD_${sanitizeFilename(productType)}_${Date.now()}.json`);
+  triggerDownload(blob, `PRD_${deriveExportSlug(content, productType)}_${Date.now()}.json`);
 }
