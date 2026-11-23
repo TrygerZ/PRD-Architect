@@ -23,6 +23,7 @@ import { useGeneration } from "./hooks/useGeneration";
 import { Sidebar } from "./components/Sidebar";
 import { ErrorBoundary } from "./components/ErrorBoundary";
 import { ReasoningPanel } from "./components/ReasoningPanel";
+import { SmartRevisionDock } from "./components/SmartRevisionDock";
 import { VersionDiff } from "./components/VersionDiff";
 
 // Task 2.6 — Code-splitting: modal & uploader di-load hanya saat dipakai.
@@ -419,6 +420,7 @@ export default function App() {
   const handleCommentChange = useCallback((secId: string, comment: string) => {
     versionCommentChange(secId, comment);
   }, [versionCommentChange]);
+  const handleClearComments = useCallback(() => setComments({}), [setComments]);
   const handleBlueprintSwitchVersion = useCallback((vid: string) => {
     versionSwitchVersion(vid);
   }, [versionSwitchVersion]);
@@ -613,7 +615,7 @@ export default function App() {
                   }
                 />
               ) : (
-                <div className="max-w-[800px] mx-auto space-y-6 pt-8 pb-8">
+                <div className="max-w-[820px] mx-auto space-y-6 pt-8 pb-8">
                   {error && (
                     <div role="alert" className="w-full bg-[var(--color-surface)] p-4 mb-4 border border-[var(--color-error)] rounded-md text-[var(--color-error)] text-[15px] font-medium no-print flex items-start justify-between gap-3">
                       <span>{error}</span>
@@ -638,8 +640,8 @@ export default function App() {
                   )}
                   
                   {/* User Message */}
-                  <div className="bg-[var(--color-surface-elevated)] rounded-md p-3 sm:p-4 max-w-[95%] sm:max-w-[85%] ml-auto shadow-sm border border-[var(--color-border)]">
-                    <p className="text-[14px] text-[var(--color-text-primary)] whitespace-pre-wrap">
+                  <div className="oa-elev-sheet rounded-2xl p-3.5 sm:p-4 max-w-[95%] sm:max-w-[85%] ml-auto">
+                    <p className="text-[14px] text-[var(--oa-text-primary)] whitespace-pre-wrap leading-relaxed">
                       {activeVersion?.userDisplayPrompt || userPrompt}
                     </p>
                   </div>
@@ -664,6 +666,7 @@ export default function App() {
                     language={language}
                     onConvertMode={handleConvertMode}
                     onCompareVersions={handleOpenDiff}
+                    theme={theme}
                   />
                 </div>
               )}
@@ -698,27 +701,38 @@ export default function App() {
               </div>
             )}
 
-            {/* Docked bottom Omni-Composer when workspace has active PRD */}
+            {/* Floating SmartRevisionDock + Docked bottom Omni-Composer when workspace has active PRD */}
             {hasMessage && view === "document" && (
-              <ChatInput
-                onSend={handleSend}
-                isGenerating={isGenerating}
-                language={language}
-                onCancel={handleCancel}
-                onAttachClick={handleAttachClick}
-                uploadedFiles={uploadedFiles}
-                onRemoveFile={handleRemoveFile}
-                variant="dock"
-                prdMode={prdMode}
-                onChangeMode={setPrdMode}
-                builderTab={builderTab}
-                onChangeBuilderTab={setBuilderTab}
-                customBlockCount={customChapterIds.length}
-                modelLabel={model}
-                onOpenSettings={handleOpenSettings}
-                draft={composerDraft}
-                onDraftChange={setComposerDraft}
-              />
+              <>
+                <SmartRevisionDock
+                  comments={comments}
+                  sections={outlineItems}
+                  isGenerating={isGenerating}
+                  language={language}
+                  onRevise={handleRevise}
+                  onClearAll={handleClearComments}
+                  onJumpToSection={handleSelectSection}
+                />
+                <ChatInput
+                  onSend={handleSend}
+                  isGenerating={isGenerating}
+                  language={language}
+                  onCancel={handleCancel}
+                  onAttachClick={handleAttachClick}
+                  uploadedFiles={uploadedFiles}
+                  onRemoveFile={handleRemoveFile}
+                  variant="dock"
+                  prdMode={prdMode}
+                  onChangeMode={setPrdMode}
+                  builderTab={builderTab}
+                  onChangeBuilderTab={setBuilderTab}
+                  customBlockCount={customChapterIds.length}
+                  modelLabel={model}
+                  onOpenSettings={handleOpenSettings}
+                  draft={composerDraft}
+                  onDraftChange={setComposerDraft}
+                />
+              </>
             )}
           </LayoutGroup>
         </main>
