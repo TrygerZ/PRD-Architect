@@ -1,8 +1,11 @@
 // Re-export shared types (single source of truth in /shared/types.ts).
 export type {
   AIProvider,
+  ContinuationStatus,
   PRDMode,
   ProductType,
+  TruncationInfo,
+  TruncationReason,
   UploadedFile,
 } from "../shared/types";
 
