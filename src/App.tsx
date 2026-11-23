@@ -1,4 +1,4 @@
-import { useState, useEffect, useRef, useCallback, Suspense, lazy } from "react";
+import { useState, useEffect, useRef, useCallback, useMemo, Suspense, lazy } from "react";
 import { Header } from "./components/Header";
 import { WelcomeScreen } from "./components/WelcomeScreen";
 import { ChatInput } from "./components/ChatInput";
@@ -9,8 +9,11 @@ import type { PRDVersion } from "./types";
 import DOMPurify from "dompurify";
 import { ArrowUp, ArrowDown, X } from "lucide-react";
 import { safeGetLocalStorage, safeSetLocalStorage } from "./utils/storage";
+import { MAX_PERSISTED_VERSIONS } from "./utils/persistence";
+import { buildChapterOutline } from "./utils/outline";
 import { buildPrintHtml, downloadMarkdown } from "./utils/printTemplate";
 import { useSettings } from "./hooks/useSettings";
+import { useTheme } from "./hooks/useTheme";
 import { useToast } from "./hooks/useToast";
 import { useScroll } from "./hooks/useScroll";
 import { useVersion } from "./hooks/useVersion";
@@ -32,10 +35,18 @@ const WbsCanvas = lazy(() =>
   import("./components/WbsCanvas").then((m) => ({ default: m.WbsCanvas })),
 );
 
+const PROVIDER_LABELS: Record<AIProvider, string> = {
+  deepseek: "DeepSeek",
+  gemini: "Google Gemini",
+  opencode: "OpenCode Zen",
+  nine_router: "9Router Proxy",
+};
+
 export default function App() {
   const [isSettingsOpen, setIsSettingsOpen] = useState(false);
   const [customApiKey, setCustomApiKey] = useState("");
   const { provider, model, customEndpoint, persistSettings } = useSettings();
+  const { theme, toggleTheme } = useTheme();
   const [productType, setProductType] = useState<ProductType>("Unknown");
   const [language, setLanguage] = useState<"id" | "en">("en");
   const { showScrollTop, showScrollBottom, handleScroll: onContainerScroll } = useScroll();
@@ -60,13 +71,16 @@ export default function App() {
     if (reason === "quota") {
       showToast(
         language === "en"
-          ? "Storage full — older versions may not be saved."
-          : "Penyimpanan penuh — versi lama mungkin tidak tersimpan.",
+          ? "Storage full: older versions may not be saved."
+          : "Penyimpanan penuh: versi lama mungkin tidak tersimpan.",
       );
     }
   });
 
-  const [sidebarOpen, setSidebarOpen] = useState(false);
+  const [sidebarOpen, setSidebarOpen] = useState<boolean>(() =>
+    typeof window !== "undefined" ? window.innerWidth >= 1024 : true,
+  );
+  const [activeSectionId, setActiveSectionId] = useState<string | undefined>(undefined);
   const [isDiffOpen, setIsDiffOpen] = useState(false);
   const [currentPrompt, setCurrentPrompt] = useState("");
   const [prdMode, setPrdMode] = useState<PRDMode>("business");
@@ -158,6 +172,7 @@ export default function App() {
     versionNewPRD(false, abortGeneration);
     setCurrentPrompt("");
     setUploadedFiles([]);
+    setActiveSectionId(undefined);
   }, [versionNewPRD, abortGeneration, versions.length, language]);
 
   // showToast now provided by useToast hook
@@ -203,7 +218,7 @@ export default function App() {
       window.history.pushState({ app: 'prd-architect' }, '', window.location.href);
     }
     
-    const handlePopState = (e: PopStateEvent) => {
+    const handlePopState = (_e: PopStateEvent) => {
       // Jika user mencoba back dan ada data yang belum disimpan
       if (isGenerating || versions.length > 0) {
         const confirmLeave = window.confirm(
@@ -221,8 +236,18 @@ export default function App() {
     return () => window.removeEventListener('popstate', handlePopState);
   }, [isGenerating, versions.length, language]);
 
-  // P6 — popstate guard continued
-  // ...
+  // Global Ctrl+K / Cmd+K shortcut for New PRD when no modal/overlay is active
+  useEffect(() => {
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === "k") {
+        if (isSettingsOpen || isDiffOpen || showUploader) return;
+        e.preventDefault();
+        handleNewPRD();
+      }
+    };
+    window.addEventListener("keydown", handleKeyDown);
+    return () => window.removeEventListener("keydown", handleKeyDown);
+  }, [handleNewPRD, isSettingsOpen, isDiffOpen, showUploader]);
 
   // Persist builder tab
   useEffect(() => {
@@ -238,9 +263,26 @@ export default function App() {
     builderTabRef.current = builderTab;
     customChapterIdsRef.current = customChapterIds;
   }, [activeVersion, comments, language, prdMode, builderTab, customChapterIds]);
+
   const prdContent = activeVersion?.content || "";
   const hasMessage = !!activeVersionId || versions.length > 0;
   const userPrompt = activeVersion?.prompt || "";
+
+  const outlineItems = useMemo(
+    () => buildChapterOutline(prdContent, comments, isGenerating),
+    [prdContent, comments, isGenerating],
+  );
+
+  const activeVersionIndex = useMemo(
+    () => (activeVersionId ? versions.findIndex((v) => v.id === activeVersionId) : -1),
+    [versions, activeVersionId],
+  );
+  const activeVersionLabel = activeVersionIndex >= 0 ? `v${activeVersionIndex + 1}` : undefined;
+  const providerLabel = PROVIDER_LABELS[provider];
+
+  useEffect(() => {
+    setActiveSectionId(undefined);
+  }, [activeVersionId]);
 
   // Reset view ke document saat tidak ada konten (PRD baru / cleared).
   useEffect(() => {
@@ -362,6 +404,30 @@ export default function App() {
   const handleBlueprintSwitchVersion = useCallback((vid: string) => {
     versionSwitchVersion(vid);
   }, [versionSwitchVersion]);
+  const scrollToSectionElement = useCallback((id: string) => {
+    const el =
+      document.getElementById(`prd-section-${id}`) ??
+      document.getElementById(`${id}-heading`);
+    if (el) {
+      el.scrollIntoView({ behavior: "smooth", block: "start" });
+    }
+  }, []);
+  const handleSelectSection = useCallback(
+    (id: string) => {
+      setActiveSectionId(id);
+      if (view !== "document") {
+        setView("document");
+        requestAnimationFrame(() => {
+          requestAnimationFrame(() => {
+            scrollToSectionElement(id);
+          });
+        });
+        return;
+      }
+      scrollToSectionElement(id);
+    },
+    [view, scrollToSectionElement],
+  );
   const quickPromptTimerRef = useRef<ReturnType<typeof setTimeout>>(undefined);
   const printTimerRef = useRef<ReturnType<typeof setTimeout>>(undefined);
 
@@ -397,38 +463,54 @@ export default function App() {
 
   return (
     <ErrorBoundary language={language}>
-    <div className="min-h-screen bg-[var(--color-bg)] flex flex-col font-geist">
-      <Header
-        onOpenSettings={handleOpenSettings}
-        onExportMd={handleExportMd}
-        onExportDocx={handleExportDocx}
-        onExportPdf={handleExportPdf}
-        onExportJson={handleExportJson}
-        onCopy={handleCopy}
-        onPrint={handlePrint}
-        hasData={prdContent.length > 0}
+    <div className="h-screen overflow-hidden bg-[var(--oa-bg-canvas)] text-[var(--oa-text-primary)] flex font-sans">
+      <Sidebar
+        versions={versions}
+        activeVersionId={activeVersionId}
+        onSwitchVersion={handleSidebarSwitchVersion}
+        onNewPRD={handleNewPRD}
         language={language}
-        onToggleLanguage={handleToggleLanguage}
-        minimal={!hasMessage}
-        onToggleSidebar={handleToggleSidebar}
-        view={view}
-        onViewChange={setView}
+        isOpen={sidebarOpen}
+        onClose={handleSidebarClose}
+        outlineItems={outlineItems}
+        activeSectionId={activeSectionId}
+        onSelectSection={handleSelectSection}
+        providerLabel={providerLabel}
+        modelName={model}
+        isGenerating={isGenerating}
+        onOpenSettings={handleOpenSettings}
+        maxVersions={MAX_PERSISTED_VERSIONS}
       />
 
-      <div className="flex flex-1 pt-12 min-h-0 max-h-screen">
-        {/* Sidebar */}
-        <Sidebar
-          versions={versions}
-          activeVersionId={activeVersionId}
-          onSwitchVersion={handleSidebarSwitchVersion}
-          onNewPRD={handleNewPRD}
+      <div className="flex-1 flex flex-col min-w-0 h-screen overflow-hidden">
+        <Header
+          onOpenSettings={handleOpenSettings}
+          onExportMd={handleExportMd}
+          onExportDocx={handleExportDocx}
+          onExportPdf={handleExportPdf}
+          onExportJson={handleExportJson}
+          onCopy={handleCopy}
+          onPrint={handlePrint}
+          hasData={prdContent.length > 0}
           language={language}
-          isOpen={sidebarOpen}
-          onClose={handleSidebarClose}
+          onToggleLanguage={handleToggleLanguage}
+          theme={theme}
+          onToggleTheme={toggleTheme}
+          minimal={!hasMessage}
+          onToggleSidebar={handleToggleSidebar}
+          sidebarOpen={sidebarOpen}
+          view={view}
+          onViewChange={setView}
+          versionsCount={versions.length}
+          activeVersionLabel={activeVersionLabel}
+          activeMode={activeVersion?.prdMode}
+          onOpenDiff={handleOpenDiff}
+          onConvertMode={handleConvertMode}
+          isGenerating={isGenerating}
         />
 
         {/* Main Content Area */}
-        <main className="flex-1 flex flex-col relative overflow-hidden">
+        <main className="flex-1 flex flex-col relative min-h-0 overflow-hidden">
           {/* WBS Canvas view — menggantikan BlueprintSheet, lazy-render */}
           {view === "wbs" && hasMessage && prdContent ? (
             <Suspense
