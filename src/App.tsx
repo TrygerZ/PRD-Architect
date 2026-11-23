@@ -1,4 +1,5 @@
 import { useState, useEffect, useRef, useCallback, useMemo, Suspense, lazy } from "react";
+import { LayoutGroup } from "motion/react";
 import { Header } from "./components/Header";
 import { WelcomeScreen } from "./components/WelcomeScreen";
 import { ChatInput } from "./components/ChatInput";
@@ -8,7 +9,7 @@ import { getChapterBlock, MAX_CUSTOM_BLOCKS } from "../shared/chapterBlocks";
 import type { PRDVersion } from "./types";
 import DOMPurify from "dompurify";
 import { ArrowUp, ArrowDown, X } from "lucide-react";
-import { safeGetLocalStorage, safeSetLocalStorage } from "./utils/storage";
+import { safeGetLocalStorage, safeSetLocalStorage, serializeDraft, parseDraft } from "./utils/storage";
 import { MAX_PERSISTED_VERSIONS } from "./utils/persistence";
 import { buildChapterOutline } from "./utils/outline";
 import { buildPrintHtml, downloadMarkdown } from "./utils/printTemplate";
@@ -41,6 +42,9 @@ const PROVIDER_LABELS: Record<AIProvider, string> = {
   opencode: "OpenCode Zen",
   nine_router: "9Router Proxy",
 };
+
+const DRAFT_KEY = "PRD_DRAFT";
+const DRAFT_TTL_MS = 24 * 60 * 60 * 1000;
 
 export default function App() {
   const [isSettingsOpen, setIsSettingsOpen] = useState(false);
@@ -82,7 +86,9 @@ export default function App() {
   );
   const [activeSectionId, setActiveSectionId] = useState<string | undefined>(undefined);
   const [isDiffOpen, setIsDiffOpen] = useState(false);
-  const [currentPrompt, setCurrentPrompt] = useState("");
+  const [composerDraft, setComposerDraft] = useState<string>(() =>
+    parseDraft(safeGetLocalStorage(DRAFT_KEY), DRAFT_TTL_MS),
+  );
   const [prdMode, setPrdMode] = useState<PRDMode>("business");
   const [view, setView] = useState<"document" | "wbs">("document");
 
@@ -170,7 +176,8 @@ export default function App() {
     // Pembatalan dikelola oleh hook useGeneration via abortGeneration.
     abortGeneration();
     versionNewPRD(false, abortGeneration);
-    setCurrentPrompt("");
+    setComposerDraft("");
+    safeSetLocalStorage(DRAFT_KEY, "");
     setUploadedFiles([]);
     setActiveSectionId(undefined);
   }, [versionNewPRD, abortGeneration, versions.length, language]);
@@ -180,10 +187,21 @@ export default function App() {
   // Cleanup timers on unmount
   useEffect(() => {
     return () => {
-      clearTimeout(quickPromptTimerRef.current);
       clearTimeout(printTimerRef.current);
     };
   }, []);
+
+  // Debounced draft persistence across Hero <-> Custom <-> Dock and Document <-> WBS transitions
+  useEffect(() => {
+    const timer = setTimeout(() => {
+      if (composerDraft.trim()) {
+        safeSetLocalStorage(DRAFT_KEY, serializeDraft(composerDraft));
+      } else {
+        safeSetLocalStorage(DRAFT_KEY, "");
+      }
+    }, 400);
+    return () => clearTimeout(timer);
+  }, [composerDraft]);
 
   // Load preferensi bahasa dari localStorage (default "en")
   useEffect(() => {
@@ -428,15 +446,15 @@ export default function App() {
     },
     [view, scrollToSectionElement],
   );
-  const quickPromptTimerRef = useRef<ReturnType<typeof setTimeout>>(undefined);
   const printTimerRef = useRef<ReturnType<typeof setTimeout>>(undefined);
 
   const handleQuickPrompt = useCallback((text: string) => {
-    setCurrentPrompt(text);
-    clearTimeout(quickPromptTimerRef.current);
-    quickPromptTimerRef.current = setTimeout(() => setCurrentPrompt(''), 100);
+    setComposerDraft(text);
   }, []);
   const handleAttachClick = useCallback(() => setShowUploader(prev => !prev), []);
+  const handleRemoveFile = useCallback((id: string) => {
+    setUploadedFiles((prev) => prev.filter((f) => f.id !== id));
+  }, []);
   const handleScrollTop = useCallback(() => {
     if (chatContainerRef.current) chatContainerRef.current.scrollTo({ top: 0, behavior: 'smooth' });
   }, []);
@@ -454,6 +472,8 @@ export default function App() {
 
   // Task 3.8 — Extract onSend ke useCallback untuk hindari stale closure
   const handleSend = useCallback((text: string) => {
+    setComposerDraft("");
+    safeSetLocalStorage(DRAFT_KEY, "");
     if (activeVersionRef.current) {
       handleAppend(text);
     } else {
@@ -511,163 +531,196 @@ export default function App() {
 
         {/* Main Content Area */}
         <main className="flex-1 flex flex-col relative min-h-0 overflow-hidden">
-          {/* WBS Canvas view — menggantikan BlueprintSheet, lazy-render */}
-          {view === "wbs" && hasMessage && prdContent ? (
-            <Suspense
-              fallback={
-                <div className="flex-1 flex items-center justify-center text-[13px] font-mono text-[var(--color-text-muted)]">
-                  {language === "en" ? "Loading WBS canvas..." : "Memuat canvas WBS..."}
-                </div>
-              }
+          <LayoutGroup>
+            {/* WBS Canvas view — menggantikan BlueprintSheet, lazy-render */}
+            {view === "wbs" && hasMessage && prdContent ? (
+              <Suspense
+                fallback={
+                  <div className="flex-1 flex items-center justify-center text-[13px] font-mono text-[var(--color-text-muted)]">
+                    {language === "en" ? "Loading WBS canvas..." : "Memuat canvas WBS..."}
+                  </div>
+                }
+              >
+                <WbsCanvas
+                  content={prdContent}
+                  prdMode={activeVersion?.prdMode}
+                  language={language}
+                />
+              </Suspense>
+            ) : (
+            <div 
+              ref={chatContainerRef}
+              className={`flex-1 overflow-y-auto px-4 sm:px-6 ${hasMessage ? "pb-20" : "pb-6"}`}
+              id="chat-messages-container"
+              aria-busy={isGenerating}
+              aria-live="polite"
+              onScroll={(e) => {
+                const el = e.currentTarget;
+                onContainerScroll({
+                  scrollTop: el.scrollTop,
+                  clientHeight: el.clientHeight,
+                  scrollHeight: el.scrollHeight,
+                });
+              }}
             >
-              <WbsCanvas
-                content={prdContent}
-                prdMode={activeVersion?.prdMode}
-                language={language}
-              />
-            </Suspense>
-          ) : (
-          <div 
-            ref={chatContainerRef}
-            className="flex-1 overflow-y-auto px-4 sm:px-6 pb-[220px] sm:pb-[180px]" 
-            id="chat-messages-container"
-            aria-busy={isGenerating}
-            aria-live="polite"
-            onScroll={(e) => {
-              const el = e.currentTarget;
-              onContainerScroll({
-                scrollTop: el.scrollTop,
-                clientHeight: el.clientHeight,
-                scrollHeight: el.scrollHeight,
-              });
-            }}
-          >
-            {showUploader && (
-              <div className="max-w-[640px] mx-auto w-full mb-4 mt-4">
-                <Suspense
-                  fallback={
-                    <div className="w-full border border-dashed border-[var(--color-border)] rounded-md py-12 flex items-center justify-center text-[var(--color-text-muted)] text-[13px] font-mono">
-                      {language === "en" ? "Loading uploader..." : "Memuat uploader..."}
-                    </div>
+              {showUploader && (
+                <div className="max-w-[640px] mx-auto w-full mb-4 mt-4">
+                  <Suspense
+                    fallback={
+                      <div className="w-full border border-dashed border-[var(--color-border)] rounded-md py-12 flex items-center justify-center text-[var(--color-text-muted)] text-[13px] font-mono">
+                        {language === "en" ? "Loading uploader..." : "Memuat uploader..."}
+                      </div>
+                    }
+                  >
+                    <FileUploader
+                      files={uploadedFiles}
+                      onFilesChange={setUploadedFiles}
+                      language={language}
+                    />
+                  </Suspense>
+                </div>
+              )}
+              {!hasMessage ? (
+                <WelcomeScreen 
+                  language={language} 
+                  onQuickPrompt={handleQuickPrompt} 
+                  prdMode={prdMode}
+                  onChangeMode={setPrdMode}
+                  builderTab={builderTab}
+                  onChangeBuilderTab={setBuilderTab}
+                  selectedIds={customChapterIds}
+                  onChangeSelectedIds={setCustomChapterIds}
+                  composer={
+                    <ChatInput
+                      onSend={handleSend}
+                      isGenerating={isGenerating}
+                      language={language}
+                      onCancel={handleCancel}
+                      onAttachClick={handleAttachClick}
+                      uploadedFiles={uploadedFiles}
+                      onRemoveFile={handleRemoveFile}
+                      variant={builderTab === "custom" ? "custom" : "hero"}
+                      prdMode={prdMode}
+                      onChangeMode={setPrdMode}
+                      builderTab={builderTab}
+                      onChangeBuilderTab={setBuilderTab}
+                      customBlockCount={customChapterIds.length}
+                      modelLabel={model}
+                      onOpenSettings={handleOpenSettings}
+                      draft={composerDraft}
+                      onDraftChange={setComposerDraft}
+                    />
                   }
-                >
-                  <FileUploader
-                    files={uploadedFiles}
-                    onFilesChange={setUploadedFiles}
+                />
+              ) : (
+                <div className="max-w-[800px] mx-auto space-y-6 pt-8 pb-8">
+                  {error && (
+                    <div role="alert" className="w-full bg-[var(--color-surface)] p-4 mb-4 border border-[var(--color-error)] rounded-md text-[var(--color-error)] text-[15px] font-medium no-print flex items-start justify-between gap-3">
+                      <span>{error}</span>
+                      <button
+                        onClick={() => setError(null)}
+                        className="shrink-0 p-1 rounded-sm hover:bg-[var(--color-error-bg)] transition-colors focus-visible:ring-2 focus-visible:ring-[var(--color-interactive)] focus-visible:outline-none"
+                        aria-label={language === "en" ? "Dismiss error" : "Tutup pemberitahuan"}
+                      >
+                        <X size={16} strokeWidth={1.5} />
+                      </button>
+                    </div>
+                  )}
+
+                  {/* Connecting Indicator */}
+                  {isConnecting && !prdContent && (
+                    <div className="flex items-center gap-3 p-4 mb-4 rounded-md border border-[var(--color-interactive-subtle)] bg-[var(--color-interactive-subtle)]">
+                      <div className="w-4 h-4 border-2 border-[var(--color-interactive)] border-t-transparent rounded-full animate-spin" />
+                      <span className="text-[13px] text-[var(--color-interactive)]">
+                        {language === "en" ? "Connecting to AI..." : "Menghubungkan ke AI..."}
+                      </span>
+                    </div>
+                  )}
+                  
+                  {/* User Message */}
+                  <div className="bg-[var(--color-surface-elevated)] rounded-md p-3 sm:p-4 max-w-[95%] sm:max-w-[85%] ml-auto shadow-sm border border-[var(--color-border)]">
+                    <p className="text-[14px] text-[var(--color-text-primary)] whitespace-pre-wrap">
+                      {activeVersion?.userDisplayPrompt || userPrompt}
+                    </p>
+                  </div>
+
+                  {/* AI Reasoning Panel (model R1/thinking) */}
+                  <ReasoningPanel
+                    reasoning={activeVersion?.reasoning}
+                    isGenerating={isGenerating}
                     language={language}
                   />
-                </Suspense>
+
+                  {/* AI Response — BlueprintSheet */}
+                  <BlueprintSheet
+                    content={prdContent}
+                    comments={comments}
+                    onCommentChange={handleCommentChange}
+                    versions={versions}
+                    activeVersionId={activeVersionId}
+                    onSwitchVersion={handleBlueprintSwitchVersion}
+                    onRevise={handleRevise}
+                    isGenerating={isGenerating}
+                    language={language}
+                    onConvertMode={handleConvertMode}
+                    onCompareVersions={handleOpenDiff}
+                  />
+                </div>
+              )}
+            </div>
+            )}
+
+            {/* Scroll Controls — horizontal center, above docked ChatInput */}
+            {(showScrollTop || showScrollDown) && view === "document" && (
+              <div className="absolute bottom-[132px] sm:bottom-[124px] left-1/2 -translate-x-1/2 z-35 flex items-center gap-2 pointer-events-none no-print">
+                {showScrollTop && (
+                  <button
+                    type="button"
+                    onClick={handleScrollTop}
+                    className="pointer-events-auto min-w-[44px] min-h-[44px] rounded-full bg-[var(--color-surface-elevated)] border border-[var(--color-border)] text-[var(--color-text-secondary)] hover:bg-[var(--color-border-subtle)] hover:text-[var(--color-text-primary)] shadow-sm flex items-center justify-center transition-colors duration-200 focus-visible:ring-2 focus-visible:ring-[var(--color-interactive)] focus-visible:outline-none"
+                    aria-label={language === "en" ? "Scroll to top" : "Kembali ke atas"}
+                    title={language === "en" ? "Scroll to top" : "Kembali ke atas"}
+                  >
+                    <ArrowUp size={16} strokeWidth={1.5} />
+                  </button>
+                )}
+                {showScrollDown && (
+                  <button
+                    type="button"
+                    onClick={handleScrollBottom}
+                    className="pointer-events-auto min-w-[44px] min-h-[44px] rounded-full bg-[var(--color-surface-elevated)] border border-[var(--color-border)] text-[var(--color-text-secondary)] hover:bg-[var(--color-border-subtle)] hover:text-[var(--color-text-primary)] shadow-sm flex items-center justify-center transition-colors duration-200 focus-visible:ring-2 focus-visible:ring-[var(--color-interactive)] focus-visible:outline-none"
+                    aria-label={language === "en" ? "Scroll to latest content" : "Kembali ke konten terbaru"}
+                    title={language === "en" ? "Scroll to latest content" : "Kembali ke konten terbaru"}
+                  >
+                    <ArrowDown size={16} strokeWidth={1.5} />
+                  </button>
+                )}
               </div>
             )}
-            {!hasMessage ? (
-              <WelcomeScreen 
-                language={language} 
-                onQuickPrompt={handleQuickPrompt} 
+
+            {/* Docked bottom Omni-Composer when workspace has active PRD */}
+            {hasMessage && view === "document" && (
+              <ChatInput
+                onSend={handleSend}
+                isGenerating={isGenerating}
+                language={language}
+                onCancel={handleCancel}
+                onAttachClick={handleAttachClick}
+                uploadedFiles={uploadedFiles}
+                onRemoveFile={handleRemoveFile}
+                variant="dock"
                 prdMode={prdMode}
                 onChangeMode={setPrdMode}
                 builderTab={builderTab}
                 onChangeBuilderTab={setBuilderTab}
-                selectedIds={customChapterIds}
-                onChangeSelectedIds={setCustomChapterIds}
+                customBlockCount={customChapterIds.length}
+                modelLabel={model}
+                onOpenSettings={handleOpenSettings}
+                draft={composerDraft}
+                onDraftChange={setComposerDraft}
               />
-            ) : (
-              <div className="max-w-[800px] mx-auto space-y-6 pt-8 pb-8">
-                {error && (
-                  <div role="alert" className="w-full bg-[var(--color-surface)] p-4 mb-4 border border-[var(--color-error)] rounded-md text-[var(--color-error)] text-[15px] font-medium no-print flex items-start justify-between gap-3">
-                    <span>{error}</span>
-                    <button
-                      onClick={() => setError(null)}
-                      className="shrink-0 p-1 rounded-sm hover:bg-[var(--color-error-bg)] transition-colors focus-visible:ring-2 focus-visible:ring-[var(--color-interactive)] focus-visible:outline-none"
-                      aria-label={language === "en" ? "Dismiss error" : "Tutup pemberitahuan"}
-                    >
-                      <X size={16} strokeWidth={1.5} />
-                    </button>
-                  </div>
-                )}
-
-                {/* Connecting Indicator */}
-                {isConnecting && !prdContent && (
-                  <div className="flex items-center gap-3 p-4 mb-4 rounded-md border border-[var(--color-interactive-subtle)] bg-[var(--color-interactive-subtle)]">
-                    <div className="w-4 h-4 border-2 border-[var(--color-interactive)] border-t-transparent rounded-full animate-spin" />
-                    <span className="text-[13px] text-[var(--color-interactive)]">
-                      {language === "en" ? "Connecting to AI..." : "Menghubungkan ke AI..."}
-                    </span>
-                  </div>
-                )}
-                
-                {/* User Message */}
-                <div className="bg-[var(--color-surface-elevated)] rounded-md p-3 sm:p-4 max-w-[95%] sm:max-w-[85%] ml-auto shadow-sm border border-[var(--color-border)]">
-                  <p className="text-[14px] text-[var(--color-text-primary)] whitespace-pre-wrap">
-                    {activeVersion?.userDisplayPrompt || userPrompt}
-                  </p>
-                </div>
-
-                {/* AI Reasoning Panel (model R1/thinking) */}
-                <ReasoningPanel
-                  reasoning={activeVersion?.reasoning}
-                  isGenerating={isGenerating}
-                  language={language}
-                />
-
-                {/* AI Response — BlueprintSheet */}
-                <BlueprintSheet
-                  content={prdContent}
-                  comments={comments}
-                  onCommentChange={handleCommentChange}
-                  versions={versions}
-                  activeVersionId={activeVersionId}
-                  onSwitchVersion={handleBlueprintSwitchVersion}
-                  onRevise={handleRevise}
-                  isGenerating={isGenerating}
-                  language={language}
-                  onConvertMode={handleConvertMode}
-                  onCompareVersions={handleOpenDiff}
-                />
-              </div>
             )}
-          </div>
-          )}
-
-          {/* Scroll Controls — horizontal center, above ChatInput */}
-          {(showScrollTop || showScrollDown) && (
-            <div className="absolute bottom-[124px] sm:bottom-[116px] left-1/2 -translate-x-1/2 z-35 flex items-center gap-2 pointer-events-none no-print">
-              {showScrollTop && (
-                <button
-                  type="button"
-                  onClick={handleScrollTop}
-                  className="pointer-events-auto min-w-[44px] min-h-[44px] rounded-full bg-[var(--color-surface-elevated)] border border-[var(--color-border)] text-[var(--color-text-secondary)] hover:bg-[var(--color-border-subtle)] hover:text-[var(--color-text-primary)] shadow-sm flex items-center justify-center transition-colors duration-200 focus-visible:ring-2 focus-visible:ring-[var(--color-interactive)] focus-visible:outline-none"
-                  aria-label={language === "en" ? "Scroll to top" : "Kembali ke atas"}
-                  title={language === "en" ? "Scroll to top" : "Kembali ke atas"}
-                >
-                  <ArrowUp size={16} strokeWidth={1.5} />
-                </button>
-              )}
-              {showScrollDown && (
-                <button
-                  type="button"
-                  onClick={handleScrollBottom}
-                  className="pointer-events-auto min-w-[44px] min-h-[44px] rounded-full bg-[var(--color-surface-elevated)] border border-[var(--color-border)] text-[var(--color-text-secondary)] hover:bg-[var(--color-border-subtle)] hover:text-[var(--color-text-primary)] shadow-sm flex items-center justify-center transition-colors duration-200 focus-visible:ring-2 focus-visible:ring-[var(--color-interactive)] focus-visible:outline-none"
-                  aria-label={language === "en" ? "Scroll to latest content" : "Kembali ke konten terbaru"}
-                  title={language === "en" ? "Scroll to latest content" : "Kembali ke konten terbaru"}
-                >
-                  <ArrowDown size={16} strokeWidth={1.5} />
-                </button>
-              )}
-            </div>
-          )}
-
-          {/* Input — fixed bottom */}
-          <ChatInput
-            onSend={handleSend}
-            isGenerating={isGenerating}
-            onCancel={handleCancel}
-            language={language}
-            onAttachClick={handleAttachClick}
-            hasFiles={uploadedFiles.length > 0}
-            initialPrompt={currentPrompt}
-            showQuickPrompts={false}
-            fileContextChars={uploadedFiles.reduce((sum, f) => sum + Math.min(f.charCount ?? 0, 8000), 0)}
-          />
+          </LayoutGroup>
         </main>
       </div>
 
