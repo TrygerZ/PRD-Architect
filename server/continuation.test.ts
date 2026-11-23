@@ -372,5 +372,19 @@ describe("server/continuation", () => {
       expect(dedup.flush()).toBe("\n\n## 6. Summary");
       expect(dedup.flush()).toBe("");
     });
+    it("inserts a newline when a GFM table separator or new row starts immediately after a closed header row without trailing newline", () => {
+      const existing =
+        "## 14. Register Risiko & Mitigasi\n\n| ID | Risk | Probability | Impact | Risk Score | Strategi Mitigasi | Owner |";
+      const next = "|---|---|---|---|---|---|---|\n| RISK-01 | QA gagal | High | High | 9 | Panduan | Lead |";
+      const stitched = existing + stripContinuationOverlap(existing, next);
+      expect(stitched).toContain("| Owner |\n|---|---|---|---|---|---|---|");
+      expect(stitched).not.toContain("Owner||---|");
+    });
+
+    it("inserts a newline between adjacent pipe-closed table rows across a seam", () => {
+      const existing = "| RISK-01 | Desc | High |";
+      const next = "| RISK-02 | Desc 2 | Low |";
+      expect(stripContinuationOverlap(existing, next)).toBe("\n" + next);
+    });
   });
 });

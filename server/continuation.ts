@@ -451,13 +451,28 @@ export function stripContinuationOverlap(existingText: string, continuationText:
 
   if (!cleaned) return "";
 
-  // Ensure a new level-2 chapter heading always starts on its own paragraph so
-  // frontend `getSections()` (`^##\s+`) never merges it into the previous chapter.
+  // Ensure block-level Markdown boundaries never glue onto the previous line
+  // across a continuation seam (e.g. `| Owner|` + `|---|---|` becoming one broken line).
   if (/^##\s+/.test(cleaned)) {
     if (!existingText.endsWith("\n")) {
       return "\n\n" + cleaned;
     }
     if (!existingText.endsWith("\n\n")) {
+      return "\n" + cleaned;
+    }
+  }
+
+  if (!existingText.endsWith("\n")) {
+    // Heading (H3-H6), fenced code block, or GFM table separator starting a new line
+    if (
+      /^#{3,6}\s+/.test(cleaned) ||
+      /^(?:`{3,}|~{3,})/.test(cleaned) ||
+      /^\|?[\s:-]+\|[\s:|-]*(?:\r?\n|$)/.test(cleaned)
+    ) {
+      return "\n" + cleaned;
+    }
+    // New table row starting with `|` directly after a closed previous table row ending in `|`
+    if (cleaned.startsWith("|") && existingText.trimEnd().endsWith("|")) {
       return "\n" + cleaned;
     }
   }
