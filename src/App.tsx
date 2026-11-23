@@ -1,5 +1,5 @@
 import { useState, useEffect, useRef, useCallback, useMemo, Suspense, lazy } from "react";
-import { LayoutGroup } from "motion/react";
+import { AnimatePresence, LayoutGroup, motion } from "motion/react";
 import { Header } from "./components/Header";
 import { WelcomeScreen } from "./components/WelcomeScreen";
 import { ChatInput } from "./components/ChatInput";
@@ -8,14 +8,16 @@ import { ProductType, UploadedFile, AIProvider, PRDMode } from "../shared/types"
 import { getChapterBlock, MAX_CUSTOM_BLOCKS } from "../shared/chapterBlocks";
 import type { PRDVersion } from "./types";
 import DOMPurify from "dompurify";
-import { ArrowUp, ArrowDown, X } from "lucide-react";
+import { ArrowUp, ArrowDown, X, AlertCircle, AlertTriangle, Check } from "lucide-react";
 import { safeGetLocalStorage, safeSetLocalStorage, serializeDraft, parseDraft } from "./utils/storage";
 import { MAX_PERSISTED_VERSIONS } from "./utils/persistence";
 import { buildChapterOutline } from "./utils/outline";
+import { MODAL_SLIDE_UP, POPOVER_FADE } from "./utils/motion";
 import { WBS_SECTION_RE } from "./utils/wbsTable";
 import { buildPrintHtml, downloadMarkdown } from "./utils/printTemplate";
 import { useSettings } from "./hooks/useSettings";
 import { useTheme } from "./hooks/useTheme";
+import { useT } from "./hooks/useT";
 import { useToast } from "./hooks/useToast";
 import { useScroll } from "./hooks/useScroll";
 import { useVersion } from "./hooks/useVersion";
@@ -55,6 +57,7 @@ export default function App() {
   const { theme, toggleTheme } = useTheme();
   const [productType, setProductType] = useState<ProductType>("Unknown");
   const [language, setLanguage] = useState<"id" | "en">("en");
+  const t = useT(language);
   const { showScrollTop, showScrollBottom, handleScroll: onContainerScroll } = useScroll();
   const { toastMessage, showToast } = useToast();
 
@@ -268,6 +271,16 @@ export default function App() {
     window.addEventListener("keydown", handleKeyDown);
     return () => window.removeEventListener("keydown", handleKeyDown);
   }, [handleNewPRD, isSettingsOpen, isDiffOpen, showUploader]);
+
+  // Close FileUploader modal on Escape
+  useEffect(() => {
+    if (!showUploader) return;
+    const handleEsc = (e: KeyboardEvent) => {
+      if (e.key === "Escape") setShowUploader(false);
+    };
+    window.addEventListener("keydown", handleEsc);
+    return () => window.removeEventListener("keydown", handleEsc);
+  }, [showUploader]);
 
   // Persist builder tab
   useEffect(() => {
@@ -570,7 +583,7 @@ export default function App() {
             {view === "wbs" && hasMessage && prdContent ? (
               <Suspense
                 fallback={
-                  <div className="flex-1 flex items-center justify-center text-[13px] font-mono text-[var(--color-text-muted)]">
+                  <div className="flex-1 flex items-center justify-center text-[13px] font-mono text-[var(--oa-text-muted)]">
                     {language === "en" ? "Loading WBS canvas..." : "Memuat canvas WBS..."}
                   </div>
                 }
@@ -585,155 +598,157 @@ export default function App() {
                 />
               </Suspense>
             ) : (
-            <div 
-              ref={chatContainerRef}
-              className={`flex-1 overflow-y-auto px-4 sm:px-6 ${hasMessage ? "pb-20" : "pb-6"}`}
-              id="chat-messages-container"
-              aria-busy={isGenerating}
-              aria-live="polite"
-              onScroll={(e) => {
-                const el = e.currentTarget;
-                onContainerScroll({
-                  scrollTop: el.scrollTop,
-                  clientHeight: el.clientHeight,
-                  scrollHeight: el.scrollHeight,
-                });
-              }}
-            >
-              {showUploader && (
-                <div className="max-w-[640px] mx-auto w-full mb-4 mt-4">
-                  <Suspense
-                    fallback={
-                      <div className="w-full border border-dashed border-[var(--color-border)] rounded-md py-12 flex items-center justify-center text-[var(--color-text-muted)] text-[13px] font-mono">
-                        {language === "en" ? "Loading uploader..." : "Memuat uploader..."}
-                      </div>
+            <div className="relative flex-1 min-h-0 flex flex-col">
+              <div 
+                ref={chatContainerRef}
+                className={`flex-1 overflow-y-auto px-4 sm:px-6 ${hasMessage ? "pb-16" : "pb-6"}`}
+                id="chat-messages-container"
+                aria-busy={isGenerating}
+                aria-live="polite"
+                onScroll={(e) => {
+                  const el = e.currentTarget;
+                  onContainerScroll({
+                    scrollTop: el.scrollTop,
+                    clientHeight: el.clientHeight,
+                    scrollHeight: el.scrollHeight,
+                  });
+                }}
+              >
+                {!hasMessage ? (
+                  <WelcomeScreen 
+                    language={language} 
+                    onQuickPrompt={handleQuickPrompt} 
+                    prdMode={prdMode}
+                    onChangeMode={setPrdMode}
+                    builderTab={builderTab}
+                    onChangeBuilderTab={setBuilderTab}
+                    selectedIds={customChapterIds}
+                    onChangeSelectedIds={setCustomChapterIds}
+                    composer={
+                      <ChatInput
+                        onSend={handleSend}
+                        isGenerating={isGenerating}
+                        language={language}
+                        onCancel={handleCancel}
+                        onAttachClick={handleAttachClick}
+                        uploadedFiles={uploadedFiles}
+                        onRemoveFile={handleRemoveFile}
+                        variant={builderTab === "custom" ? "custom" : "hero"}
+                        prdMode={prdMode}
+                        onChangeMode={setPrdMode}
+                        builderTab={builderTab}
+                        onChangeBuilderTab={setBuilderTab}
+                        customBlockCount={customChapterIds.length}
+                        modelLabel={model}
+                        onOpenSettings={handleOpenSettings}
+                        draft={composerDraft}
+                        onDraftChange={setComposerDraft}
+                      />
                     }
-                  >
-                    <FileUploader
-                      files={uploadedFiles}
-                      onFilesChange={setUploadedFiles}
-                      language={language}
-                    />
-                  </Suspense>
-                </div>
-              )}
-              {!hasMessage ? (
-                <WelcomeScreen 
-                  language={language} 
-                  onQuickPrompt={handleQuickPrompt} 
-                  prdMode={prdMode}
-                  onChangeMode={setPrdMode}
-                  builderTab={builderTab}
-                  onChangeBuilderTab={setBuilderTab}
-                  selectedIds={customChapterIds}
-                  onChangeSelectedIds={setCustomChapterIds}
-                  composer={
-                    <ChatInput
-                      onSend={handleSend}
+                  />
+                ) : (
+                  <div className="max-w-[820px] mx-auto space-y-6 pt-8 pb-8">
+                    {error && (
+                      <div
+                        role="alert"
+                        className="oa-elev-sheet w-full rounded-xl p-4 mb-4 border-[var(--oa-signal-garnet)]/45 bg-[var(--oa-signal-garnet-tint)] text-[var(--oa-signal-garnet)] text-[14px] font-medium no-print flex items-start justify-between gap-3"
+                      >
+                        <div className="flex items-start gap-2.5 min-w-0">
+                          <AlertCircle size={17} strokeWidth={1.75} className="shrink-0 mt-0.5" aria-hidden="true" />
+                          <span className="leading-snug">{error}</span>
+                        </div>
+                        <button
+                          type="button"
+                          onClick={() => setError(null)}
+                          className="shrink-0 p-1 rounded-lg hover:bg-[var(--oa-signal-garnet)]/15 transition-colors cursor-pointer focus-visible:ring-2 focus-visible:ring-[var(--oa-signal-garnet)] focus-visible:outline-none"
+                          aria-label={language === "en" ? "Dismiss error" : "Tutup pemberitahuan"}
+                        >
+                          <X size={16} strokeWidth={1.6} aria-hidden="true" />
+                        </button>
+                      </div>
+                    )}
+
+                    {/* Connecting Indicator */}
+                    {isConnecting && !prdContent && (
+                      <div className="oa-recessed-well flex items-center gap-3 px-4 py-3 mb-4 rounded-xl border border-[var(--oa-border-champagne)]/40">
+                        <div className="w-4 h-4 border-2 border-[var(--oa-border-default)] border-t-[var(--oa-accent-champagne)] rounded-full animate-spin shrink-0" />
+                        <span className="text-[13px] font-mono text-[var(--oa-text-champagne)]">
+                          {language === "en" ? "Connecting to AI..." : "Menghubungkan ke AI..."}
+                        </span>
+                      </div>
+                    )}
+                    
+                    {/* User Message */}
+                    <div className="oa-elev-sheet rounded-2xl p-3.5 sm:p-4 max-w-[95%] sm:max-w-[85%] ml-auto">
+                      <p className="text-[14px] text-[var(--oa-text-primary)] whitespace-pre-wrap leading-relaxed">
+                        {activeVersion?.userDisplayPrompt || userPrompt}
+                      </p>
+                    </div>
+
+                    {/* AI Reasoning Panel (model R1/thinking) */}
+                    <ReasoningPanel
+                      reasoning={activeVersion?.reasoning}
                       isGenerating={isGenerating}
                       language={language}
-                      onCancel={handleCancel}
-                      onAttachClick={handleAttachClick}
-                      uploadedFiles={uploadedFiles}
-                      onRemoveFile={handleRemoveFile}
-                      variant={builderTab === "custom" ? "custom" : "hero"}
-                      prdMode={prdMode}
-                      onChangeMode={setPrdMode}
-                      builderTab={builderTab}
-                      onChangeBuilderTab={setBuilderTab}
-                      customBlockCount={customChapterIds.length}
-                      modelLabel={model}
-                      onOpenSettings={handleOpenSettings}
-                      draft={composerDraft}
-                      onDraftChange={setComposerDraft}
                     />
-                  }
-                />
-              ) : (
-                <div className="max-w-[820px] mx-auto space-y-6 pt-8 pb-8">
-                  {error && (
-                    <div role="alert" className="w-full bg-[var(--color-surface)] p-4 mb-4 border border-[var(--color-error)] rounded-md text-[var(--color-error)] text-[15px] font-medium no-print flex items-start justify-between gap-3">
-                      <span>{error}</span>
-                      <button
-                        onClick={() => setError(null)}
-                        className="shrink-0 p-1 rounded-sm hover:bg-[var(--color-error-bg)] transition-colors focus-visible:ring-2 focus-visible:ring-[var(--color-interactive)] focus-visible:outline-none"
-                        aria-label={language === "en" ? "Dismiss error" : "Tutup pemberitahuan"}
-                      >
-                        <X size={16} strokeWidth={1.5} />
-                      </button>
-                    </div>
-                  )}
 
-                  {/* Connecting Indicator */}
-                  {isConnecting && !prdContent && (
-                    <div className="flex items-center gap-3 p-4 mb-4 rounded-md border border-[var(--color-interactive-subtle)] bg-[var(--color-interactive-subtle)]">
-                      <div className="w-4 h-4 border-2 border-[var(--color-interactive)] border-t-transparent rounded-full animate-spin" />
-                      <span className="text-[13px] text-[var(--color-interactive)]">
-                        {language === "en" ? "Connecting to AI..." : "Menghubungkan ke AI..."}
-                      </span>
-                    </div>
-                  )}
-                  
-                  {/* User Message */}
-                  <div className="oa-elev-sheet rounded-2xl p-3.5 sm:p-4 max-w-[95%] sm:max-w-[85%] ml-auto">
-                    <p className="text-[14px] text-[var(--oa-text-primary)] whitespace-pre-wrap leading-relaxed">
-                      {activeVersion?.userDisplayPrompt || userPrompt}
-                    </p>
+                    {/* AI Response — BlueprintSheet */}
+                    <BlueprintSheet
+                      content={prdContent}
+                      comments={comments}
+                      onCommentChange={handleCommentChange}
+                      versions={versions}
+                      activeVersionId={activeVersionId}
+                      onSwitchVersion={handleBlueprintSwitchVersion}
+                      onRevise={handleRevise}
+                      isGenerating={isGenerating}
+                      language={language}
+                      onConvertMode={handleConvertMode}
+                      onCompareVersions={handleOpenDiff}
+                      theme={theme}
+                    />
                   </div>
-
-                  {/* AI Reasoning Panel (model R1/thinking) */}
-                  <ReasoningPanel
-                    reasoning={activeVersion?.reasoning}
-                    isGenerating={isGenerating}
-                    language={language}
-                  />
-
-                  {/* AI Response — BlueprintSheet */}
-                  <BlueprintSheet
-                    content={prdContent}
-                    comments={comments}
-                    onCommentChange={handleCommentChange}
-                    versions={versions}
-                    activeVersionId={activeVersionId}
-                    onSwitchVersion={handleBlueprintSwitchVersion}
-                    onRevise={handleRevise}
-                    isGenerating={isGenerating}
-                    language={language}
-                    onConvertMode={handleConvertMode}
-                    onCompareVersions={handleOpenDiff}
-                    theme={theme}
-                  />
-                </div>
-              )}
-            </div>
-            )}
-
-            {/* Scroll Controls — horizontal center, above docked ChatInput */}
-            {(showScrollTop || showScrollDown) && view === "document" && (
-              <div className="absolute bottom-[132px] sm:bottom-[124px] left-1/2 -translate-x-1/2 z-35 flex items-center gap-2 pointer-events-none no-print">
-                {showScrollTop && (
-                  <button
-                    type="button"
-                    onClick={handleScrollTop}
-                    className="pointer-events-auto min-w-[44px] min-h-[44px] rounded-full bg-[var(--color-surface-elevated)] border border-[var(--color-border)] text-[var(--color-text-secondary)] hover:bg-[var(--color-border-subtle)] hover:text-[var(--color-text-primary)] shadow-sm flex items-center justify-center transition-colors duration-200 focus-visible:ring-2 focus-visible:ring-[var(--color-interactive)] focus-visible:outline-none"
-                    aria-label={language === "en" ? "Scroll to top" : "Kembali ke atas"}
-                    title={language === "en" ? "Scroll to top" : "Kembali ke atas"}
-                  >
-                    <ArrowUp size={16} strokeWidth={1.5} />
-                  </button>
-                )}
-                {showScrollDown && (
-                  <button
-                    type="button"
-                    onClick={handleScrollBottom}
-                    className="pointer-events-auto min-w-[44px] min-h-[44px] rounded-full bg-[var(--color-surface-elevated)] border border-[var(--color-border)] text-[var(--color-text-secondary)] hover:bg-[var(--color-border-subtle)] hover:text-[var(--color-text-primary)] shadow-sm flex items-center justify-center transition-colors duration-200 focus-visible:ring-2 focus-visible:ring-[var(--color-interactive)] focus-visible:outline-none"
-                    aria-label={language === "en" ? "Scroll to latest content" : "Kembali ke konten terbaru"}
-                    title={language === "en" ? "Scroll to latest content" : "Kembali ke konten terbaru"}
-                  >
-                    <ArrowDown size={16} strokeWidth={1.5} />
-                  </button>
                 )}
               </div>
+
+              {/* Scroll Controls - anchored above SmartRevisionDock & ChatInput */}
+              <AnimatePresence>
+                {(showScrollTop || showScrollDown) && (
+                  <motion.div
+                    key="scroll-controls"
+                    initial={{ opacity: 0, y: 6 }}
+                    animate={{ opacity: 1, y: 0 }}
+                    exit={{ opacity: 0, y: 6 }}
+                    transition={POPOVER_FADE}
+                    className="absolute bottom-4 left-1/2 -translate-x-1/2 z-35 flex items-center gap-2 pointer-events-none no-print"
+                  >
+                    {showScrollTop && (
+                      <button
+                        type="button"
+                        onClick={handleScrollTop}
+                        className="oa-elev-popover pointer-events-auto min-w-[40px] min-h-[40px] px-3 rounded-full text-[var(--oa-text-secondary)] hover:text-[var(--oa-text-primary)] hover:border-[var(--oa-border-strong)] flex items-center justify-center transition-colors cursor-pointer focus-visible:ring-2 focus-visible:ring-[var(--oa-accent-champagne)] focus-visible:outline-none"
+                        aria-label={t.scroll.top}
+                        title={t.scroll.top}
+                      >
+                        <ArrowUp size={15} strokeWidth={1.6} aria-hidden="true" />
+                      </button>
+                    )}
+                    {showScrollDown && (
+                      <button
+                        type="button"
+                        onClick={handleScrollBottom}
+                        className="oa-elev-popover pointer-events-auto min-h-[40px] px-3.5 rounded-full border-[var(--oa-border-champagne)] text-[var(--oa-text-champagne)] text-[12px] font-medium flex items-center gap-1.5 transition-colors cursor-pointer focus-visible:ring-2 focus-visible:ring-[var(--oa-accent-champagne)] focus-visible:outline-none"
+                        aria-label={t.composer.followLive}
+                        title={t.composer.followLive}
+                      >
+                        <ArrowDown size={14} strokeWidth={1.75} aria-hidden="true" />
+                        <span>{t.composer.followLive}</span>
+                      </button>
+                    )}
+                  </motion.div>
+                )}
+              </AnimatePresence>
+            </div>
             )}
 
             {/* Floating SmartRevisionDock + Docked bottom Omni-Composer when workspace has active PRD */}
@@ -794,18 +809,87 @@ export default function App() {
         language={language}
       />
 
+      {/* Centered Tier-3 Context Files Overlay */}
+      <AnimatePresence>
+        {showUploader && (
+          <motion.div
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+            transition={POPOVER_FADE}
+            role="dialog"
+            aria-modal="true"
+            aria-label={language === "en" ? "Context Files" : "File Konteks"}
+            onClick={() => setShowUploader(false)}
+            className="fixed inset-0 z-[95] flex items-center justify-center p-4 bg-[var(--oa-scrim)] backdrop-blur-xs no-print"
+          >
+            <motion.div
+              initial={{ opacity: 0, y: 12, scale: 0.98 }}
+              animate={{ opacity: 1, y: 0, scale: 1 }}
+              exit={{ opacity: 0, y: 8, scale: 0.98 }}
+              transition={MODAL_SLIDE_UP}
+              onClick={(e) => e.stopPropagation()}
+              className="oa-elev-popover w-full max-w-[600px] max-h-[85vh] overflow-y-auto rounded-2xl p-5"
+            >
+              <Suspense
+                fallback={
+                  <div className="w-full border border-dashed border-[var(--oa-border-default)] rounded-xl py-12 flex items-center justify-center text-[var(--oa-text-muted)] text-[13px] font-mono">
+                    {language === "en" ? "Loading uploader..." : "Memuat uploader..."}
+                  </div>
+                }
+              >
+                <FileUploader
+                  files={uploadedFiles}
+                  onFilesChange={setUploadedFiles}
+                  language={language}
+                  onClose={() => setShowUploader(false)}
+                />
+              </Suspense>
+            </motion.div>
+          </motion.div>
+        )}
+      </AnimatePresence>
+
       {/* Toast Notification */}
-      <div 
+      <div
         role="status"
         aria-live="polite"
         aria-atomic="true"
-        className={`fixed top-16 left-1/2 -translate-x-1/2 z-[100] transition-[opacity,transform] duration-300 pointer-events-none no-print
-          ${toastMessage ? "translate-y-0 opacity-100" : "-translate-y-4 opacity-0"}`
-        }
+        className="fixed top-16 left-1/2 -translate-x-1/2 z-[100] pointer-events-none no-print"
       >
-        <div className="bg-[var(--color-surface-elevated)] border border-[var(--color-border-subtle)] text-[var(--color-text-primary)] text-[13px] px-4 py-2.5 rounded shadow-xl flex items-center gap-2">
-          {toastMessage}
-        </div>
+        <AnimatePresence>
+          {toastMessage && (
+            <motion.div
+              key={toastMessage}
+              initial={{ opacity: 0, y: -8, scale: 0.98 }}
+              animate={{ opacity: 1, y: 0, scale: 1 }}
+              exit={{ opacity: 0, y: -6, scale: 0.98 }}
+              transition={POPOVER_FADE}
+              className={`oa-elev-popover rounded-xl px-4 py-2.5 text-[13px] text-[var(--oa-text-primary)] flex items-center gap-2 ${
+                /storage full|penyimpanan penuh|failed|gagal|blocked|diblokir/i.test(toastMessage)
+                  ? "border-[var(--oa-signal-ochre)]/45"
+                  : ""
+              }`}
+            >
+              {/storage full|penyimpanan penuh|failed|gagal|blocked|diblokir/i.test(toastMessage) ? (
+                <AlertTriangle
+                  size={14}
+                  strokeWidth={1.75}
+                  className="text-[var(--oa-signal-ochre)] shrink-0"
+                  aria-hidden="true"
+                />
+              ) : (
+                <Check
+                  size={14}
+                  strokeWidth={2}
+                  className="text-[var(--oa-signal-sage)] shrink-0"
+                  aria-hidden="true"
+                />
+              )}
+              <span>{toastMessage}</span>
+            </motion.div>
+          )}
+        </AnimatePresence>
       </div>
     </div>
     </ErrorBoundary>
