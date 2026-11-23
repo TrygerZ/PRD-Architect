@@ -157,4 +157,151 @@ describe("SheetSection MermaidRenderer mount stability", () => {
     // Memo comparator must skip re-rendering the finished chapter completely
     expect(mermaidLifecycle.renders).toHaveLength(1);
   });
+
+  it("opens inline top revision editor from sticky header Add note button without collapsing the chapter", async () => {
+    const onToggle = vi.fn();
+    const onComment = vi.fn();
+
+    await act(async () => {
+      root.render(
+        <SheetSection
+          section={section}
+          sectionId="sec_System_Architecture_0"
+          index={0}
+          total={5}
+          isCollapsed={false}
+          onToggleCollapse={onToggle}
+          onCommentChange={onComment}
+          isGenerating={false}
+          language="en"
+          theme="dark"
+          comment=""
+        />,
+      );
+    });
+
+    const addNoteBtn = container.querySelector(
+      'button[aria-label="Add note"]',
+    ) as HTMLButtonElement | null;
+    expect(addNoteBtn).toBeTruthy();
+
+    await act(async () => {
+      addNoteBtn?.click();
+    });
+
+    // Clicking top-right Add note must NOT trigger header collapse
+    expect(onToggle).not.toHaveBeenCalled();
+
+    const textarea = container.querySelector("textarea") as HTMLTextAreaElement | null;
+    expect(textarea).toBeTruthy();
+    expect(container.textContent).toContain("Revision note / Ch. 01");
+
+    const nativeSetter = Object.getOwnPropertyDescriptor(
+      HTMLTextAreaElement.prototype,
+      "value",
+    )?.set;
+    await act(async () => {
+      nativeSetter?.call(textarea, "Split microservice diagram by domain");
+      textarea?.dispatchEvent(new Event("input", { bubbles: true }));
+    });
+
+    const saveBtn = Array.from(container.querySelectorAll("button")).find((b) =>
+      b.textContent?.includes("Save note"),
+    );
+    expect(saveBtn).toBeTruthy();
+
+    await act(async () => {
+      saveBtn?.click();
+    });
+
+    expect(onComment).toHaveBeenCalledWith(
+      "sec_System_Architecture_0",
+      "Split microservice diagram by domain",
+    );
+  });
+
+  it("shows 1 active note pill in sticky header and top saved note strip when a comment exists", async () => {
+    const onComment = vi.fn();
+
+    await act(async () => {
+      root.render(
+        <SheetSection
+          section={section}
+          sectionId="sec_System_Architecture_0"
+          index={0}
+          total={5}
+          isCollapsed={false}
+          onToggleCollapse={vi.fn()}
+          onCommentChange={onComment}
+          isGenerating={false}
+          language="en"
+          theme="dark"
+          comment="Add latency SLA for Redis cache"
+        />,
+      );
+    });
+
+    const pillBtn = container.querySelector(
+      'button[aria-label="1 active note"]',
+    ) as HTMLButtonElement | null;
+    expect(pillBtn).toBeTruthy();
+    expect(container.textContent).toContain("Add latency SLA for Redis cache");
+
+    // Inline strip sits directly before section content (no bottom card footer)
+    const contentEl = container.querySelector("#sec_System_Architecture_0-content");
+    const stripEl = Array.from(container.querySelectorAll("p")).find(
+      (p) => p.textContent === "Add latency SLA for Redis cache",
+    );
+    expect(stripEl && contentEl).toBeTruthy();
+    expect(
+      Boolean(stripEl!.compareDocumentPosition(contentEl!) & Node.DOCUMENT_POSITION_FOLLOWING),
+    ).toBe(true);
+  });
+
+  it("auto-expands a collapsed section and opens inline top editor when openNoteNonce increments", async () => {
+    const onToggle = vi.fn();
+
+    await act(async () => {
+      root.render(
+        <SheetSection
+          section={section}
+          sectionId="sec_System_Architecture_0"
+          index={0}
+          total={5}
+          isCollapsed={true}
+          onToggleCollapse={onToggle}
+          onCommentChange={vi.fn()}
+          isGenerating={false}
+          language="en"
+          theme="dark"
+          comment=""
+          openNoteNonce={0}
+        />,
+      );
+    });
+
+    expect(container.querySelector("textarea")).toBeNull();
+
+    await act(async () => {
+      root.render(
+        <SheetSection
+          section={section}
+          sectionId="sec_System_Architecture_0"
+          index={0}
+          total={5}
+          isCollapsed={true}
+          onToggleCollapse={onToggle}
+          onCommentChange={vi.fn()}
+          isGenerating={false}
+          language="en"
+          theme="dark"
+          comment=""
+          openNoteNonce={1}
+        />,
+      );
+    });
+
+    expect(onToggle).toHaveBeenCalledWith("sec_System_Architecture_0");
+    expect(container.querySelector("textarea")).toBeTruthy();
+  });
 });

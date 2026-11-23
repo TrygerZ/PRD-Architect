@@ -4,6 +4,7 @@ import { describe, it, expect, vi, afterEach } from "vitest";
 import { createRoot, type Root } from "react-dom/client";
 import { BlueprintSheet } from "./BlueprintSheet";
 import type { PRDVersion } from "../types";
+import { getSectionId } from "../utils/outline";
 
 (globalThis as Record<string, unknown>).IS_REACT_ACT_ENVIRONMENT = true;
 
@@ -154,5 +155,33 @@ describe("BlueprintSheet continuation and truncation UI", () => {
     });
 
     expect(printRoot?.textContent).toContain("Executive Summary");
+  });
+
+  it("opens inline top revision editor on target chapter when openNoteRequest is provided", () => {
+    container = document.createElement("div");
+    document.body.appendChild(container);
+    root = createRoot(container);
+
+    const targetId = getSectionId("2. Problem", 1);
+    const onCommentChange = vi.fn();
+    act(() => {
+      root?.render(
+        <BlueprintSheet
+          content={baseVersion.content}
+          comments={{}}
+          onCommentChange={onCommentChange}
+          openNoteRequest={{ sectionId: targetId, nonce: 1 }}
+          versions={[baseVersion]}
+          activeVersionId="v1"
+          isGenerating={false}
+          language="en"
+        />,
+      );
+    });
+
+    const targetCard = container.querySelector(`#prd-section-${targetId}`);
+    expect(targetCard).toBeTruthy();
+    expect(targetCard?.querySelector("textarea")).toBeTruthy();
+    expect(targetCard?.textContent).toContain("Revision note / Ch. 02");
   });
 });

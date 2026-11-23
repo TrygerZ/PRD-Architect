@@ -38,6 +38,7 @@ export interface SheetSectionProps {
   comment: string;
   onCommentChange?: (sectionId: string, comment: string) => void;
   isStreamingSection?: boolean;
+  openNoteNonce?: number;
 }
 
 const REMARK_PLUGINS = [remarkGfm];
@@ -271,12 +272,14 @@ export const SheetSection = memo(function SheetSection({
   comment,
   onCommentChange,
   isStreamingSection = false,
+  openNoteNonce = 0,
 }: SheetSectionProps) {
   const t = useT(language);
   const [isEditingNote, setIsEditingNote] = useState(false);
   const [draftNote, setDraftNote] = useState(comment);
   const [copied, setCopied] = useState(false);
   const copiedTimerRef = useRef<ReturnType<typeof setTimeout> | undefined>(undefined);
+  const lastOpenNonceRef = useRef(0);
 
   useEffect(() => {
     setDraftNote(comment);
@@ -284,6 +287,17 @@ export const SheetSection = memo(function SheetSection({
       setIsEditingNote(false);
     }
   }, [comment]);
+
+  useEffect(() => {
+    if (openNoteNonce > 0 && openNoteNonce !== lastOpenNonceRef.current) {
+      lastOpenNonceRef.current = openNoteNonce;
+      if (isCollapsed) {
+        onToggleCollapse(sectionId);
+      }
+      setDraftNote(comment);
+      setIsEditingNote(true);
+    }
+  }, [openNoteNonce, isCollapsed, onToggleCollapse, sectionId, comment]);
 
   useEffect(() => {
     return () => {
@@ -329,15 +343,34 @@ export const SheetSection = memo(function SheetSection({
   const hasSavedComment = comment.trim().length > 0;
   const zeroIndex = String(index + 1).padStart(2, "0");
 
+  const handleToggleNoteEditor = () => {
+    if (isEditingNote) {
+      setDraftNote(comment);
+      setIsEditingNote(false);
+      return;
+    }
+    if (isCollapsed) {
+      onToggleCollapse(sectionId);
+    }
+    setDraftNote(comment);
+    setIsEditingNote(true);
+  };
+
   return (
     <div
-      className={`oa-elev-sheet rounded-2xl overflow-hidden transition-colors hover:border-[var(--oa-border-strong)] ${
-        hasSavedComment ? "border-[var(--oa-border-champagne)]/70" : ""
+      className={`oa-elev-sheet rounded-2xl transition-colors hover:border-[var(--oa-border-strong)] ${
+        hasSavedComment || isEditingNote ? "border-[var(--oa-border-champagne)]/75" : ""
       }`}
     >
-      {/* Header - click to collapse */}
+      {/* Sticky Chapter Header — stays pinned while scrolling long chapters so revision CTA is always reachable */}
       <div
-        className="flex items-center justify-between gap-3 px-5 py-3.5 border-b border-[var(--oa-border-subtle)] bg-[var(--oa-bg-surface)] hover:bg-[var(--oa-bg-hover)]/35 cursor-pointer select-none transition-colors no-print focus-visible:ring-2 focus-visible:ring-[var(--oa-accent-champagne)] focus-visible:outline-none"
+        className={`sticky top-0 z-20 flex items-center justify-between gap-3 px-4 sm:px-5 py-3 backdrop-blur-md cursor-pointer select-none transition-colors no-print focus-visible:ring-2 focus-visible:ring-[var(--oa-accent-champagne)] focus-visible:outline-none ${
+          isCollapsed ? "rounded-2xl" : "rounded-t-2xl border-b"
+        } ${
+          isEditingNote || hasSavedComment
+            ? "bg-[var(--oa-bg-elevated)]/95 border-[var(--oa-border-champagne)]/45"
+            : "bg-[var(--oa-bg-surface)]/95 border-[var(--oa-border-subtle)] hover:bg-[var(--oa-bg-hover)]/45"
+        }`}
         onClick={() => onToggleCollapse(sectionId)}
         role="button"
         tabIndex={0}
@@ -352,13 +385,21 @@ export const SheetSection = memo(function SheetSection({
       >
         <div className="flex items-center gap-2.5 min-w-0">
           <ChevronDown
-            className={`w-4 h-4 text-[var(--oa-text-muted)] shrink-0 transition-transform duration-150 ${
-              isCollapsed ? "-rotate-90" : ""
-            }`}
+            className={`w-4 h-4 shrink-0 transition-transform duration-150 ${
+              isEditingNote || hasSavedComment
+                ? "text-[var(--oa-text-champagne)]"
+                : "text-[var(--oa-text-muted)]"
+            } ${isCollapsed ? "-rotate-90" : ""}`}
             strokeWidth={1.6}
             aria-hidden="true"
           />
-          <span className="inline-flex items-center justify-center px-1.5 py-0.5 rounded-md bg-[var(--oa-bg-recessed)] border border-[var(--oa-border-subtle)] text-[10.5px] font-mono text-[var(--oa-text-champagne)] shrink-0">
+          <span
+            className={`inline-flex items-center justify-center px-1.5 py-0.5 rounded-md border text-[10.5px] font-mono shrink-0 ${
+              isEditingNote || hasSavedComment
+                ? "bg-[var(--oa-accent-champagne-tint)] border-[var(--oa-border-champagne)] text-[var(--oa-text-champagne)]"
+                : "bg-[var(--oa-bg-recessed)] border-[var(--oa-border-subtle)] text-[var(--oa-text-champagne)]"
+            }`}
+          >
             {zeroIndex}
           </span>
           <h2
@@ -369,14 +410,67 @@ export const SheetSection = memo(function SheetSection({
           </h2>
         </div>
 
-        <div className="flex items-center gap-2 shrink-0">
-          {hasSavedComment && (
-            <span
-              className="w-2 h-2 rounded-full bg-[var(--oa-accent-champagne)]"
-              title={t.sheet.noteSaved}
-              aria-label={t.sheet.noteSaved}
-            />
+        {/* Top-right action cluster — stopPropagation keeps header clicks cleanly separated from collapse */}
+        <div
+          className="flex items-center gap-1.5 sm:gap-2 shrink-0"
+          onClick={(e) => e.stopPropagation()}
+          onKeyDown={(e) => e.stopPropagation()}
+        >
+          {onCommentChange && (
+            <button
+              type="button"
+              onClick={handleToggleNoteEditor}
+              aria-expanded={isEditingNote}
+              aria-label={hasSavedComment ? t.sheet.activeNoteBadge : t.sheet.addNote}
+              title={hasSavedComment ? t.sheet.editNote : t.sheet.addNote}
+              className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg border text-[11.5px] font-medium transition-colors cursor-pointer focus-visible:ring-2 focus-visible:ring-[var(--oa-accent-champagne)] focus-visible:outline-none ${
+                hasSavedComment || isEditingNote
+                  ? "bg-[var(--oa-accent-champagne-tint)] border-[var(--oa-border-champagne)] text-[var(--oa-text-champagne)] hover:bg-[var(--oa-accent-champagne)]/20"
+                  : "bg-[var(--oa-bg-elevated)] border-[var(--oa-border-strong)] text-[var(--oa-text-primary)] hover:border-[var(--oa-border-champagne)] hover:text-[var(--oa-text-champagne)]"
+              }`}
+            >
+              {hasSavedComment ? (
+                <>
+                  <span
+                    className="w-1.5 h-1.5 rounded-full bg-[var(--oa-accent-champagne)] shrink-0"
+                    aria-hidden="true"
+                  />
+                  <span className="hidden sm:inline">{t.sheet.activeNoteBadge}</span>
+                  <span className="sm:hidden font-mono">1</span>
+                </>
+              ) : (
+                <>
+                  <MessageSquarePlus
+                    size={12}
+                    strokeWidth={1.7}
+                    className="text-[var(--oa-text-champagne)] shrink-0"
+                    aria-hidden="true"
+                  />
+                  <span className="hidden sm:inline">{t.sheet.addNote}</span>
+                </>
+              )}
+            </button>
           )}
+
+          <button
+            type="button"
+            onClick={copySection}
+            aria-label={copied ? t.mermaid.copied : t.sheet.copySection}
+            title={copied ? t.mermaid.copied : t.sheet.copySection}
+            className="inline-flex items-center justify-center p-1.5 rounded-lg bg-[var(--oa-bg-recessed)] border border-[var(--oa-border-subtle)] text-[var(--oa-text-muted)] hover:text-[var(--oa-text-primary)] hover:border-[var(--oa-border-strong)] transition-colors cursor-pointer focus-visible:ring-2 focus-visible:ring-[var(--oa-accent-champagne)] focus-visible:outline-none"
+          >
+            {copied ? (
+              <Check
+                size={12}
+                strokeWidth={2}
+                className="text-[var(--oa-signal-sage)]"
+                aria-hidden="true"
+              />
+            ) : (
+              <ClipboardCopy size={12} strokeWidth={1.6} aria-hidden="true" />
+            )}
+          </button>
+
           <span className="text-[11px] font-mono text-[var(--oa-text-muted)] px-2 py-0.5 rounded-md bg-[var(--oa-bg-recessed)] border border-[var(--oa-border-subtle)]">
             {index + 1}/{total}
           </span>
@@ -386,11 +480,127 @@ export const SheetSection = memo(function SheetSection({
       {/* Content - collapsible */}
       <div
         id={`section-content-${sectionId}`}
-        className="grid transition-[grid-template-rows] duration-200 ease-out print:max-h-none"
+        className="grid transition-[grid-template-rows] duration-200 ease-out rounded-b-2xl overflow-hidden print:max-h-none"
         style={{ gridTemplateRows: isCollapsed ? "0fr" : "1fr" }}
         role="region"
       >
         <div className="overflow-hidden">
+          {/* Option A: Inline Top Revision Editor / Saved Note Strip right below the sticky header */}
+          {isEditingNote ? (
+            <div className="scroll-mt-16 px-5 py-3.5 border-b border-[var(--oa-border-champagne)]/45 bg-[var(--oa-bg-recessed)]/85 space-y-2.5 no-print">
+              <div className="flex flex-wrap items-center justify-between gap-2">
+                <div className="flex items-center gap-2">
+                  <span
+                    className="w-1.5 h-1.5 rounded-full bg-[var(--oa-accent-champagne)] shrink-0"
+                    aria-hidden="true"
+                  />
+                  <span className="text-[10.5px] font-mono uppercase tracking-[0.06em] text-[var(--oa-text-champagne)]">
+                    {`${t.sheet.revisionNoteHeader} / ${t.revisionDock.chapterPrefix} ${zeroIndex}`}
+                  </span>
+                </div>
+                <span className="text-[10.5px] font-mono text-[var(--oa-text-muted)]">
+                  {t.sheet.shortcutHint}
+                </span>
+              </div>
+
+              <textarea
+                value={draftNote}
+                onChange={(e) => setDraftNote(e.target.value)}
+                onKeyDown={(e) => {
+                  if ((e.ctrlKey || e.metaKey) && e.key === "Enter") {
+                    e.preventDefault();
+                    handleSaveNote();
+                  } else if (e.key === "Escape") {
+                    e.preventDefault();
+                    handleCancelNote();
+                  }
+                }}
+                placeholder={
+                  language === "en"
+                    ? "Add revision note for this chapter..."
+                    : "Tambahkan catatan revisi untuk chapter ini..."
+                }
+                className="scroll-mt-24 w-full min-h-[78px] px-3.5 py-2.5 rounded-xl bg-[var(--oa-bg-canvas)] border border-[var(--oa-border-champagne)]/65 focus:border-[var(--oa-border-champagne)] outline-none text-[13px] leading-relaxed text-[var(--oa-text-primary)] placeholder:text-[var(--oa-text-muted)] resize-y"
+                autoFocus
+              />
+
+              <div className="flex items-center justify-between gap-2">
+                <div>
+                  {hasSavedComment && (
+                    <button
+                      type="button"
+                      onClick={handleClearNote}
+                      className="inline-flex items-center gap-1.5 px-2 py-1 rounded-lg text-[11.5px] text-[var(--oa-text-muted)] hover:text-[var(--oa-signal-garnet)] hover:bg-[var(--oa-signal-garnet-tint)] transition-colors cursor-pointer focus-visible:ring-2 focus-visible:ring-[var(--oa-accent-champagne)] focus-visible:outline-none"
+                    >
+                      <Trash2 size={12} strokeWidth={1.6} aria-hidden="true" />
+                      <span>{t.sheet.clearNote}</span>
+                    </button>
+                  )}
+                </div>
+                <div className="flex items-center gap-2">
+                  <button
+                    type="button"
+                    onClick={handleCancelNote}
+                    className="px-3 py-1.5 rounded-lg border border-[var(--oa-border-default)] bg-[var(--oa-bg-surface)] text-[11.5px] font-medium text-[var(--oa-text-secondary)] hover:text-[var(--oa-text-primary)] hover:border-[var(--oa-border-strong)] transition-colors cursor-pointer focus-visible:ring-2 focus-visible:ring-[var(--oa-accent-champagne)] focus-visible:outline-none"
+                  >
+                    {t.builder.cancel}
+                  </button>
+                  <button
+                    type="button"
+                    onClick={handleSaveNote}
+                    className="oa-bevel-cta inline-flex items-center gap-1.5 px-3.5 py-1.5 rounded-lg text-[11.5px] font-semibold cursor-pointer focus-visible:ring-2 focus-visible:ring-[var(--oa-accent-champagne)] focus-visible:outline-none"
+                  >
+                    <Check size={12} strokeWidth={2} aria-hidden="true" />
+                    <span>{t.sheet.saveNote}</span>
+                  </button>
+                </div>
+              </div>
+            </div>
+          ) : hasSavedComment ? (
+            <div className="px-5 py-3 border-b border-[var(--oa-border-champagne)]/35 bg-[var(--oa-accent-champagne-tint)]/75 no-print">
+              <div className="flex flex-wrap items-start justify-between gap-2.5">
+                <div className="flex items-start gap-2.5 min-w-0 flex-1">
+                  <span
+                    className="w-1.5 h-1.5 rounded-full bg-[var(--oa-accent-champagne)] shrink-0 mt-[7px]"
+                    aria-hidden="true"
+                  />
+                  <div className="min-w-0 flex-1">
+                    <div className="flex items-center gap-2 mb-0.5">
+                      <span className="text-[10px] font-mono uppercase tracking-[0.06em] text-[var(--oa-text-champagne)]">
+                        {`${t.sheet.revisionNoteHeader} / ${t.sheet.noteSaved}`}
+                      </span>
+                    </div>
+                    <p className="text-[12.5px] text-[var(--oa-text-primary)] whitespace-pre-wrap leading-relaxed">
+                      {comment}
+                    </p>
+                  </div>
+                </div>
+                <div className="flex items-center gap-1 shrink-0">
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setDraftNote(comment);
+                      setIsEditingNote(true);
+                    }}
+                    className="inline-flex items-center gap-1 px-2 py-1 rounded-md text-[11px] font-medium text-[var(--oa-text-champagne)] hover:bg-[var(--oa-accent-champagne)]/15 transition-colors cursor-pointer focus-visible:ring-2 focus-visible:ring-[var(--oa-accent-champagne)] focus-visible:outline-none"
+                  >
+                    <Pencil size={11} strokeWidth={1.6} aria-hidden="true" />
+                    <span>{t.sheet.editNote}</span>
+                  </button>
+                  <button
+                    type="button"
+                    onClick={handleClearNote}
+                    aria-label={t.sheet.clearNote}
+                    title={t.sheet.clearNote}
+                    className="inline-flex items-center p-1 rounded-md text-[var(--oa-text-muted)] hover:text-[var(--oa-signal-garnet)] hover:bg-[var(--oa-signal-garnet-tint)] transition-colors cursor-pointer focus-visible:ring-2 focus-visible:ring-[var(--oa-accent-champagne)] focus-visible:outline-none"
+                  >
+                    <Trash2 size={12} strokeWidth={1.6} aria-hidden="true" />
+                  </button>
+                </div>
+              </div>
+            </div>
+          ) : null}
+
           <div className="px-5 sm:px-6 py-5">
             <div
               id={`${sectionId}-content`}
@@ -443,136 +653,6 @@ export const SheetSection = memo(function SheetSection({
               )}
             </div>
           </div>
-
-          {/* Footer - inline copy and revision note UX */}
-          <div className="px-5 py-3 border-t border-[var(--oa-border-subtle)] bg-[var(--oa-bg-recessed)]/35 no-print">
-            {isEditingNote ? (
-              <div className="oa-elev-sheet rounded-xl border-[var(--oa-border-champagne)] p-3 space-y-2.5">
-                <textarea
-                  value={draftNote}
-                  onChange={(e) => setDraftNote(e.target.value)}
-                  onKeyDown={(e) => {
-                    if ((e.ctrlKey || e.metaKey) && e.key === "Enter") {
-                      e.preventDefault();
-                      handleSaveNote();
-                    } else if (e.key === "Escape") {
-                      e.preventDefault();
-                      handleCancelNote();
-                    }
-                  }}
-                  placeholder={
-                    language === "en"
-                      ? "Add revision note for this chapter..."
-                      : "Tambahkan catatan revisi untuk chapter ini..."
-                  }
-                  className="w-full min-h-[76px] p-2.5 rounded-lg bg-[var(--oa-bg-recessed)] border border-[var(--oa-border-default)] focus:border-[var(--oa-border-champagne)] outline-none text-[12px] font-mono text-[var(--oa-text-primary)] placeholder:text-[var(--oa-text-muted)] resize-y"
-                  autoFocus
-                />
-                <div className="flex items-center justify-end gap-2">
-                  <button
-                    type="button"
-                    onClick={handleCancelNote}
-                    className="px-2.5 py-1 rounded-lg text-[11.5px] font-medium text-[var(--oa-text-muted)] hover:text-[var(--oa-text-primary)] hover:bg-[var(--oa-bg-hover)]/60 transition-colors cursor-pointer focus-visible:ring-2 focus-visible:ring-[var(--oa-accent-champagne)] focus-visible:outline-none"
-                  >
-                    {t.builder.cancel}
-                  </button>
-                  <button
-                    type="button"
-                    onClick={handleSaveNote}
-                    className="oa-bevel-cta px-3 py-1 rounded-lg text-[11.5px] font-semibold cursor-pointer focus-visible:ring-2 focus-visible:ring-[var(--oa-accent-champagne)] focus-visible:outline-none"
-                  >
-                    {language === "en" ? "Save" : "Simpan"}
-                  </button>
-                </div>
-              </div>
-            ) : hasSavedComment ? (
-              <div className="oa-elev-sheet rounded-xl border-[var(--oa-border-champagne)] p-3 space-y-2">
-                <div className="flex flex-wrap items-center justify-between gap-2">
-                  <span className="inline-flex items-center gap-1.5 px-2 py-0.5 rounded-full bg-[var(--oa-signal-sage-tint)] border border-[var(--oa-signal-sage)]/30 text-[10.5px] font-mono text-[var(--oa-signal-sage)]">
-                    <Check size={11} strokeWidth={2} aria-hidden="true" />
-                    <span>{t.sheet.noteSaved}</span>
-                  </span>
-
-                  <div className="flex items-center gap-1.5">
-                    <button
-                      type="button"
-                      onClick={copySection}
-                      className="inline-flex items-center gap-1 px-2 py-1 rounded-md text-[11px] text-[var(--oa-text-muted)] hover:text-[var(--oa-text-primary)] hover:bg-[var(--oa-bg-hover)]/60 transition-colors cursor-pointer focus-visible:ring-2 focus-visible:ring-[var(--oa-accent-champagne)] focus-visible:outline-none"
-                    >
-                      {copied ? (
-                        <Check
-                          size={12}
-                          strokeWidth={1.8}
-                          className="text-[var(--oa-signal-sage)]"
-                          aria-hidden="true"
-                        />
-                      ) : (
-                        <ClipboardCopy size={12} strokeWidth={1.5} aria-hidden="true" />
-                      )}
-                      <span>{copied ? t.mermaid.copied : t.sheet.copySection}</span>
-                    </button>
-
-                    <button
-                      type="button"
-                      onClick={() => {
-                        setDraftNote(comment);
-                        setIsEditingNote(true);
-                      }}
-                      className="inline-flex items-center gap-1 px-2 py-1 rounded-md text-[11px] text-[var(--oa-text-champagne)] hover:bg-[var(--oa-accent-champagne-tint)] transition-colors cursor-pointer focus-visible:ring-2 focus-visible:ring-[var(--oa-accent-champagne)] focus-visible:outline-none"
-                    >
-                      <Pencil size={11} strokeWidth={1.6} aria-hidden="true" />
-                      <span>{t.sheet.editNote}</span>
-                    </button>
-
-                    <button
-                      type="button"
-                      onClick={handleClearNote}
-                      aria-label={t.sheet.clearNote}
-                      title={t.sheet.clearNote}
-                      className="inline-flex items-center gap-1 px-2 py-1 rounded-md text-[11px] text-[var(--oa-text-muted)] hover:text-[var(--oa-signal-garnet)] hover:bg-[var(--oa-signal-garnet-tint)] transition-colors cursor-pointer focus-visible:ring-2 focus-visible:ring-[var(--oa-accent-champagne)] focus-visible:outline-none"
-                    >
-                      <Trash2 size={11} strokeWidth={1.6} aria-hidden="true" />
-                      <span>{t.sheet.clearNote}</span>
-                    </button>
-                  </div>
-                </div>
-                <p className="text-[12px] font-mono text-[var(--oa-text-secondary)] whitespace-pre-wrap leading-relaxed">
-                  {comment}
-                </p>
-              </div>
-            ) : (
-              <div className="flex items-center justify-end gap-2">
-                <button
-                  type="button"
-                  onClick={copySection}
-                  className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg text-[11.5px] text-[var(--oa-text-muted)] hover:text-[var(--oa-text-primary)] hover:bg-[var(--oa-bg-hover)]/60 transition-colors cursor-pointer focus-visible:ring-2 focus-visible:ring-[var(--oa-accent-champagne)] focus-visible:outline-none"
-                >
-                  {copied ? (
-                    <Check
-                      size={12}
-                      strokeWidth={1.8}
-                      className="text-[var(--oa-signal-sage)]"
-                      aria-hidden="true"
-                    />
-                  ) : (
-                    <ClipboardCopy size={12} strokeWidth={1.5} aria-hidden="true" />
-                  )}
-                  <span>{copied ? t.mermaid.copied : t.sheet.copySection}</span>
-                </button>
-                <button
-                  type="button"
-                  onClick={() => {
-                    setDraftNote(comment);
-                    setIsEditingNote(true);
-                  }}
-                  className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg text-[11.5px] text-[var(--oa-text-muted)] hover:text-[var(--oa-text-champagne)] hover:bg-[var(--oa-accent-champagne-tint)] transition-colors cursor-pointer focus-visible:ring-2 focus-visible:ring-[var(--oa-accent-champagne)] focus-visible:outline-none"
-                >
-                  <MessageSquarePlus size={12} strokeWidth={1.5} aria-hidden="true" />
-                  <span>{t.sheet.addNote}</span>
-                </button>
-              </div>
-            )}
-          </div>
         </div>
       </div>
     </div>
@@ -592,6 +672,7 @@ function areSheetSectionPropsEqual(
     prev.isCollapsed === next.isCollapsed &&
     prev.isGenerating === next.isGenerating &&
     prev.isStreamingSection === next.isStreamingSection &&
+    prev.openNoteNonce === next.openNoteNonce &&
     prev.language === next.language &&
     prev.theme === next.theme &&
     prev.comment === next.comment &&

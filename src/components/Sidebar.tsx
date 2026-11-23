@@ -20,6 +20,7 @@ export interface SidebarProps {
   outlineItems?: OutlineItem[];
   activeSectionId?: string;
   onSelectSection?: (id: string) => void;
+  onQuickNoteSection?: (id: string) => void;
   providerLabel: string;
   modelName: string;
   isGenerating: boolean;
@@ -53,6 +54,7 @@ export const Sidebar = memo(function Sidebar({
   outlineItems,
   activeSectionId,
   onSelectSection,
+  onQuickNoteSection,
   providerLabel,
   modelName,
   isGenerating,
@@ -64,6 +66,9 @@ export const Sidebar = memo(function Sidebar({
     100,
     Math.round((versions.length / Math.max(1, maxVersions)) * 100),
   );
+  const stagedNotesCount = outlineItems
+    ? outlineItems.filter((item) => item.hasComment).length
+    : 0;
 
   return (
     <>
@@ -146,36 +151,51 @@ export const Sidebar = memo(function Sidebar({
           <div className="flex-1 min-h-0 overflow-y-auto px-2.5 pb-3 space-y-4">
             {outlineItems && outlineItems.length > 0 && (
               <section aria-label={isGenerating ? t.outline.liveTitle : t.outline.chapterTitle}>
-                <div className="px-2 pt-1 pb-1.5 flex items-center justify-between">
-                  <span className="text-[10.5px] font-mono uppercase tracking-[0.06em] text-[var(--oa-text-muted)]">
+                <div className="px-2 pt-1 pb-1.5 flex items-center justify-between gap-2">
+                  <span className="text-[10.5px] font-mono uppercase tracking-[0.06em] text-[var(--oa-text-muted)] truncate">
                     {isGenerating ? t.outline.liveTitle : t.outline.chapterTitle}
                   </span>
-                  <span className="text-[10px] font-mono text-[var(--oa-text-muted)]">
-                    {String(outlineItems.length).padStart(2, "0")}
-                  </span>
+                  <div className="flex items-center gap-1.5 shrink-0">
+                    {!isGenerating && stagedNotesCount > 0 && (
+                      <span className="px-1.5 py-0.5 rounded-full text-[9.5px] font-mono leading-none bg-[var(--oa-accent-champagne-tint)] text-[var(--oa-text-champagne)] border border-[var(--oa-border-champagne)]">
+                        {t.outline.noteCount.replace("{count}", String(stagedNotesCount))}
+                      </span>
+                    )}
+                    <span className="text-[10px] font-mono text-[var(--oa-text-muted)]">
+                      {String(outlineItems.length).padStart(2, "0")}
+                    </span>
+                  </div>
                 </div>
 
                 <div className="flex flex-col gap-0.5">
                   {outlineItems.map((item) => {
                     const isSelected = activeSectionId === item.id;
+                    const quickNoteLabel = t.sheet.quickNoteLabel.replace(
+                      "{num}",
+                      item.indexLabel,
+                    );
                     return (
-                      <button
+                      <div
                         key={item.id}
-                        type="button"
-                        onClick={() => onSelectSection?.(item.id)}
-                        className={`w-full flex items-center gap-2 px-2.5 py-1.5 rounded-lg border text-left transition-colors cursor-pointer focus-visible:ring-2 focus-visible:ring-[var(--oa-accent-champagne)] focus-visible:outline-none ${
+                        className={`group w-full flex items-center gap-1 rounded-lg border transition-colors ${
                           isSelected
                             ? "bg-[var(--oa-bg-elevated)] border-[var(--oa-border-champagne)] text-[var(--oa-text-primary)]"
                             : "bg-transparent border-transparent text-[var(--oa-text-secondary)] hover:bg-[var(--oa-bg-hover)]/50 hover:text-[var(--oa-text-primary)]"
                         }`}
                       >
-                        <span className="text-[10.5px] font-mono text-[var(--oa-text-muted)] shrink-0">
-                          {item.indexLabel}
-                        </span>
-                        <span className="text-[12px] truncate flex-1">
-                          {item.title}
-                        </span>
-                        <span className="shrink-0 flex items-center">
+                        <button
+                          type="button"
+                          onClick={() => onSelectSection?.(item.id)}
+                          className="flex-1 min-w-0 flex items-center gap-2 pl-2.5 py-1.5 pr-1 text-left cursor-pointer focus-visible:ring-2 focus-visible:ring-[var(--oa-accent-champagne)] focus-visible:outline-none rounded-lg"
+                        >
+                          <span className="text-[10.5px] font-mono text-[var(--oa-text-muted)] shrink-0">
+                            {item.indexLabel}
+                          </span>
+                          <span className="text-[12px] truncate flex-1">
+                            {item.title}
+                          </span>
+                        </button>
+                        <span className="shrink-0 pr-1.5 flex items-center">
                           {item.status === "done" && (
                             <Check
                               size={12}
@@ -190,16 +210,39 @@ export const Sidebar = memo(function Sidebar({
                               aria-label={t.outline.streaming}
                             />
                           )}
-                          {item.status === "idle" && item.hasComment && (
-                            <span
-                              className="px-1.5 rounded-full text-[10px] font-mono leading-4 bg-[var(--oa-accent-champagne-tint)] text-[var(--oa-text-champagne)] border border-[var(--oa-border-champagne)]"
-                              aria-label={t.outline.noteCount.replace("{count}", "1")}
-                            >
-                              1
-                            </span>
-                          )}
+                          {item.status === "idle" &&
+                            (item.hasComment ? (
+                              onQuickNoteSection && !isGenerating ? (
+                                <button
+                                  type="button"
+                                  onClick={() => onQuickNoteSection(item.id)}
+                                  aria-label={quickNoteLabel}
+                                  title={t.sheet.editNote}
+                                  className="px-1.5 rounded-full text-[10px] font-mono leading-4 bg-[var(--oa-accent-champagne-tint)] text-[var(--oa-text-champagne)] border border-[var(--oa-border-champagne)] hover:bg-[var(--oa-accent-champagne)]/20 transition-colors cursor-pointer focus-visible:ring-2 focus-visible:ring-[var(--oa-accent-champagne)] focus-visible:outline-none"
+                                >
+                                  1
+                                </button>
+                              ) : (
+                                <span
+                                  className="px-1.5 rounded-full text-[10px] font-mono leading-4 bg-[var(--oa-accent-champagne-tint)] text-[var(--oa-text-champagne)] border border-[var(--oa-border-champagne)]"
+                                  aria-label={t.outline.noteCount.replace("{count}", "1")}
+                                >
+                                  1
+                                </span>
+                              )
+                            ) : onQuickNoteSection && !isGenerating ? (
+                              <button
+                                type="button"
+                                onClick={() => onQuickNoteSection(item.id)}
+                                aria-label={quickNoteLabel}
+                                title={t.sheet.addNote}
+                                className="w-5 h-5 rounded-md inline-flex items-center justify-center text-[var(--oa-text-muted)] hover:text-[var(--oa-text-champagne)] hover:bg-[var(--oa-accent-champagne-tint)] border border-transparent hover:border-[var(--oa-border-champagne)] opacity-0 group-hover:opacity-100 group-focus-within:opacity-100 focus-visible:opacity-100 transition-all cursor-pointer focus-visible:ring-2 focus-visible:ring-[var(--oa-accent-champagne)] focus-visible:outline-none"
+                              >
+                                <Plus size={11} strokeWidth={2} aria-hidden="true" />
+                              </button>
+                            ) : null)}
                         </span>
-                      </button>
+                      </div>
                     );
                   })}
                 </div>

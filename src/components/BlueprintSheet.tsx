@@ -31,6 +31,7 @@ export interface BlueprintSheetProps {
   continuingStatus?: ContinuationStatus | null;
   truncatedInfo?: TruncationInfo | null;
   onContinue?: () => void;
+  openNoteRequest?: { sectionId: string; nonce: number } | null;
   language: "id" | "en";
   onConvertMode?: (mode: PRDMode) => void;
   onCompareVersions?: () => void;
@@ -111,6 +112,7 @@ export const BlueprintSheet = memo(function BlueprintSheet({
   continuingStatus,
   truncatedInfo,
   onContinue,
+  openNoteRequest,
   language,
   onConvertMode: _onConvertMode,
   onCompareVersions,
@@ -320,7 +322,10 @@ export const BlueprintSheet = memo(function BlueprintSheet({
                 className="scroll-mt-4"
               >
                 <LazySection
-                  forceRender={Boolean(isGenerating && index === sections.length - 1)}
+                  forceRender={Boolean(
+                    (isGenerating && index === sections.length - 1) ||
+                      openNoteRequest?.sectionId === sectionId,
+                  )}
                   heading={section.heading}
                   index={index}
                   total={sections.length}
@@ -337,6 +342,9 @@ export const BlueprintSheet = memo(function BlueprintSheet({
                     theme={theme}
                     comment={comments[sectionId] || ""}
                     onCommentChange={onCommentChange}
+                    openNoteNonce={
+                      openNoteRequest?.sectionId === sectionId ? openNoteRequest.nonce : 0
+                    }
                     isStreamingSection={Boolean(
                       isGenerating && index === sections.length - 1,
                     )}

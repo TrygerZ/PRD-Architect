@@ -90,6 +90,8 @@ export default function App() {
     typeof window !== "undefined" ? window.innerWidth >= 1024 : true,
   );
   const [activeSectionId, setActiveSectionId] = useState<string | undefined>(undefined);
+  const [openNoteRequest, setOpenNoteRequest] = useState<{ sectionId: string; nonce: number } | null>(null);
+  const openNoteNonceRef = useRef(0);
   const [isDiffOpen, setIsDiffOpen] = useState(false);
   const [composerDraft, setComposerDraft] = useState<string>(() =>
     parseDraft(safeGetLocalStorage(DRAFT_KEY), DRAFT_TTL_MS),
@@ -189,6 +191,7 @@ export default function App() {
     safeSetLocalStorage(DRAFT_KEY, "");
     setUploadedFiles([]);
     setActiveSectionId(undefined);
+    setOpenNoteRequest(null);
   }, [versionNewPRD, abortGeneration, versions.length, language]);
 
   // showToast now provided by useToast hook
@@ -324,6 +327,7 @@ export default function App() {
 
   useEffect(() => {
     setActiveSectionId(undefined);
+    setOpenNoteRequest(null);
   }, [activeVersionId]);
 
   // Reset view ke document saat tidak ada konten (PRD baru / cleared).
@@ -471,6 +475,14 @@ export default function App() {
     },
     [view, scrollToSectionElement],
   );
+  const handleQuickNoteSection = useCallback(
+    (id: string) => {
+      openNoteNonceRef.current += 1;
+      setOpenNoteRequest({ sectionId: id, nonce: openNoteNonceRef.current });
+      handleSelectSection(id);
+    },
+    [handleSelectSection],
+  );
   const findWbsOutlineItem = useCallback(
     () =>
       outlineItems.find((item) => WBS_SECTION_RE.test(item.title)) ??
@@ -498,9 +510,9 @@ export default function App() {
         ? `${existing.trimEnd()}\n${entry}`
         : entry;
       versionCommentChange(target.id, nextComment);
-      handleSelectSection(target.id);
+      handleQuickNoteSection(target.id);
     },
-    [findWbsOutlineItem, versionCommentChange, handleSelectSection],
+    [findWbsOutlineItem, versionCommentChange, handleQuickNoteSection],
   );
   const printTimerRef = useRef<ReturnType<typeof setTimeout>>(undefined);
 
@@ -551,6 +563,7 @@ export default function App() {
         outlineItems={outlineItems}
         activeSectionId={activeSectionId}
         onSelectSection={handleSelectSection}
+        onQuickNoteSection={handleQuickNoteSection}
         providerLabel={providerLabel}
         modelName={model}
         isGenerating={isGenerating}
@@ -707,6 +720,7 @@ export default function App() {
                       content={prdContent}
                       comments={comments}
                       onCommentChange={handleCommentChange}
+                      openNoteRequest={openNoteRequest}
                       versions={versions}
                       activeVersionId={activeVersionId}
                       onSwitchVersion={handleBlueprintSwitchVersion}
