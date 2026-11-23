@@ -26,7 +26,9 @@ export function triggerDownload(blob: Blob, filename: string): void {
   document.body.appendChild(a);
   a.click();
   document.body.removeChild(a);
-  URL.revokeObjectURL(url);
+  // Defer revoking the object URL so Chromium's async download manager finishes
+  // reading the blob bytes instead of aborting with "interrupted".
+  setTimeout(() => URL.revokeObjectURL(url), 10_000);
 }
 
 export function stripHtmlTags(line: string): string {
@@ -368,7 +370,7 @@ export function buildExportMeta(
   });
 
   const eyebrow =
-    language === "en" ? "PRODUCT REQUIREMENTS DOCUMENT" : "DOKUMEN SPESIFIKASI PRODUK (PRD)";
+    language === "en" ? "PRD ARCHITECT  |  PRODUCT SPECIFICATION" : "PRD ARCHITECT  |  SPESIFIKASI PRODUK";
 
   const parts: string[] = [];
   if (cleanType) parts.push(cleanType);

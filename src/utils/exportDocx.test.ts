@@ -72,7 +72,7 @@ describe("exportDocx OOXML structure & editorial styling", () => {
 
     // YAML frontmatter stripped & cover header present
     expect(docXml).not.toContain("author: test");
-    expect(docXml).toContain("DOKUMEN SPESIFIKASI PRODUK (PRD)");
+    expect(docXml).toContain("PRD ARCHITECT");
     expect(docXml).toContain("Mobile App");
 
     // Inline bold & Consolas monospace preserved inside normal paragraphs/lists (not stripped)
