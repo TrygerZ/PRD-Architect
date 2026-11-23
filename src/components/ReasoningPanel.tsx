@@ -18,39 +18,46 @@ export const ReasoningPanel = memo(function ReasoningPanel({
   const [elapsedMs, setElapsedMs] = useState<number>(0);
   const startTimeRef = useRef<number | null>(null);
   const frozenForReasoningRef = useRef<string | undefined>(undefined);
+  const reasoningRef = useRef(reasoning);
+  reasoningRef.current = reasoning;
 
   const hasReasoning = Boolean(reasoning?.trim());
 
-  // Track elapsed thinking seconds while reasoning streams, freeze on completion, reset on new run
+  // Live 100ms elapsed timer: depends only on [isGenerating, hasReasoning] so rapid SSE chunks never stall ticks.
+  useEffect(() => {
+    if (!isGenerating || !hasReasoning) return;
+
+    if (startTimeRef.current === null) {
+      startTimeRef.current = Date.now();
+      setElapsedMs(0);
+    }
+
+    const intervalId = window.setInterval(() => {
+      if (startTimeRef.current !== null) {
+        setElapsedMs(Date.now() - startTimeRef.current);
+      }
+    }, 100);
+
+    return () => {
+      window.clearInterval(intervalId);
+    };
+  }, [isGenerating, hasReasoning]);
+
+  // Freeze final elapsed value on completion and reset cleanly on new run or history switch.
   useEffect(() => {
     if (isGenerating) {
       if (!hasReasoning) {
         startTimeRef.current = null;
         frozenForReasoningRef.current = undefined;
         setElapsedMs(0);
-        return;
       }
-
-      if (startTimeRef.current === null) {
-        startTimeRef.current = Date.now();
-        setElapsedMs(0);
-      }
-
-      const intervalId = window.setInterval(() => {
-        if (startTimeRef.current !== null) {
-          setElapsedMs(Date.now() - startTimeRef.current);
-        }
-      }, 100);
-
-      return () => {
-        window.clearInterval(intervalId);
-      };
+      return;
     }
 
     if (startTimeRef.current !== null) {
       setElapsedMs(Date.now() - startTimeRef.current);
       startTimeRef.current = null;
-      frozenForReasoningRef.current = reasoning;
+      frozenForReasoningRef.current = reasoningRef.current;
     } else if (!hasReasoning || reasoning !== frozenForReasoningRef.current) {
       setElapsedMs(0);
       frozenForReasoningRef.current = undefined;

@@ -1,5 +1,5 @@
 // Renders a single PRD section (collapsible heading, markdown/WBS/Mermaid body, and inline revision note).
-import React, { memo, useEffect, useMemo, useRef, useState } from "react";
+import React, { createContext, memo, useContext, useEffect, useMemo, useRef, useState } from "react";
 import ReactMarkdown from "react-markdown";
 import type { Components } from "react-markdown";
 import remarkGfm from "remark-gfm";
@@ -39,6 +39,133 @@ export interface SheetSectionProps {
   onCommentChange?: (comment: string) => void;
   isStreamingSection?: boolean;
 }
+
+interface MarkdownRenderContextValue {
+  isGenerating?: boolean;
+  theme: ThemeMode;
+  language: "id" | "en";
+}
+
+const MarkdownRenderContext = createContext<MarkdownRenderContextValue>({
+  isGenerating: false,
+  theme: "dark",
+  language: "id",
+});
+
+function MarkdownCode({
+  node: _node,
+  className,
+  children,
+  ...props
+}: {
+  node?: unknown;
+  className?: string;
+  children?: React.ReactNode;
+}) {
+  const { isGenerating, theme, language } = useContext(MarkdownRenderContext);
+  const match = /language-(\w+)/.exec(className || "");
+  if (match?.[1] === "mermaid") {
+    const raw = Array.isArray(children)
+      ? children.filter((c) => typeof c === "string").join("")
+      : typeof children === "string"
+        ? children
+        : String(children ?? "");
+    const chartStr = raw.replace(/[\r\n]+$/, "");
+    return (
+      <MermaidRenderer
+        chart={chartStr}
+        isGenerating={isGenerating}
+        theme={theme}
+        language={language}
+      />
+    );
+  }
+  const isInline = !match && !String(children).includes("\n");
+  if (isInline) {
+    return (
+      <code
+        className="px-1.5 py-0.5 mx-0.5 rounded-md bg-[var(--oa-bg-recessed)] border border-[var(--oa-border-subtle)] text-[12px] font-mono text-[var(--oa-text-champagne)] print:bg-gray-100 print:text-black"
+        {...props}
+      >
+        {children}
+      </code>
+    );
+  }
+  return (
+    <code
+      className={`font-mono text-[12.5px] text-[var(--oa-text-primary)] ${className || ""}`}
+      {...props}
+    >
+      {children}
+    </code>
+  );
+}
+
+const MARKDOWN_COMPONENTS: Components = {
+  a: ({ href, children, ...props }: React.AnchorHTMLAttributes<HTMLAnchorElement>) => (
+    <a href={href} target="_blank" rel="noreferrer noopener" {...props}>
+      {children}
+    </a>
+  ),
+  h2: () => null,
+  h3: ({ node: _node, children, ...props }: React.HTMLAttributes<HTMLHeadingElement> & { node?: unknown }) => (
+    <h3
+      className="relative text-[15.5px] font-semibold text-[var(--oa-text-primary)] mt-6 mb-2.5 tracking-tight print:text-black"
+      {...props}
+    >
+      {children}
+    </h3>
+  ),
+  table: ({ node: _node, ...props }: React.HTMLAttributes<HTMLTableElement> & { node?: unknown }) => (
+    <div className="w-full overflow-x-auto my-5 rounded-xl border border-[var(--oa-border-default)] bg-[var(--oa-bg-surface)] print:border-gray-300 print:bg-transparent">
+      <table className="w-full text-[13px] text-left border-collapse" {...props} />
+    </div>
+  ),
+  thead: ({ node: _node, ...props }: React.HTMLAttributes<HTMLTableSectionElement> & { node?: unknown }) => (
+    <thead
+      className="bg-[var(--oa-bg-recessed)] text-[var(--oa-text-primary)] border-b border-[var(--oa-border-default)] print:bg-gray-100 print:text-black"
+      {...props}
+    />
+  ),
+  th: ({ node: _node, ...props }: React.ThHTMLAttributes<HTMLTableCellElement> & { node?: unknown }) => (
+    <th
+      className="px-4 py-2.5 font-mono font-semibold whitespace-nowrap text-[11px] uppercase tracking-[0.06em] text-[var(--oa-text-muted)] print:text-black"
+      {...props}
+    />
+  ),
+  tbody: ({ node: _node, ...props }: React.HTMLAttributes<HTMLTableSectionElement> & { node?: unknown }) => (
+    <tbody
+      className="divide-y divide-[var(--oa-border-default)] print:divide-gray-200"
+      {...props}
+    />
+  ),
+  td: ({ node: _node, ...props }: React.TdHTMLAttributes<HTMLTableCellElement> & { node?: unknown }) => (
+    <td
+      className="px-4 py-2.5 align-top leading-relaxed text-[var(--oa-text-secondary)] print:text-black min-w-[120px] text-[13px]"
+      {...props}
+    />
+  ),
+  pre: ({ node, children, ...props }: { node?: unknown; children?: React.ReactNode }) => {
+    const firstChild = (
+      node as { children?: Array<{ properties?: { className?: string[] } }> } | undefined
+    )?.children?.[0];
+    const isMermaid = firstChild?.properties?.className?.includes("language-mermaid");
+    if (isMermaid) {
+      return <>{children}</>;
+    }
+    return (
+      <div className="oa-recessed-well relative my-5 rounded-xl overflow-hidden">
+        <pre
+          className="p-4 overflow-x-auto m-0 bg-transparent text-[12.5px] font-mono text-[var(--oa-text-primary)] print:text-black"
+          {...props}
+        >
+          {children}
+        </pre>
+      </div>
+    );
+  },
+  code: MarkdownCode,
+};
 
 function WbsSectionView({
   heading,
@@ -192,118 +319,8 @@ export const SheetSection = memo(function SheetSection({
   const wbs = useMemo(() => splitWbsSection(section.content), [section.content]);
   const isWbsSection = WBS_SECTION_RE.test(section.heading) || wbs !== null;
 
-  const markdownComponents = useMemo<Components>(
-    () => ({
-      a: ({ href, children, ...props }: React.AnchorHTMLAttributes<HTMLAnchorElement>) => (
-        <a href={href} target="_blank" rel="noreferrer noopener" {...props}>
-          {children}
-        </a>
-      ),
-      h2: () => null,
-      h3: ({ node: _node, children, ...props }: React.HTMLAttributes<HTMLHeadingElement> & { node?: unknown }) => (
-        <h3
-          className="relative text-[15.5px] font-semibold text-[var(--oa-text-primary)] mt-6 mb-2.5 tracking-tight print:text-black"
-          {...props}
-        >
-          {children}
-        </h3>
-      ),
-      table: ({ node: _node, ...props }: React.HTMLAttributes<HTMLTableElement> & { node?: unknown }) => (
-        <div className="w-full overflow-x-auto my-5 rounded-xl border border-[var(--oa-border-default)] bg-[var(--oa-bg-surface)] print:border-gray-300 print:bg-transparent">
-          <table className="w-full text-[13px] text-left border-collapse" {...props} />
-        </div>
-      ),
-      thead: ({ node: _node, ...props }: React.HTMLAttributes<HTMLTableSectionElement> & { node?: unknown }) => (
-        <thead
-          className="bg-[var(--oa-bg-recessed)] text-[var(--oa-text-primary)] border-b border-[var(--oa-border-default)] print:bg-gray-100 print:text-black"
-          {...props}
-        />
-      ),
-      th: ({ node: _node, ...props }: React.ThHTMLAttributes<HTMLTableCellElement> & { node?: unknown }) => (
-        <th
-          className="px-4 py-2.5 font-mono font-semibold whitespace-nowrap text-[11px] uppercase tracking-[0.06em] text-[var(--oa-text-muted)] print:text-black"
-          {...props}
-        />
-      ),
-      tbody: ({ node: _node, ...props }: React.HTMLAttributes<HTMLTableSectionElement> & { node?: unknown }) => (
-        <tbody
-          className="divide-y divide-[var(--oa-border-default)] print:divide-gray-200"
-          {...props}
-        />
-      ),
-      td: ({ node: _node, ...props }: React.TdHTMLAttributes<HTMLTableCellElement> & { node?: unknown }) => (
-        <td
-          className="px-4 py-2.5 align-top leading-relaxed text-[var(--oa-text-secondary)] print:text-black min-w-[120px] text-[13px]"
-          {...props}
-        />
-      ),
-      pre: ({ node, children, ...props }: { node?: unknown; children?: React.ReactNode }) => {
-        const firstChild = (
-          node as { children?: Array<{ properties?: { className?: string[] } }> } | undefined
-        )?.children?.[0];
-        const isMermaid = firstChild?.properties?.className?.includes("language-mermaid");
-        if (isMermaid) {
-          return <>{children}</>;
-        }
-        return (
-          <div className="oa-recessed-well relative my-5 rounded-xl overflow-hidden">
-            <pre
-              className="p-4 overflow-x-auto m-0 bg-transparent text-[12.5px] font-mono text-[var(--oa-text-primary)] print:text-black"
-              {...props}
-            >
-              {children}
-            </pre>
-          </div>
-        );
-      },
-      code: ({
-        node: _node,
-        className,
-        children,
-        ...props
-      }: {
-        node?: unknown;
-        className?: string;
-        children?: React.ReactNode;
-      }) => {
-        const match = /language-(\w+)/.exec(className || "");
-        if (match?.[1] === "mermaid") {
-          const raw = Array.isArray(children)
-            ? children.filter((c) => typeof c === "string").join("")
-            : typeof children === "string"
-              ? children
-              : String(children ?? "");
-          const chartStr = raw.replace(/[\r\n]+$/, "");
-          return (
-            <MermaidRenderer
-              chart={chartStr}
-              isGenerating={isGenerating}
-              theme={theme}
-              language={language}
-            />
-          );
-        }
-        const isInline = !match && !String(children).includes("\n");
-        if (isInline) {
-          return (
-            <code
-              className="px-1.5 py-0.5 mx-0.5 rounded-md bg-[var(--oa-bg-recessed)] border border-[var(--oa-border-subtle)] text-[12px] font-mono text-[var(--oa-text-champagne)] print:bg-gray-100 print:text-black"
-              {...props}
-            >
-              {children}
-            </code>
-          );
-        }
-        return (
-          <code
-            className={`font-mono text-[12.5px] text-[var(--oa-text-primary)] ${className || ""}`}
-            {...props}
-          >
-            {children}
-          </code>
-        );
-      },
-    }),
+  const renderContext = useMemo<MarkdownRenderContextValue>(
+    () => ({ isGenerating, theme, language }),
     [isGenerating, theme, language],
   );
 
@@ -389,25 +406,27 @@ export const SheetSection = memo(function SheetSection({
                 print:prose-p:text-black print:prose-li:text-black print:prose-headings:text-black print:prose-strong:text-black
               `}
             >
-              {isWbsSection ? (
-                <>
-                  {wbs && wbs.before.trim() ? (
-                    <ReactMarkdown remarkPlugins={[remarkGfm]} components={markdownComponents}>
-                      {wbs.before}
-                    </ReactMarkdown>
-                  ) : null}
-                  <WbsSectionView
-                    heading={wbs ? wbs.heading : section.heading}
-                    content={wbs ? wbs.after : section.content}
-                    language={language}
-                    markdownComponents={markdownComponents}
-                  />
-                </>
-              ) : (
-                <ReactMarkdown remarkPlugins={[remarkGfm]} components={markdownComponents}>
-                  {section.content}
-                </ReactMarkdown>
-              )}
+              <MarkdownRenderContext.Provider value={renderContext}>
+                {isWbsSection ? (
+                  <>
+                    {wbs && wbs.before.trim() ? (
+                      <ReactMarkdown remarkPlugins={[remarkGfm]} components={MARKDOWN_COMPONENTS}>
+                        {wbs.before}
+                      </ReactMarkdown>
+                    ) : null}
+                    <WbsSectionView
+                      heading={wbs ? wbs.heading : section.heading}
+                      content={wbs ? wbs.after : section.content}
+                      language={language}
+                      markdownComponents={MARKDOWN_COMPONENTS}
+                    />
+                  </>
+                ) : (
+                  <ReactMarkdown remarkPlugins={[remarkGfm]} components={MARKDOWN_COMPONENTS}>
+                    {section.content}
+                  </ReactMarkdown>
+                )}
+              </MarkdownRenderContext.Provider>
 
               {isStreamingSection && (
                 <div className="mt-2 flex items-center gap-2 no-print">

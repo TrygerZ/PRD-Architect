@@ -220,7 +220,9 @@ export const BlueprintSheet = memo(function BlueprintSheet({
                     className="w-1.5 h-1.5 rounded-full bg-[var(--oa-accent-champagne)] animate-pulse shrink-0"
                     aria-hidden="true"
                   />
-                  <span>STREAMING CH. {streamingChapterLabel}</span>
+                  <span>
+                    {`${t.outline.streaming.toUpperCase()} ${t.revisionDock.chapterPrefix.toUpperCase()} ${streamingChapterLabel}`}
+                  </span>
                 </span>
               )}
 
