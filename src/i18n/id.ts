@@ -136,5 +136,10 @@ export const id: Dict = {
     clearNote: "Hapus catatan",
     streamingChapter: "Menulis chapter",
     copySection: "Salin bagian",
+    continuingBadge: "Melanjutkan ({attempt}/{max})",
+    incompleteTitle: "Dokumen belum lengkap ({detected}/{expected} bab)",
+    incompleteLengthDesc: "Generasi mencapai batas output model sebelum semua bab selesai. Lanjutkan untuk melengkapi bagian yang tersisa di dokumen ini.",
+    incompleteChaptersDesc: "Generasi berhenti sebelum semua bab yang diharapkan selesai ditulis. Lanjutkan untuk melengkapi bagian yang tersisa di dokumen ini.",
+    continueCta: "Lanjutkan Generasi",
   },
 };

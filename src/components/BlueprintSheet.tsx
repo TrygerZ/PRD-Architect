@@ -1,8 +1,8 @@
 import React, { useState, useEffect, useRef, memo, useCallback, useMemo } from "react";
 import ReactMarkdown from "react-markdown";
 import remarkGfm from "remark-gfm";
-import { ChevronDown, GitCompare } from "lucide-react";
-import { PRDVersion, PRDMode } from "../types";
+import { AlertTriangle, ArrowRight, ChevronDown, GitCompare } from "lucide-react";
+import { PRDVersion, PRDMode, ContinuationStatus, TruncationInfo } from "../types";
 import { formatDate } from "../utils/format";
 import { SheetSection } from "./BlueprintSection";
 import { getSections } from "../utils/sections";
@@ -28,6 +28,9 @@ export interface BlueprintSheetProps {
   onSwitchVersion?: (versionId: string) => void;
   onRevise?: () => void;
   isGenerating?: boolean;
+  continuingStatus?: ContinuationStatus | null;
+  truncatedInfo?: TruncationInfo | null;
+  onContinue?: () => void;
   language: "id" | "en";
   onConvertMode?: (mode: PRDMode) => void;
   onCompareVersions?: () => void;
@@ -103,6 +106,9 @@ export const BlueprintSheet = memo(function BlueprintSheet({
   onSwitchVersion,
   onRevise: _onRevise,
   isGenerating,
+  continuingStatus,
+  truncatedInfo,
+  onContinue,
   language,
   onConvertMode: _onConvertMode,
   onCompareVersions,
@@ -167,6 +173,23 @@ export const BlueprintSheet = memo(function BlueprintSheet({
   })();
 
   const streamingChapterLabel = String(Math.max(1, totalSections)).padStart(2, "0");
+  const streamingStatusText = continuingStatus
+    ? `${t.sheet.continuingBadge
+        .replace("{attempt}", String(continuingStatus.attempt))
+        .replace("{max}", String(continuingStatus.maxAttempts))
+        .toUpperCase()} / ${t.revisionDock.chapterPrefix.toUpperCase()} ${streamingChapterLabel}`
+    : `${t.outline.streaming.toUpperCase()} ${t.revisionDock.chapterPrefix.toUpperCase()} ${streamingChapterLabel}`;
+
+  const effectiveTruncation: TruncationInfo | null = !isGenerating && content.length > 0
+    ? truncatedInfo ??
+      (totalSections > 0 && totalSections < expectedSections
+        ? {
+            reason: "missing_chapters",
+            detectedChapters: totalSections,
+            expectedChapters: expectedSections,
+          }
+        : null)
+    : null;
 
   return (
     <div className="w-full mx-auto relative print:block print:w-full print:max-w-full print:bg-white print:text-black">
@@ -220,9 +243,7 @@ export const BlueprintSheet = memo(function BlueprintSheet({
                     className="w-1.5 h-1.5 rounded-full bg-[var(--oa-accent-champagne)] animate-pulse shrink-0"
                     aria-hidden="true"
                   />
-                  <span>
-                    {`${t.outline.streaming.toUpperCase()} ${t.revisionDock.chapterPrefix.toUpperCase()} ${streamingChapterLabel}`}
-                  </span>
+                  <span>{streamingStatusText}</span>
                 </span>
               )}
 
@@ -322,6 +343,40 @@ export const BlueprintSheet = memo(function BlueprintSheet({
               </div>
             );
           })}
+
+          {effectiveTruncation && onContinue && (
+            <div
+              role="status"
+              className="oa-elev-sheet rounded-2xl p-4 sm:p-5 border border-[var(--oa-signal-ochre)]/45 bg-[var(--oa-signal-ochre-tint)] flex flex-col sm:flex-row sm:items-center justify-between gap-4 no-print"
+            >
+              <div className="flex items-start gap-3 min-w-0">
+                <span className="w-8 h-8 rounded-lg bg-[var(--oa-bg-recessed)] border border-[var(--oa-signal-ochre)]/40 flex items-center justify-center text-[var(--oa-signal-ochre)] shrink-0 mt-0.5">
+                  <AlertTriangle size={15} strokeWidth={1.75} aria-hidden="true" />
+                </span>
+                <div className="min-w-0">
+                  <p className="text-[13.5px] font-semibold text-[var(--oa-text-primary)] leading-snug">
+                    {t.sheet.incompleteTitle
+                      .replace("{detected}", String(effectiveTruncation.detectedChapters))
+                      .replace("{expected}", String(effectiveTruncation.expectedChapters))}
+                  </p>
+                  <p className="mt-1 text-[12.5px] text-[var(--oa-text-secondary)] leading-relaxed">
+                    {effectiveTruncation.reason === "length"
+                      ? t.sheet.incompleteLengthDesc
+                      : t.sheet.incompleteChaptersDesc}
+                  </p>
+                </div>
+              </div>
+
+              <button
+                type="button"
+                onClick={onContinue}
+                className="oa-bevel-cta inline-flex items-center justify-center gap-2 px-4 py-2 rounded-xl text-[12.5px] font-semibold cursor-pointer shrink-0 focus-visible:ring-2 focus-visible:ring-[var(--oa-accent-champagne)] focus-visible:ring-offset-2 focus-visible:ring-offset-[var(--oa-bg-canvas)] focus-visible:outline-none"
+              >
+                <span>{t.sheet.continueCta}</span>
+                <ArrowRight size={14} strokeWidth={1.85} aria-hidden="true" />
+              </button>
+            </div>
+          )}
         </div>
       )}
     </div>

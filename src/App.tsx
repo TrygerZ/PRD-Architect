@@ -141,6 +141,8 @@ export default function App() {
   const {
     isGenerating,
     isConnecting,
+    continuingStatus,
+    truncatedByVersion,
     error,
     setError,
     abortGeneration,
@@ -148,6 +150,7 @@ export default function App() {
     handleGenerate,
     handleAppend,
     handleRevise,
+    handleContinue,
     handleConvertMode,
   } = useGeneration({
     customApiKey,
@@ -702,6 +705,11 @@ export default function App() {
                       onSwitchVersion={handleBlueprintSwitchVersion}
                       onRevise={handleRevise}
                       isGenerating={isGenerating}
+                      continuingStatus={continuingStatus}
+                      truncatedInfo={
+                        activeVersionId ? (truncatedByVersion[activeVersionId] ?? null) : null
+                      }
+                      onContinue={handleContinue}
                       language={language}
                       onConvertMode={handleConvertMode}
                       onCompareVersions={handleOpenDiff}

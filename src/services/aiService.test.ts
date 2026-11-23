@@ -157,4 +157,75 @@ describe("generatePRD service", () => {
 
     expect(mockFetch).toHaveBeenCalledTimes(1);
   });
+
+  it("handles SSE keep-alive comments, continuing/truncated events, and existingContent in continue mode", async () => {
+    const streamPayload = [
+      ": keep-alive\n\n",
+      'data: {"text":"part 1"}\n\n',
+      'data: {"continuing":{"attempt":1,"maxAttempts":5}}\n\n',
+      'data: {"text":" part 2"}\n\n',
+      'data: {"truncated":{"reason":"length","finishReason":"length","detectedChapters":5,"expectedChapters":15}}\n\n',
+      "data: [DONE]\n\n",
+    ].join("");
+
+    const mockFetch = vi.fn().mockResolvedValue({
+      ok: true,
+      body: {
+        getReader: () => {
+          let sent = false;
+          return {
+            read: async () => {
+              if (!sent) {
+                sent = true;
+                return { done: false, value: new TextEncoder().encode(streamPayload) };
+              }
+              return { done: true, value: undefined };
+            },
+            cancel: vi.fn().mockResolvedValue(undefined),
+          };
+        },
+      },
+    });
+
+    vi.stubGlobal("fetch", mockFetch);
+
+    const onChunk = vi.fn();
+    const onContinuing = vi.fn();
+    const onTruncated = vi.fn();
+
+    await generatePRD(
+      "Original idea",
+      undefined,
+      "deepseek",
+      "deepseek-v4-flash",
+      "en",
+      "SaaS",
+      [],
+      "continue",
+      "business",
+      undefined,
+      onChunk,
+      undefined,
+      ["exec-summary", "problem-def"],
+      {
+        existingContent: "## 1. Executive Summary\nPartial...",
+        onContinuing,
+        onTruncated,
+      },
+    );
+
+    const [, options] = mockFetch.mock.calls[0];
+    const body = JSON.parse(options.body);
+    expect(body.mode).toBe("continue");
+    expect(body.existingContent).toBe("## 1. Executive Summary\nPartial...");
+    expect(body.customChapterIds).toEqual(["exec-summary", "problem-def"]);
+    expect(onContinuing).toHaveBeenCalledWith({ attempt: 1, maxAttempts: 5 });
+    expect(onTruncated).toHaveBeenCalledWith({
+      reason: "length",
+      finishReason: "length",
+      detectedChapters: 5,
+      expectedChapters: 15,
+    });
+    expect(onChunk).toHaveBeenCalledWith({ text: "part 1 part 2", reasoning: "" });
+  });
 });

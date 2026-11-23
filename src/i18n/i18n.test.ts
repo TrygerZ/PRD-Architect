@@ -88,6 +88,11 @@ const REQUIRED_KEYS = [
   "sheet.clearNote",
   "sheet.streamingChapter",
   "sheet.copySection",
+  "sheet.continuingBadge",
+  "sheet.incompleteTitle",
+  "sheet.incompleteLengthDesc",
+  "sheet.incompleteChaptersDesc",
+  "sheet.continueCta",
 ];
 
 describe("i18n dictionary parity and copy hygiene", () => {

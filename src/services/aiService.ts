@@ -1,11 +1,12 @@
-import { UploadedFile, AIProvider } from "../types";
+import type { SSEChunk } from "../../shared/types";
+import type { UploadedFile, AIProvider, ContinuationStatus, TruncationInfo } from "../types";
 
 class NonRetryableError extends Error {}
 
-interface SSEChunk {
-  text?: string;
-  reasoning?: string;
-  error?: string;
+export interface GeneratePRDOptions {
+  existingContent?: string;
+  onContinuing?: (status: ContinuationStatus) => void;
+  onTruncated?: (info: TruncationInfo) => void;
 }
 
 const MAX_RETRIES = 2;
@@ -26,6 +27,7 @@ export const generatePRD = async (
   onChunk: (chunk: { text?: string; reasoning?: string }) => void,
   customEndpoint?: string,
   customChapterIds?: string[],
+  options?: GeneratePRDOptions,
 ) => {
   let lastError: Error | null = null;
 
@@ -48,6 +50,7 @@ export const generatePRD = async (
           mode,
           prdMode,
           ...(customChapterIds && customChapterIds.length > 0 ? { customChapterIds } : {}),
+          ...(options?.existingContent ? { existingContent: options.existingContent } : {}),
         }),
         signal,
       });
@@ -117,8 +120,9 @@ export const generatePRD = async (
               const line = buffer.slice(0, newlineIdx);
               buffer = buffer.slice(newlineIdx + 1);
 
-              if (line.startsWith("data: ")) {
-                const dataStr = line.substring(6);
+              if (line.startsWith("data:")) {
+                const dataStr = line.slice(5).trim();
+                if (!dataStr) continue;
                 if (dataStr === "[DONE]") {
                   done = true;
                   flush();
@@ -140,6 +144,14 @@ export const generatePRD = async (
 
                 if (data.error) {
                   throw new NonRetryableError(data.error);
+                }
+
+                if (data.continuing) {
+                  options?.onContinuing?.(data.continuing);
+                }
+
+                if (data.truncated) {
+                  options?.onTruncated?.(data.truncated);
                 }
 
                 if (data.text || data.reasoning) {
@@ -169,10 +181,13 @@ export const generatePRD = async (
         // Flush residual buffer content — partial line (BUG B4)
         if (buffer.trim()) {
           try {
-            if (buffer.startsWith('data: ')) {
-              const dataStr = buffer.substring(6);
-              if (dataStr !== '[DONE]') {
+            const trimmed = buffer.trim();
+            if (trimmed.startsWith('data:')) {
+              const dataStr = trimmed.slice(5).trim();
+              if (dataStr && dataStr !== '[DONE]') {
                 const data: SSEChunk = JSON.parse(dataStr);
+                if (data.continuing) options?.onContinuing?.(data.continuing);
+                if (data.truncated) options?.onTruncated?.(data.truncated);
                 if (data.text || data.reasoning) onChunk({ text: data.text, reasoning: data.reasoning });
               }
             }

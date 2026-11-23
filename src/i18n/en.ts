@@ -134,6 +134,11 @@ export const en = {
     clearNote: "Clear note",
     streamingChapter: "Streaming chapter",
     copySection: "Copy section",
+    continuingBadge: "Continuing ({attempt}/{max})",
+    incompleteTitle: "Document incomplete ({detected}/{expected} chapters)",
+    incompleteLengthDesc: "Generation reached the model output limit before finishing all chapters. Continue to complete the remaining sections in place.",
+    incompleteChaptersDesc: "Generation stopped before all expected chapters were written. Continue to complete the remaining sections in place.",
+    continueCta: "Continue Generating",
   },
 };
 

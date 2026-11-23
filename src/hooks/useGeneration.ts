@@ -1,6 +1,14 @@
 import { useState, useRef, useCallback, useEffect } from "react";
 import { generatePRD } from "../services/aiService";
-import { ProductType, PRDVersion, UploadedFile, AIProvider, PRDMode } from "../types";
+import {
+  ProductType,
+  PRDVersion,
+  UploadedFile,
+  AIProvider,
+  PRDMode,
+  ContinuationStatus,
+  TruncationInfo,
+} from "../types";
 import { getSections } from "../utils/sections";
 import { normalizeBrTags } from "../utils/format";
 import { capVersions } from "../utils/persistence";
@@ -52,6 +60,8 @@ export function useGeneration({
 }: UseGenerationArgs) {
   const [isGenerating, setIsGenerating] = useState(false);
   const [isConnecting, setIsConnecting] = useState(false);
+  const [continuingStatus, setContinuingStatus] = useState<ContinuationStatus | null>(null);
+  const [truncatedByVersion, setTruncatedByVersion] = useState<Record<string, TruncationInfo>>({});
   const [error, setError] = useState<string | null>(null);
 
   const abortControllerRef = useRef<AbortController | null>(null);
@@ -64,6 +74,7 @@ export function useGeneration({
     isGeneratingRef.current = false;
     setIsGenerating(false);
     setIsConnecting(false);
+    setContinuingStatus(null);
   }, []);
 
   const handleCancel = useCallback(() => {
@@ -89,6 +100,7 @@ export function useGeneration({
       setIsGenerating(true);
       connectingRef.current = true;
       setIsConnecting(true);
+      setContinuingStatus(null);
       setError(null);
 
       const controller = new AbortController();
@@ -146,6 +158,14 @@ export function useGeneration({
           },
           customEndpoint,
           customChapterIds,
+          {
+            onContinuing: (status) => setContinuingStatus(status),
+            onTruncated: (info) =>
+              setTruncatedByVersion((prev) => ({
+                ...prev,
+                [newVersionId]: info,
+              })),
+          },
         );
         // Titik ingestion tunggal: normalisasi <br> sisa AI sekali di sini,
         // tepat setelah stream selesai disimpan — semua konsumen (website,
@@ -171,6 +191,7 @@ export function useGeneration({
           isGeneratingRef.current = false;
           setIsGenerating(false);
           setIsConnecting(false);
+          setContinuingStatus(null);
         }
       }
     },
@@ -298,6 +319,102 @@ export function useGeneration({
     [executeGeneration, activeVersionRef, languageRef, setPrdMode],
   );
 
+  const handleContinue = useCallback(async () => {
+    const currentActive = activeVersionRef.current;
+    const lang = languageRef.current;
+    if (!currentActive || !currentActive.content.trim() || isGeneratingRef.current) {
+      return;
+    }
+
+    const targetVersionId = currentActive.id;
+    isGeneratingRef.current = true;
+    setIsGenerating(true);
+    connectingRef.current = true;
+    setIsConnecting(true);
+    setContinuingStatus(null);
+    setError(null);
+    setTruncatedByVersion((prev) => {
+      if (!(targetVersionId in prev)) return prev;
+      const next = { ...prev };
+      delete next[targetVersionId];
+      return next;
+    });
+
+    const controller = new AbortController();
+    abortControllerRef.current = controller;
+
+    const customIds = currentActive.customChapterIds?.length ? currentActive.customChapterIds : undefined;
+
+    try {
+      await generatePRD(
+        currentActive.prompt,
+        customApiKey,
+        provider,
+        model,
+        lang,
+        currentActive.productType,
+        uploadedFiles,
+        "continue",
+        currentActive.prdMode || "business",
+        controller.signal,
+        (chunk) => {
+          if (connectingRef.current) {
+            connectingRef.current = false;
+            setIsConnecting(false);
+          }
+          setVersions((prev) =>
+            prev.map((v) =>
+              v.id === targetVersionId
+                ? {
+                    ...v,
+                    content: v.content + (chunk.text ?? ""),
+                    reasoning: (v.reasoning ?? "") + (chunk.reasoning ?? ""),
+                  }
+                : v,
+            ),
+          );
+        },
+        customEndpoint,
+        customIds,
+        {
+          existingContent: currentActive.content,
+          onContinuing: (status) => setContinuingStatus(status),
+          onTruncated: (info) =>
+            setTruncatedByVersion((prev) => ({
+              ...prev,
+              [targetVersionId]: info,
+            })),
+        },
+      );
+      setVersions((prev) =>
+        prev.map((v) =>
+          v.id === targetVersionId ? { ...v, content: normalizeBrTags(v.content) } : v,
+        ),
+      );
+    } catch (err: unknown) {
+      if (err instanceof Error && (err.name === "AbortError" || err.message === "This operation was aborted")) {
+        setIsConnecting(false);
+        return;
+      }
+      const message = err instanceof Error ? err.message : undefined;
+      setError(
+        message ||
+          (lang === "en"
+            ? "An unexpected error occurred while continuing PRD generation."
+            : "Terjadi kesalahan tidak terduga saat melanjutkan pembuatan PRD."),
+      );
+      console.error(err);
+    } finally {
+      if (abortControllerRef.current === controller) {
+        abortControllerRef.current = null;
+        isGeneratingRef.current = false;
+        setIsGenerating(false);
+        setIsConnecting(false);
+        setContinuingStatus(null);
+      }
+    }
+  }, [customApiKey, provider, model, customEndpoint, uploadedFiles, activeVersionRef, languageRef, setVersions]);
+
   // Abort generation on unmount (cleanup)
   useEffect(() => {
     return () => {
@@ -308,6 +425,8 @@ export function useGeneration({
   return {
     isGenerating,
     isConnecting,
+    continuingStatus,
+    truncatedByVersion,
     error,
     setError,
     abortGeneration,
@@ -316,6 +435,7 @@ export function useGeneration({
     handleGenerate,
     handleAppend,
     handleRevise,
+    handleContinue,
     handleConvertMode,
   };
 }
