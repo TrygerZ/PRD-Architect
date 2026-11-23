@@ -41,6 +41,7 @@ const WbsCanvas = lazy(() =>
 );
 
 const PROVIDER_LABELS: Record<AIProvider, string> = {
+  openai_compatible: "OpenAI-Compatible",
   deepseek: "DeepSeek",
   gemini: "Google Gemini",
   opencode: "OpenCode Zen",
