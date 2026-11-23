@@ -415,3 +415,41 @@ export function stripContinuationOverlap(existingText: string, continuationText:
 
   return cleaned;
 }
+
+export interface SeamDeduplicator {
+  feed: (chunk: string) => string;
+  flush: () => string;
+}
+
+/**
+ * Stateful streaming wrapper around `stripContinuationOverlap`.
+ * Buffers up to `probeChars` at the start of a continuation turn so token-sized
+ * chunks (e.g. 2-6 chars each) are deduplicated accurately before emitting.
+ */
+export function createSeamDeduplicator(
+  existingText: string,
+  probeChars: number = SEAM_PROBE_CHARS,
+): SeamDeduplicator {
+  let resolved = false;
+  let buffer = "";
+
+  return {
+    feed(chunk: string): string {
+      if (!chunk) return "";
+      if (resolved) return chunk;
+      buffer += chunk;
+      if (buffer.length < probeChars) return "";
+      const cleaned = stripContinuationOverlap(existingText, buffer);
+      resolved = true;
+      buffer = "";
+      return cleaned;
+    },
+    flush(): string {
+      if (resolved || !buffer) return "";
+      const cleaned = stripContinuationOverlap(existingText, buffer);
+      resolved = true;
+      buffer = "";
+      return cleaned;
+    },
+  };
+}

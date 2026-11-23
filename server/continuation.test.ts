@@ -8,6 +8,7 @@ import {
   prepareAssistantContext,
   buildContinuationMessages,
   stripContinuationOverlap,
+  createSeamDeduplicator,
 } from "./continuation";
 import { CHAPTER_BLOCKS } from "../shared/chapterBlocks";
 
@@ -275,6 +276,29 @@ describe("server/continuation", () => {
 
     it("does not falsely strip short coincidental word prefixes under 6 chars", () => {
       expect(stripContinuationOverlap("Describe the", "thematic layout")).toBe("thematic layout");
+    });
+  });
+
+  describe("createSeamDeduplicator", () => {
+    it("deduplicates echoed text arriving across small streamed token chunks", () => {
+      const existing = "2. System displays generated thumbnail, 3D mesh preview, and AI-estimated";
+      const dedup = createSeamDeduplicator(existing, 40);
+      const chunks = ["and ", "AI-", "estimated", " dimensions ", "for merchant ", "verification and publishing."];
+      let out = "";
+      for (const c of chunks) {
+        out += dedup.feed(c);
+      }
+      out += dedup.flush();
+      expect(out).toBe(" dimensions for merchant verification and publishing.");
+    });
+
+    it("flushes short continuation turns smaller than probeChars cleanly", () => {
+      const existing = "End of chapter 5.";
+      const dedup = createSeamDeduplicator(existing, 200);
+      expect(dedup.feed("## 6. ")).toBe("");
+      expect(dedup.feed("Summary")).toBe("");
+      expect(dedup.flush()).toBe("\n\n## 6. Summary");
+      expect(dedup.flush()).toBe("");
     });
   });
 });
