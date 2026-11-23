@@ -166,6 +166,7 @@ export default function App() {
     setActiveVersionId,
     setComments,
     setPrdMode,
+    setBuilderTab,
     setProductType,
     builderTabRef,
     customChapterIdsRef,
@@ -573,7 +574,8 @@ export default function App() {
           onViewChange={setView}
           versionsCount={versions.length}
           activeVersionLabel={activeVersionLabel}
-          activeMode={activeVersion?.prdMode}
+          activeMode={activeVersion?.customChapterIds?.length ? "custom" : activeVersion?.prdMode}
+          customChapterCount={activeVersion?.customChapterIds?.length}
           onOpenDiff={handleOpenDiff}
           onConvertMode={handleConvertMode}
           isGenerating={isGenerating}

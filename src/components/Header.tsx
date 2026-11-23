@@ -43,7 +43,8 @@ export interface HeaderProps {
   onViewChange?: (view: "document" | "wbs") => void;
   versionsCount?: number;
   activeVersionLabel?: string;
-  activeMode?: PRDMode;
+  activeMode?: PRDMode | "custom";
+  customChapterCount?: number;
   onOpenDiff?: () => void;
   onConvertMode?: (mode: PRDMode) => void;
   isGenerating?: boolean;
@@ -76,6 +77,7 @@ export function Header({
   versionsCount = 0,
   activeVersionLabel,
   activeMode,
+  customChapterCount,
   onOpenDiff,
   onConvertMode,
   isGenerating = false,
@@ -271,6 +273,37 @@ export function Header({
                         transition={POPOVER_FADE}
                         className="absolute left-0 mt-1.5 w-[224px] oa-elev-popover rounded-xl py-1.5 z-50"
                       >
+                        {activeMode === "custom" && (
+                          <>
+                            <div
+                              role="menuitem"
+                              aria-disabled="true"
+                              className="w-full flex items-center justify-between gap-2 px-3 py-1.5 text-[12px] text-[var(--oa-text-primary)] opacity-75 cursor-default select-none"
+                            >
+                              <span className="flex items-center gap-2 min-w-0">
+                                <span
+                                  className="w-1.5 h-1.5 rounded-full shrink-0 bg-[var(--oa-accent-champagne)]"
+                                  aria-hidden="true"
+                                />
+                                <span className="truncate">
+                                  {customChapterCount
+                                    ? `${t.builder.tabCustom} (${customChapterCount})`
+                                    : t.builder.tabCustom}
+                                </span>
+                              </span>
+                              <Check
+                                size={12}
+                                strokeWidth={2}
+                                className="text-[var(--oa-accent-champagne)] shrink-0"
+                                aria-hidden="true"
+                              />
+                            </div>
+                            <div
+                              role="separator"
+                              className="my-1 border-t border-[var(--oa-border-subtle)]"
+                            />
+                          </>
+                        )}
                         {convertOptions.map(({ mode, label }) => {
                           const isCurrent = activeMode === mode;
                           return (

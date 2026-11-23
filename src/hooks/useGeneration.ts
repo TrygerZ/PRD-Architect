@@ -34,6 +34,7 @@ interface UseGenerationArgs {
   setActiveVersionId: React.Dispatch<React.SetStateAction<string | null>>;
   setComments: (value: Record<string, string>) => void;
   setPrdMode?: React.Dispatch<React.SetStateAction<PRDMode>>;
+  setBuilderTab?: React.Dispatch<React.SetStateAction<"standard" | "custom">>;
   setProductType?: React.Dispatch<React.SetStateAction<ProductType>>;
   // Custom PRD builder refs (lifted to App)
   builderTabRef?: React.MutableRefObject<"standard" | "custom">;
@@ -54,6 +55,7 @@ export function useGeneration({
   setActiveVersionId,
   setComments,
   setPrdMode,
+  setBuilderTab,
   setProductType,
   builderTabRef,
   customChapterIdsRef,
@@ -292,7 +294,8 @@ export function useGeneration({
       const currentActive = activeVersionRef.current;
       const lang = languageRef.current;
       if (!currentActive || isGeneratingRef.current) return;
-      if ((currentActive.prdMode || "business") === targetMode) return;
+      const isCustom = Boolean(currentActive.customChapterIds?.length);
+      if (!isCustom && (currentActive.prdMode || "business") === targetMode) return;
 
       const MODE_LABEL: Record<PRDMode, { en: string; id: string }> = {
         business: { en: "Business & Investor", id: "Bisnis & Investor" },
@@ -306,6 +309,7 @@ export function useGeneration({
           ? `Convert the following existing PRD into a ${MODE_LABEL[targetMode].en} PRD. Preserve the core product idea, scope, and key details, but restructure and rewrite it to fully match the target format.\n\n### EXISTING PRD:\n${currentActive.content}`
           : `Konversi PRD berikut menjadi PRD mode ${MODE_LABEL[targetMode].id}. Pertahankan ide produk inti, ruang lingkup, dan detail penting, tetapi susun ulang dan tulis ulang agar sepenuhnya sesuai format target.\n\n### PRD SAAT INI:\n${currentActive.content}`;
 
+      setBuilderTab?.("standard");
       setPrdMode?.(targetMode);
       // Converting from custom to standard: produce legacy version without customChapterIds
       await executeGeneration(
@@ -316,7 +320,7 @@ export function useGeneration({
         targetMode,
       );
     },
-    [executeGeneration, activeVersionRef, languageRef, setPrdMode],
+    [executeGeneration, activeVersionRef, languageRef, setBuilderTab, setPrdMode],
   );
 
   const handleContinue = useCallback(async () => {
