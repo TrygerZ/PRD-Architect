@@ -18,6 +18,7 @@ import { getChapterBlock } from "./shared/chapterBlocks";
 import { activeParses, acquireParseSlot, releaseParseSlot, extractTextFromFile } from "./server/fileExtraction";
 import { registerAuthRoutes } from "./server/auth";
 import { resolveEndpoint, endpointErrorMessage, resolveApiKey, allowServerKeyFallback } from "./server/endpoint";
+import { fetchUpstreamModels } from "./server/models";
 import { isBlockedStaticPath } from "./server/staticPathGuard";
 import { startKeepWarm } from "./server/keepWarm";
 import {
@@ -35,7 +36,15 @@ import {
 // Wave 7 — Track A: Union types for type safety (TS-04 to TS-07)
 // Shared with the frontend via /shared/types.ts (single source of truth)
 import type { AIProvider, PRDMode, ProductType, TruncationInfo } from "./shared/types";
-import { PROVIDER_MODELS } from "./shared/models";
+import { PROVIDER_MODELS, clampMaxTokens, deriveModelsEndpoint, DEFAULT_MAX_TOKENS } from "./shared/models";
+
+const VALID_PROVIDERS: readonly AIProvider[] = [
+  "openai_compatible",
+  "deepseek",
+  "gemini",
+  "opencode",
+  "nine_router",
+];
 
 // Wave 7 — Track A: Typed chat request body (TS-03)
 interface ChatRequest {
@@ -392,25 +401,36 @@ app.post("/api/generate-prd", async (req, res) => {
   // Wave 3 — Task 3.7: Hoist flushTimeout for defensive cleanup in finally block
   let flushTimeout: ReturnType<typeof setTimeout> | null = null;
   try {
-    const { prompt, provider: rawProvider = 'deepseek', model = 'deepseek-v4-flash', customEndpoint, productType, uploadedFiles, mode = 'initial', prdMode: rawPrdMode = 'business', existingContent } = req.body;
+    const {
+      prompt,
+      provider: rawProvider = "openai_compatible",
+      model,
+      customEndpoint,
+      maxTokens: rawMaxTokens,
+      productType,
+      uploadedFiles,
+      mode = "initial",
+      prdMode: rawPrdMode = "business",
+      existingContent,
+    } = req.body;
     // Wave 7 — Track A: Narrow types from req.body (TS-04 to TS-07)
     const provider = rawProvider as AIProvider;
     const prdMode = rawPrdMode as PRDMode;
 
-    // Validate provider
-    const VALID_PROVIDERS: AIProvider[] = ["deepseek", "gemini", "opencode", "nine_router"];
+    // Validate provider (supports unified openai_compatible + legacy aliases)
     if (!VALID_PROVIDERS.includes(provider)) {
       if (!res.writableEnded) {
-        res.write(`data: ${JSON.stringify({ error: language === 'en' ? `Invalid provider "${provider}". Must be one of: ${VALID_PROVIDERS.join(", ")}` : `Provider "${provider}" tidak valid. Harus salah satu dari: ${VALID_PROVIDERS.join(", ")}` })}\n\n`);
+        res.write(`data: ${JSON.stringify({ error: language === "en" ? `Invalid provider "${provider}". Must be one of: ${VALID_PROVIDERS.join(", ")}` : `Provider "${provider}" tidak valid. Harus salah satu dari: ${VALID_PROVIDERS.join(", ")}` })}\n\n`);
         res.end();
       }
       return;
     }
 
+    const trimmedModel = typeof model === "string" ? model.trim() : "";
     // BUG 4.7: Validasi format model name (hanya alfanumerik, titik, strip, underscore, slash, colon)
-    if (model && !/^[a-zA-Z0-9._/:-]+$/.test(model)) {
+    if (trimmedModel && !/^[a-zA-Z0-9._/:-]+$/.test(trimmedModel)) {
       if (!res.writableEnded) {
-        res.write(`data: ${JSON.stringify({ error: t('Invalid model format', 'Format model tidak valid', language) })}\n\n`);
+        res.write(`data: ${JSON.stringify({ error: t("Invalid model format", "Format model tidak valid", language) })}\n\n`);
         res.end();
       }
       return;
@@ -487,10 +507,10 @@ app.post("/api/generate-prd", async (req, res) => {
     }
 
     // Katalog model & endpoint terpusat (shared/models.ts) — hindari drift FE/BE.
-    const providerConfig = PROVIDER_MODELS[provider as AIProvider] ?? PROVIDER_MODELS.deepseek;
+    const providerConfig = PROVIDER_MODELS[provider] ?? PROVIDER_MODELS.openai_compatible;
 
-    // Resolusi endpoint (helper bersama dengan /api/test-connection).
-    // Custom endpoint yang ditolak → error eksplisit, TIDAK fallback diam-diam.
+    // Resolusi endpoint (helper bersama dengan /api/test-connection & /api/models).
+    // Custom endpoint yang ditolak -> error eksplisit, TIDAK fallback diam-diam.
     const resolved = await resolveEndpoint(provider, customEndpoint);
     if (!resolved.ok) {
       if (!res.writableEnded) {
@@ -499,15 +519,32 @@ app.post("/api/generate-prd", async (req, res) => {
       }
       return;
     }
-    const { endpoint, usingCustomEndpoint } = resolved;
+    const { endpoint, isPrivate, usingCustomEndpoint } = resolved;
 
-    const modelName = model || providerConfig.defaultModel;
-
-    const { apiKey, apiKeyEnvName } = resolveApiKey(provider, usingCustomEndpoint, req.cookies?.prd_session, allowServerKeyFallback());
-
-    if (!apiKey) {
+    const fallbackModel =
+      provider === "openai_compatible"
+        ? (process.env.AI_MODEL?.trim() || "")
+        : providerConfig.defaultModel;
+    const modelName = trimmedModel || fallbackModel;
+    if (!modelName) {
       if (!res.writableEnded) {
-        res.write(`data: ${JSON.stringify({ error: language === 'en' ? "API KEY not found. Please provide a custom key in Settings or set " + apiKeyEnvName + " in .env file." : "API KEY tidak ditemukan. Silakan masukkan API Key di Pengaturan atau set " + apiKeyEnvName + " di file .env." })}\n\n`);
+        res.write(`data: ${JSON.stringify({ error: t("Model name is required. Please set a model in Settings.", "Nama model wajib diisi. Silakan atur model di Pengaturan.", language) })}\n\n`);
+        res.end();
+      }
+      return;
+    }
+
+    const { apiKey, optional: apiKeyOptional, apiKeyEnvName } = resolveApiKey(
+      provider,
+      usingCustomEndpoint,
+      req.cookies?.prd_session,
+      allowServerKeyFallback(),
+      isPrivate,
+    );
+
+    if (!apiKey && !apiKeyOptional) {
+      if (!res.writableEnded) {
+        res.write(`data: ${JSON.stringify({ error: language === "en" ? "API KEY not found. Please provide an API key in Settings or set " + apiKeyEnvName + " in .env file." : "API KEY tidak ditemukan. Silakan masukkan API Key di Pengaturan atau set " + apiKeyEnvName + " di file .env." })}\n\n`);
         res.end();
       }
       return;
@@ -575,33 +612,29 @@ app.post("/api/generate-prd", async (req, res) => {
       }
     }, 20_000);
 
-    // 1. Konfigurasi semua header terlebih dahulu
+    // 1. Konfigurasi semua header terlebih dahulu (Authorization opsional untuk endpoint lokal)
     const fetchHeaders: Record<string, string> = {
       "Content-Type": "application/json",
-      "Authorization": "Bearer " + apiKey,
     };
+    if (apiKey) {
+      fetchHeaders.Authorization = "Bearer " + apiKey;
+    }
 
-    // 2. Helper body request & batas token
-    const maxTokens = providerConfig.maxTokens ?? 16384;
-    const buildFetchBody = (messages: ChatMessage[]): ChatRequest => {
-      if (provider === "gemini") {
-        return {
-          model: modelName,
-          messages,
-          stream: true,
-          max_tokens: maxTokens,
-          temperature: 0.1,
-        };
-      }
-      return {
-        model: modelName,
-        messages,
-        stream: true,
-        max_tokens: maxTokens,
-        temperature: 0.1,
-        top_p: 0.1,
-      };
-    };
+    // 2. Helper body request & batas token (universal OpenAI-compatible payload)
+    const hasCustomMaxTokens =
+      rawMaxTokens !== undefined && rawMaxTokens !== null && rawMaxTokens !== "";
+    const maxTokens = hasCustomMaxTokens
+      ? clampMaxTokens(rawMaxTokens, DEFAULT_MAX_TOKENS)
+      : provider === "openai_compatible"
+        ? DEFAULT_MAX_TOKENS
+        : (providerConfig.maxTokens ?? DEFAULT_MAX_TOKENS);
+    const buildFetchBody = (messages: ChatMessage[]): ChatRequest => ({
+      model: modelName,
+      messages,
+      stream: true,
+      max_tokens: maxTokens,
+      temperature: 0.1,
+    });
 
     // 3. Idle timeout (reset per chunk dari upstream)
     // CRIT-03 fix: Replace absolute 120s deadline with idle timeout (reset per chunk)
@@ -709,11 +742,25 @@ app.post("/api/generate-prd", async (req, res) => {
       const fetchOptions: RequestInit = {
         method: "POST",
         headers: fetchHeaders,
+        redirect: "manual",
         signal: abortController?.signal,
         body: JSON.stringify(buildFetchBody(messages)),
       };
 
       const response = await fetch(endpoint, fetchOptions);
+
+      if (response.type === "opaqueredirect" || (response.status >= 300 && response.status < 400)) {
+        log("WARN", `Upstream API blocked HTTP redirect (status ${response.status}) endpoint=${endpoint} model=${modelName}`);
+        throw markSafe(
+          new Error(
+            t(
+              "Endpoint attempted an HTTP redirect, which is blocked for security.",
+              "Endpoint mencoba melakukan redirect HTTP, yang diblokir demi keamanan.",
+              language,
+            ),
+          ),
+        );
+      }
 
       if (!response.ok) {
         // Wave 3 — Task 3.3: Use safe error messages map, log full details server-side only
@@ -982,42 +1029,63 @@ app.post("/api/generate-prd", async (req, res) => {
 // Test Connection — cek provider/model/endpoint dengan request minimal non-streaming.
 // Rate limit: memakai apiLimiter global untuk /api/ (10 req/menit) — cukup.
 app.post("/api/test-connection", async (req, res) => {
-  const language: "id" | "en" = (req.body?.language === 'en' || req.body?.language === 'id') ? req.body.language : 'id';
-  const { provider: rawProvider, model, customEndpoint } = req.body ?? {};
+  const language: "id" | "en" = (req.body?.language === "en" || req.body?.language === "id") ? req.body.language : "id";
+  const { provider: rawProvider = "openai_compatible", model, customEndpoint } = req.body ?? {};
 
-  const VALID_PROVIDERS: AIProvider[] = ["deepseek", "gemini", "opencode", "nine_router"];
   if (!VALID_PROVIDERS.includes(rawProvider)) {
     return res.status(400).json({
       ok: false,
-      error: language === 'en'
+      error: language === "en"
         ? `Invalid provider. Must be one of: ${VALID_PROVIDERS.join(", ")}`
         : `Provider tidak valid. Harus salah satu dari: ${VALID_PROVIDERS.join(", ")}`,
     });
   }
   const provider = rawProvider as AIProvider;
-  if (model !== undefined && (typeof model !== 'string' || !/^[a-zA-Z0-9._/:-]+$/.test(model))) {
-    return res.status(400).json({ ok: false, error: t('Invalid model format', 'Format model tidak valid', language) });
+  const trimmedModel = typeof model === "string" ? model.trim() : "";
+  if (model !== undefined && (typeof model !== "string" || (trimmedModel.length > 0 && !/^[a-zA-Z0-9._/:-]+$/.test(trimmedModel)))) {
+    return res.status(400).json({ ok: false, error: t("Invalid model format", "Format model tidak valid", language) });
   }
-  if (customEndpoint !== undefined && typeof customEndpoint !== 'string') {
-    return res.status(400).json({ ok: false, error: t('Invalid endpoint', 'Endpoint tidak valid', language) });
+  if (customEndpoint !== undefined && typeof customEndpoint !== "string") {
+    return res.status(400).json({ ok: false, error: t("Invalid endpoint", "Endpoint tidak valid", language) });
   }
 
-  const providerConfig = PROVIDER_MODELS[provider];
+  const providerConfig = PROVIDER_MODELS[provider] ?? PROVIDER_MODELS.openai_compatible;
   const resolved = await resolveEndpoint(provider, customEndpoint);
   if (!resolved.ok) {
     return res.json({ ok: false, error: endpointErrorMessage(resolved, language) });
   }
-  const { endpoint, usingCustomEndpoint } = resolved;
-  const modelName = model || providerConfig.defaultModel;
-
-  const { apiKey, apiKeyEnvName } = resolveApiKey(provider, usingCustomEndpoint, req.cookies?.prd_session, allowServerKeyFallback());
-  if (!apiKey) {
+  const { endpoint, isPrivate, usingCustomEndpoint } = resolved;
+  const fallbackModel =
+    provider === "openai_compatible"
+      ? (process.env.AI_MODEL?.trim() || "")
+      : providerConfig.defaultModel;
+  const modelName = trimmedModel || fallbackModel;
+  if (!modelName) {
     return res.json({
       ok: false,
-      error: language === 'en'
-        ? `API KEY not found. Please provide a custom key in Settings or set ${apiKeyEnvName} in .env file.`
+      error: t("Model name is required.", "Nama model wajib diisi.", language),
+    });
+  }
+
+  const { apiKey, optional: apiKeyOptional, apiKeyEnvName } = resolveApiKey(
+    provider,
+    usingCustomEndpoint,
+    req.cookies?.prd_session,
+    allowServerKeyFallback(),
+    isPrivate,
+  );
+  if (!apiKey && !apiKeyOptional) {
+    return res.json({
+      ok: false,
+      error: language === "en"
+        ? `API KEY not found. Please provide an API key in Settings or set ${apiKeyEnvName} in .env file.`
         : `API KEY tidak ditemukan. Silakan masukkan API Key di Pengaturan atau set ${apiKeyEnvName} di file .env.`,
     });
+  }
+
+  const testHeaders: Record<string, string> = { "Content-Type": "application/json" };
+  if (apiKey) {
+    testHeaders.Authorization = "Bearer " + apiKey;
   }
 
   const controller = new AbortController();
@@ -1026,33 +1094,98 @@ app.post("/api/test-connection", async (req, res) => {
   try {
     const response = await fetch(endpoint, {
       method: "POST",
-      headers: { "Content-Type": "application/json", "Authorization": "Bearer " + apiKey },
+      headers: testHeaders,
+      redirect: "manual",
       signal: controller.signal,
       body: JSON.stringify({ model: modelName, messages: [{ role: "user", content: "ping" }], max_tokens: 8, stream: false }),
     });
     const latencyMs = Date.now() - startedAt;
 
+    if (response.type === "opaqueredirect" || (response.status >= 300 && response.status < 400)) {
+      log("WARN", `Test connection blocked HTTP redirect (status ${response.status}) endpoint=${endpoint} model=${modelName}`);
+      return res.json({
+        ok: false,
+        error: t(
+          "Endpoint attempted an HTTP redirect, which is blocked for security.",
+          "Endpoint mencoba melakukan redirect HTTP, yang diblokir demi keamanan.",
+          language,
+        ),
+      });
+    }
+
     if (!response.ok) {
       const safeMsg = safeErrorMessages[response.status] || GENERIC_UPSTREAM_ERROR;
       const body = await readUpstreamErrorBody(response);
-      log('ERROR', `Test connection failed (status ${response.status} ${response.statusText}) endpoint=${endpoint} model=${modelName} body=${body}`);
-      return res.json({ ok: false, error: language === 'en' ? safeMsg.en : safeMsg.id });
+      log("ERROR", `Test connection failed (status ${response.status} ${response.statusText}) endpoint=${endpoint} model=${modelName} body=${body}`);
+      return res.json({ ok: false, error: language === "en" ? safeMsg.en : safeMsg.id });
     }
 
-    log('INFO', `Test connection ok endpoint=${endpoint} model=${modelName} latency=${latencyMs}ms`);
+    log("INFO", `Test connection ok endpoint=${endpoint} model=${modelName} latency=${latencyMs}ms`);
     return res.json({ ok: true, provider, model: modelName, endpoint, latencyMs });
   } catch (error) {
-    const aborted = error instanceof Error && error.name === 'AbortError';
-    log('ERROR', `Test connection error endpoint=${endpoint} model=${modelName}:`, error instanceof Error ? error.message : error);
+    const aborted = error instanceof Error && error.name === "AbortError";
+    log("ERROR", `Test connection error endpoint=${endpoint} model=${modelName}:`, error instanceof Error ? error.message : error);
     return res.json({
       ok: false,
       error: aborted
-        ? t('Connection timed out after 15 seconds.', 'Koneksi habis waktu setelah 15 detik.', language)
-        : t('Could not reach the endpoint. Check the endpoint URL in Settings.', 'Tidak dapat menghubungi endpoint. Periksa URL endpoint di Pengaturan.', language),
+        ? t("Connection timed out after 15 seconds.", "Koneksi habis waktu setelah 15 detik.", language)
+        : t("Could not reach the endpoint. Check the endpoint URL in Settings.", "Tidak dapat menghubungi endpoint. Periksa URL endpoint di Pengaturan.", language),
     });
   } finally {
     clearTimeout(timer);
   }
+});
+
+// Fetch Models — ambil daftar model live dari sibling GET /models via backend proxy
+// (memakai SSRF guard & httpOnly cookie yang sama dengan /api/generate-prd).
+app.post("/api/models", async (req, res) => {
+  const language: "id" | "en" = (req.body?.language === "en" || req.body?.language === "id") ? req.body.language : "id";
+  const { provider: rawProvider = "openai_compatible", customEndpoint } = req.body ?? {};
+
+  if (!VALID_PROVIDERS.includes(rawProvider)) {
+    return res.status(400).json({
+      ok: false,
+      error: language === "en"
+        ? `Invalid provider. Must be one of: ${VALID_PROVIDERS.join(", ")}`
+        : `Provider tidak valid. Harus salah satu dari: ${VALID_PROVIDERS.join(", ")}`,
+    });
+  }
+  if (customEndpoint !== undefined && typeof customEndpoint !== "string") {
+    return res.status(400).json({ ok: false, error: t("Invalid endpoint", "Endpoint tidak valid", language) });
+  }
+
+  const provider = rawProvider as AIProvider;
+  const resolved = await resolveEndpoint(provider, customEndpoint);
+  if (!resolved.ok) {
+    return res.json({ ok: false, error: endpointErrorMessage(resolved, language) });
+  }
+
+  const modelsUrl = deriveModelsEndpoint(resolved.endpoint);
+  if (!modelsUrl) {
+    return res.json({
+      ok: false,
+      error: t("Could not derive /models URL from this endpoint.", "Tidak dapat menentukan URL /models dari endpoint ini.", language),
+    });
+  }
+
+  const { apiKey, optional: apiKeyOptional, apiKeyEnvName } = resolveApiKey(
+    provider,
+    resolved.usingCustomEndpoint,
+    req.cookies?.prd_session,
+    allowServerKeyFallback(),
+    resolved.isPrivate,
+  );
+  if (!apiKey && !apiKeyOptional) {
+    return res.json({
+      ok: false,
+      error: language === "en"
+        ? `API KEY not found. Please enter an API key first or set ${apiKeyEnvName} in .env file.`
+        : `API KEY tidak ditemukan. Silakan masukkan API Key terlebih dahulu atau set ${apiKeyEnvName} di file .env.`,
+    });
+  }
+
+  const result = await fetchUpstreamModels({ modelsUrl, apiKey, language });
+  return res.json(result);
 });
 
 // 404 handler untuk route /api/* yang tidak dikenal — cegah ditelan oleh SPA fallback

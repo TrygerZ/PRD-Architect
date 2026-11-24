@@ -21,22 +21,28 @@ import {
   Maximize2,
   ChevronsDownUp,
   ChevronsUpDown,
+  Image as ImageIcon,
 } from "lucide-react";
 import { extractWbs, flattenWbs, type WbsNode, type WbsPriority } from "../utils/wbs";
 import { getSections } from "../utils/sections";
 import { WBS_SECTION_RE } from "../utils/wbsTable";
 import type { ThemeMode } from "../utils/theme";
+import { useT } from "../hooks/useT";
 import { DetailPanel } from "./DetailPanel";
+import { WbsExportPopover } from "./WbsExportPopover";
 import { layout, type WbsFlowNode } from "./wbsLayout";
 
 export interface WbsCanvasProps {
   content: string;
   prdMode?: "business" | "technical" | "simple";
+  productType?: string;
+  versionLabel?: string;
   language: "id" | "en";
   theme?: ThemeMode;
   onSelect?: (node: WbsNode) => void;
   onJumpToDocument?: () => void;
   onAddWbsNote?: (nodeTitle: string) => void;
+  onNotify?: (message: string) => void;
 }
 
 const PRIORITY_BADGES: Record<
@@ -282,15 +288,20 @@ function WbsToolbar({
   allModulesCollapsed,
   hasCollapsibleModules,
   onToggleAllModules,
+  exportOpen,
+  onToggleExport,
 }: {
   language: "id" | "en";
   nodeCount: number;
   allModulesCollapsed: boolean;
   hasCollapsibleModules: boolean;
   onToggleAllModules: () => void;
+  exportOpen: boolean;
+  onToggleExport: () => void;
 }) {
   const { zoomIn, zoomOut, fitView } = useReactFlow();
   const { zoom } = useViewport();
+  const t = useT(language);
 
   return (
     <div className="absolute bottom-4 left-4 z-10 oa-elev-popover rounded-xl px-2 py-1.5 flex flex-wrap items-center gap-1 select-none pointer-events-auto">
@@ -361,6 +372,37 @@ function WbsToolbar({
 
       <span className="w-px h-4 bg-[var(--oa-border-subtle)] mx-0.5" aria-hidden="true" />
 
+      <button
+        type="button"
+        data-wbs-export-trigger="true"
+        onClick={onToggleExport}
+        aria-haspopup="dialog"
+        aria-expanded={exportOpen}
+        aria-label={t.wbs.exportHd}
+        title={t.wbs.exportTitle}
+        className={`inline-flex items-center gap-1 px-2 py-1 rounded-lg text-[11px] transition-colors cursor-pointer focus-visible:ring-2 focus-visible:ring-[var(--oa-accent-champagne)] focus-visible:outline-none ${
+          exportOpen
+            ? "bg-[var(--oa-accent-champagne-tint)] border border-[var(--oa-border-champagne)] text-[var(--oa-text-champagne)] font-semibold"
+            : "border border-transparent text-[var(--oa-text-secondary)] hover:text-[var(--oa-text-primary)] hover:bg-[var(--oa-bg-hover)]/60 font-medium"
+        }`}
+      >
+        <ImageIcon
+          size={12}
+          strokeWidth={1.6}
+          className={exportOpen ? "text-[var(--oa-text-champagne)]" : "text-[var(--oa-accent-champagne)]"}
+          aria-hidden="true"
+        />
+        <span className="hidden sm:inline">{t.wbs.exportHd}</span>
+        <ChevronDown
+          size={11}
+          strokeWidth={1.6}
+          className={`transition-transform duration-150 ${exportOpen ? "rotate-180" : ""}`}
+          aria-hidden="true"
+        />
+      </button>
+
+      <span className="w-px h-4 bg-[var(--oa-border-subtle)] mx-0.5" aria-hidden="true" />
+
       <span className="px-1.5 text-[10.5px] font-mono text-[var(--oa-text-muted)]">
         {nodeCount} {language === "en" ? "nodes" : "node"}
       </span>
@@ -371,13 +413,17 @@ function WbsToolbar({
 export function WbsCanvas({
   content,
   prdMode,
+  productType = "Unknown",
+  versionLabel,
   language,
   theme = "dark",
   onSelect,
   onJumpToDocument,
   onAddWbsNote,
+  onNotify,
 }: WbsCanvasProps): JSX.Element {
   const [selected, setSelected] = useState<WbsNode | null>(null);
+  const [exportOpen, setExportOpen] = useState(false);
   const tree = useMemo(() => extractWbs(content, prdMode), [content, prdMode]);
   const [collapsed, setCollapsed] = useState<Set<string>>(new Set());
   const [nodeHeights, setNodeHeights] = useState<Record<string, number>>({});
@@ -577,6 +623,21 @@ export function WbsCanvas({
               allModulesCollapsed={allModulesCollapsed}
               hasCollapsibleModules={level1ModuleIds.length > 0}
               onToggleAllModules={handleToggleAllModules}
+              exportOpen={exportOpen}
+              onToggleExport={() => setExportOpen((prev) => !prev)}
+            />
+            <WbsExportPopover
+              isOpen={exportOpen}
+              onClose={() => setExportOpen(false)}
+              language={language}
+              uiTheme={theme}
+              content={content}
+              productType={productType}
+              prdMode={prdMode}
+              versionLabel={versionLabel}
+              collapsedIds={collapsed}
+              nodeHeights={nodeHeights}
+              onNotify={onNotify}
             />
           </ReactFlow>
         </div>

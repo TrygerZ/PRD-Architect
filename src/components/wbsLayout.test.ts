@@ -3,7 +3,15 @@
 // target: pohon mengalir rapi kiri→kanan seperti WBS_Design.png.
 import { describe, it, expect } from "vitest";
 import { extractWbs, flattenWbs, type WbsNode, type WbsTree } from "../utils/wbs";
-import { layout, H_STEP, Y_UNIT, GAP, estimateNodeHeight } from "./wbsLayout";
+import {
+  layout,
+  H_STEP,
+  Y_UNIT,
+  GAP,
+  estimateNodeHeight,
+  getCardWidth,
+  wrapCardTitle,
+} from "./wbsLayout";
 
 function fixture(): string {
   const module = (title: string, feats: [string, number][]): string =>
@@ -209,5 +217,33 @@ describe("wbsLayout — bounding box sedepth tidak overlap & parent ter-center (
       expect(n.position.y).toBeLessThan(last.position.y + lastH);
       expect(n.position.y + parentH).toBeGreaterThan(first.position.y);
     }
+  });
+});
+
+describe("wbsLayout card geometry helpers", () => {
+  it("returns exact card widths per depth and clamps deeper levels to level 3", () => {
+    expect(getCardWidth(0)).toBe(230);
+    expect(getCardWidth(1)).toBe(200);
+    expect(getCardWidth(2)).toBe(190);
+    expect(getCardWidth(3)).toBe(155);
+    expect(getCardWidth(5)).toBe(155);
+  });
+
+  it("wraps long titles on word boundaries without dropping words", () => {
+    const lines = wrapCardTitle(
+      "Real-time ISO 20022 Reconciliation & Automated FX Liquidity Sweep",
+      2,
+    );
+    expect(lines.length).toBeGreaterThan(1);
+    expect(lines.join(" ")).toBe(
+      "Real-time ISO 20022 Reconciliation & Automated FX Liquidity Sweep",
+    );
+  });
+
+  it("breaks single oversized tokens cleanly so text never overflows card width", () => {
+    const token = "SupercalifragilisticexpialidociousIdentifierToken";
+    const lines = wrapCardTitle(token, 3);
+    expect(lines.length).toBeGreaterThan(1);
+    expect(lines.join("")).toBe(token);
   });
 });

@@ -1,7 +1,22 @@
 // Shared types used by both the frontend (src/) and backend (server.ts).
 // Single source of truth to avoid duplicate, drifting definitions.
 
-export type AIProvider = "deepseek" | "gemini" | "opencode" | "nine_router";
+export type LegacyAIProvider = "deepseek" | "gemini" | "opencode" | "nine_router";
+export type AIProvider = "openai_compatible" | LegacyAIProvider;
+
+export interface ProviderPreset {
+  id: string;
+  label: string;
+  baseUrl: string;
+  defaultModel: string;
+  sampleModels: string[];
+  requiresApiKey: boolean;
+}
+
+export interface RemoteModelOption {
+  id: string;
+  contextLength?: number;
+}
 
 export type PRDMode = "business" | "technical" | "simple";
 
@@ -53,6 +68,7 @@ export interface GeneratePRDRequest {
   provider?: AIProvider;
   model?: string;
   customEndpoint?: string;
+  maxTokens?: number;
   productType?: string;
   uploadedFiles?: UploadedFile[];
   mode?: "initial" | "revision" | "append" | "continue";

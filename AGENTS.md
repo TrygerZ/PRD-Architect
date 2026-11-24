@@ -20,7 +20,7 @@
 
 ## 1. Project snapshot
 
-**What it is**: a full-stack AI PRD generator. The user types a product idea, the app streams a structured PRD back (4 modes: `simple` 6 chapters, `business` 12 chapters, `technical` 9 chapters, `custom` up to 20 chapters from 29 modular blocks), with an Obsidian Atelier dual-mode UI (`dark` / `light`), live Mermaid diagrams, a WBS canvas, revisions/version history, file-context upload, and export to Markdown/DOCX/PDF/JSON/Print.
+**What it is**: a full-stack AI PRD generator. The user types a product idea, the app streams a structured PRD back (4 modes: `simple` 6 chapters, `business` 12 chapters, `technical` 9 chapters, `custom` up to 20 chapters from 29 modular blocks) via a unified OpenAI-compatible AI provider, with an Obsidian Atelier dual-mode UI (`dark` / `light`), live Mermaid diagrams, a WBS canvas with HD PNG/SVG export, revisions/version history, file-context upload, and export to Markdown/DOCX/PDF/JSON/Print.
 
 **Stack**: React 19 + Vite + Tailwind v4 + Motion (frontend) - Express + TypeScript (backend) - Vitest (tests) - Node 22 (pinned in `.node-version` and `render.yaml`).
 
@@ -28,14 +28,14 @@
 
 | Path | Role |
 | --- | --- |
-| `server.ts` | Express entry point: middleware, security, SSE `/api/generate-prd` route |
-| `server/` | Backend modules: `auth.ts`, `endpoint.ts` (SSRF guard + provider resolution), `continuation.ts` (auto-continue loop + seam repair), `prompts.ts`, `blockPrompts.ts`, `fileExtraction.ts`, `sanitize.ts`, `staticPathGuard.ts`, `keepWarm.ts`, `log.ts` |
+| `server.ts` | Express entry point: middleware, security, SSE `/api/generate-prd`, `/api/test-connection`, and `/api/models` routes |
+| `server/` | Backend modules: `auth.ts`, `endpoint.ts` (SSRF guard + universal endpoint/key resolution), `models.ts` (SSRF-guarded live model discovery), `continuation.ts` (auto-continue loop + seam repair), `prompts.ts`, `blockPrompts.ts`, `fileExtraction.ts`, `sanitize.ts`, `staticPathGuard.ts`, `keepWarm.ts`, `log.ts` |
 | `shared/` | Types, constants, and pure guards used by BOTH frontend and backend (`types.ts`, `models.ts`, `chapterBlocks.ts`, `truncation.ts`). Single source of truth |
 | `src/App.tsx` | Thin orchestrator; owns top-level state |
-| `src/components/` | UI components (presentational, kept thin) |
+| `src/components/` | UI components (presentational, kept thin; includes `WbsCanvas`, `WbsExportPopover`, `ApiKeyModal`) |
 | `src/hooks/` | Stateful logic: `useGeneration`, `useVersion`, `useSettings`, `useTheme`, `useT`, `useToast`, `useScroll` |
 | `src/services/aiService.ts` | Frontend SSE client with retry/backoff |
-| `src/utils/` | Pure logic: `persistence.ts`, `export.ts` (barrel + JSON), `exportMarkdown.ts`, `exportMermaid.ts`, `exportDocx.ts`, `exportPdf.ts`, `pdfFonts.ts`, `printTemplate.ts`, `wbs.ts`, `wbsTable.ts`, `mermaid.ts`, `sections.ts`, `outline.ts`, `theme.ts`, `motion.ts`, `tokens.ts`, `storage.ts`, `format.ts`, `quickPrompts.ts` |
+| `src/utils/` | Pure logic: `persistence.ts`, `settings.ts` (unified settings storage + legacy migration), `export.ts` (barrel + JSON), `exportMarkdown.ts`, `exportMermaid.ts`, `exportWbsImage.ts` (deterministic WBS vector SVG + HD PNG rasterizer), `exportDocx.ts`, `exportPdf.ts`, `pdfFonts.ts`, `printTemplate.ts`, `wbs.ts`, `wbsTable.ts`, `mermaid.ts`, `sections.ts`, `outline.ts`, `theme.ts`, `motion.ts`, `tokens.ts`, `storage.ts`, `format.ts`, `quickPrompts.ts` |
 | `src/i18n/` | `en.ts` + `id.ts` dictionaries + `i18n.test.ts` parity & copy-hygiene guard |
 | `bugs/` | RCA / bug investigation write-ups (tracked) |
 | `docs/` | Local-only docs - **gitignored**, see section 8 |
@@ -309,7 +309,8 @@ Conventional Commits, matching the existing history:
 - **Streaming is SSE**, not JSON: `/api/generate-prd` writes `data:` chunks. Errors after the stream starts cannot change the HTTP status - they must be delivered as an SSE `error` chunk. Validation that needs a real `400` must happen **before** the SSE headers are written (see the `customChapterIds` validation).
 - **Generation is long-running, auto-continuing, and abortable.** Respect `AbortSignal`; never add an arbitrary timeout - infinite generation time is an intentional feature for deep-reasoning models. `/api/generate-prd` runs an auto-continue loop (up to 12 attempts) with SSE heartbeats when `finish_reason === "length"`, when a proxy/tunnel drops SSE without `[DONE]`, or when `shared/truncation.ts` detects structural mid-output truncation. Preserve seam deduplication and newline insertion in `server/continuation.ts` (before GFM table separators, rows, headings, and fences).
 - **Persistence is IndexedDB + `BroadcastChannel`**, multi-tab aware, last-writer-wins by `savedAt`. Any change to `src/utils/persistence.ts` must preserve: quota handling, schema versioning, per-version validation, and the cross-tab race guard.
-- **Export pipeline is split into focused modules**: `src/utils/export.ts` (barrel + JSON), `exportMarkdown.ts` (shared parsers, column weights, derived slugs, deferred `URL.revokeObjectURL`), `exportMermaid.ts` (light-theme PNG rasterizer), `exportDocx.ts` (Editorial Print DOCX), `exportPdf.ts` (Editorial Print PDF with FlateDecode stream/image compression + page-break/orphan guards), `pdfFonts.ts` (unpacks self-hosted WOFF to Unicode TTF via `DecompressionStream`), and `printTemplate.ts` (print HTML + `.md` download with deferred revoke). Use `codegraph node <symbol>` instead of reading full renderer files.
+- **Export pipeline is split into focused modules**: `src/utils/export.ts` (barrel + JSON), `exportMarkdown.ts` (shared parsers, column weights, derived slugs, deferred `URL.revokeObjectURL`), `exportMermaid.ts` (light-theme PNG rasterizer), `exportWbsImage.ts` (deterministic WBS vector SVG builder + High-DPI PNG canvas rasterizer with safe dimension/pixel caps), `exportDocx.ts` (Editorial Print DOCX), `exportPdf.ts` (Editorial Print PDF with FlateDecode stream/image compression + page-break/orphan guards), `pdfFonts.ts` (unpacks self-hosted WOFF to Unicode TTF via `DecompressionStream`), and `printTemplate.ts` (print HTML + `.md` download with deferred revoke). Use `codegraph node <symbol>` instead of reading full renderer files.
+- **Upstream AI fetches must enforce SSRF + no-redirect guards**: `/api/generate-prd`, `/api/test-connection`, and `/api/models` (`server/models.ts`) all resolve endpoints via `server/endpoint.ts` (`assertPublicEndpoint`) and pass `redirect: "manual"` while explicitly rejecting HTTP 3xx responses so redirects cannot bypass SSRF checks. Never weaken these guards.
 - **Two i18n dictionaries must stay in sync** (`en.ts` / `id.ts`). A missing key falls back to English silently - so a missing `id` key is a real bug, not a crash. `src/i18n/i18n.test.ts` enforces EN/ID key parity, non-empty strings, and zero em-dashes or emojis in UI copy.
 - **`vitest` runs in the `node` environment** (`vitest.config.ts`), even for `.tsx` component tests. Don't assume DOM APIs are available; check how the existing tests stub them.
 - **Coverage is scoped** to `src/utils/**`, `server/**`, `src/services/**` - that is the intentional test surface. UI components are verified manually/in-browser.

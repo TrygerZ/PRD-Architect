@@ -22,6 +22,7 @@ interface UseGenerationArgs {
   provider: AIProvider;
   model: string;
   customEndpoint?: string;
+  maxTokens?: number;
   uploadedFiles: UploadedFile[];
   // Refs agar handler selalu membaca state terbaru tanpa stale closure.
   // App tetap pemilik state; hook ini hanya meminjam referensi.
@@ -46,6 +47,7 @@ export function useGeneration({
   provider,
   model,
   customEndpoint,
+  maxTokens,
   uploadedFiles,
   languageRef,
   prdModeRef,
@@ -161,6 +163,7 @@ export function useGeneration({
           customEndpoint,
           customChapterIds,
           {
+            maxTokens,
             onContinuing: (status) => setContinuingStatus(status),
             onTruncated: (info) =>
               setTruncatedByVersion((prev) => ({
@@ -197,7 +200,7 @@ export function useGeneration({
         }
       }
     },
-    [customApiKey, provider, model, customEndpoint, uploadedFiles, setVersions, setActiveVersionId, setComments],
+    [customApiKey, provider, model, customEndpoint, maxTokens, uploadedFiles, setVersions, setActiveVersionId, setComments],
   );
 
   const handleGenerate = useCallback(
@@ -382,6 +385,7 @@ export function useGeneration({
         customIds,
         {
           existingContent: currentActive.content,
+          maxTokens,
           onContinuing: (status) => setContinuingStatus(status),
           onTruncated: (info) =>
             setTruncatedByVersion((prev) => ({
@@ -417,7 +421,7 @@ export function useGeneration({
         setContinuingStatus(null);
       }
     }
-  }, [customApiKey, provider, model, customEndpoint, uploadedFiles, activeVersionRef, languageRef, setVersions]);
+  }, [customApiKey, provider, model, customEndpoint, maxTokens, uploadedFiles, activeVersionRef, languageRef, setVersions]);
 
   // Abort generation on unmount (cleanup)
   useEffect(() => {

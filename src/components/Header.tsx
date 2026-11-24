@@ -15,6 +15,7 @@ import {
   Moon,
   Check,
   Repeat,
+  Image as ImageIcon,
 } from "lucide-react";
 import { AnimatePresence, motion } from "motion/react";
 import type { PRDMode } from "../../shared/types";
@@ -29,6 +30,8 @@ export interface HeaderProps {
   onExportDocx: () => void;
   onExportPdf: () => void;
   onExportJson: () => void;
+  onExportWbsPng?: () => void;
+  hasWbs?: boolean;
   onCopy: () => void;
   onPrint: () => void;
   hasData: boolean;
@@ -62,6 +65,8 @@ export const Header = memo(function Header({
   onExportDocx,
   onExportPdf,
   onExportJson,
+  onExportWbsPng,
+  hasWbs = false,
   onCopy,
   onPrint,
   hasData,
@@ -389,7 +394,7 @@ export const Header = memo(function Header({
                     animate={{ opacity: 1, y: 0, scale: 1 }}
                     exit={{ opacity: 0, y: -4, scale: 0.98 }}
                     transition={POPOVER_FADE}
-                    className="absolute right-0 mt-1.5 w-[196px] oa-elev-popover rounded-xl py-1.5 z-50"
+                    className="absolute right-0 mt-1.5 w-[224px] oa-elev-popover rounded-xl py-1.5 z-50"
                   >
                     {exportItems.map(({ label, icon: Icon, onClick }) => (
                       <button
@@ -403,6 +408,28 @@ export const Header = memo(function Header({
                         <span>{label}</span>
                       </button>
                     ))}
+                    {onExportWbsPng && (
+                      <button
+                        type="button"
+                        role="menuitem"
+                        disabled={!hasWbs}
+                        onClick={() => runExport(onExportWbsPng)}
+                        className="w-full flex items-center justify-between gap-2 px-3 py-1.5 text-[12px] text-[var(--oa-text-secondary)] hover:text-[var(--oa-text-primary)] hover:bg-[var(--oa-bg-hover)]/60 disabled:opacity-45 disabled:cursor-not-allowed transition-colors text-left focus-visible:ring-2 focus-visible:ring-[var(--oa-accent-champagne)] focus-visible:outline-none cursor-pointer"
+                      >
+                        <span className="flex items-center gap-2.5 min-w-0">
+                          <ImageIcon
+                            size={13}
+                            strokeWidth={1.5}
+                            className="text-[var(--oa-accent-champagne)] shrink-0"
+                            aria-hidden="true"
+                          />
+                          <span className="truncate">{t.header.exportWbsPng}</span>
+                        </span>
+                        <span className="shrink-0 rounded px-1.5 py-px text-[9px] font-mono font-bold tracking-[0.04em] bg-[var(--oa-accent-champagne-tint)] border border-[var(--oa-border-champagne)] text-[var(--oa-text-champagne)]">
+                          HD
+                        </span>
+                      </button>
+                    )}
                     <div
                       className="my-1 border-t border-[var(--oa-border-subtle)]"
                       role="separator"

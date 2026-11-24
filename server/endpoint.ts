@@ -1,5 +1,5 @@
 // Resolusi endpoint + API key untuk provider AI — dipakai bersama oleh
-// /api/generate-prd dan /api/test-connection (hindari duplikasi logika SSRF/key).
+// /api/generate-prd, /api/test-connection, dan /api/models (hindari duplikasi logika SSRF/key).
 //
 // SSRF guard: tolak custom endpoint yang menunjuk ke alamat privat/loopback/metadata.
 // Cek IP literal via range; untuk nama domain, resolve DNS dan tolak bila ADA hasil privat
@@ -8,7 +8,7 @@ import net from "net";
 import dns from "dns";
 
 import { log } from "./log";
-import { PROVIDER_MODELS } from "../shared/models";
+import { normalizeChatEndpoint, PROVIDER_MODELS } from "../shared/models";
 import type { AIProvider } from "../shared/types";
 
 // Alamat privat/loopback hanya diizinkan di luar production, atau bila
@@ -28,7 +28,7 @@ export function allowServerKeyFallback(): boolean {
 export function isPrivateAddress(ip: string): boolean {
   const type = net.isIP(ip);
   if (type === 4) {
-    const parts = ip.split('.').map(Number);
+    const parts = ip.split(".").map(Number);
     const [a, b] = parts;
     if (a === 0) return true;                          // 0.0.0.0/8
     if (a === 127) return true;                        // 127.0.0.0/8 loopback
@@ -40,10 +40,10 @@ export function isPrivateAddress(ip: string): boolean {
   }
   if (type === 6) {
     const lower = ip.toLowerCase();
-    if (lower === '::1' || lower === '::') return true;       // loopback / unspecified
-    if (lower.startsWith('fe8') || lower.startsWith('fe9') ||
-        lower.startsWith('fea') || lower.startsWith('feb')) return true; // fe80::/10 link-local
-    if (lower.startsWith('fc') || lower.startsWith('fd')) return true;   // fc00::/7 unique-local
+    if (lower === "::1" || lower === "::") return true;       // loopback / unspecified
+    if (lower.startsWith("fe8") || lower.startsWith("fe9") ||
+        lower.startsWith("fea") || lower.startsWith("feb")) return true; // fe80::/10 link-local
+    if (lower.startsWith("fc") || lower.startsWith("fd")) return true;   // fc00::/7 unique-local
     // IPv4-mapped (::ffff:a.b.c.d)
     const v4 = lower.match(/::ffff:(\d+\.\d+\.\d+\.\d+)$/);
     if (v4) return isPrivateAddress(v4[1]);
@@ -64,102 +64,161 @@ export async function assertPublicEndpoint(
     return false; // URL invalid selalu ditolak
   }
   const h = hostname.toLowerCase();
-  if (h === 'localhost' || h.endsWith('.localhost')) return allowPrivate;
+  if (h === "localhost" || h.endsWith(".localhost")) return allowPrivate;
   // IP literal — cek langsung
   if (net.isIP(h)) return allowPrivate || !isPrivateAddress(h);
   // Nama domain — resolve, tolak bila ada hasil di range privat
   try {
     const results = await dns.promises.lookup(h, { all: true });
     if (results.length === 0) return false;
-    if (results.some(r => isPrivateAddress(r.address))) return allowPrivate;
+    if (results.some((r) => isPrivateAddress(r.address))) return allowPrivate;
     return true;
   } catch {
-    return false; // resolve gagal → jangan izinkan (juga saat flag aktif)
+    return false; // resolve gagal -> jangan izinkan (juga saat flag aktif)
   }
 }
 
-// Host privat/loopback yang bisa dinilai tanpa DNS (untuk logging saja).
+// Host privat/loopback yang bisa dinilai tanpa DNS (untuk logging & deteksi lokal).
 function isPrivateHostLiteral(urlStr: string): boolean {
   try {
     const h = new URL(urlStr).hostname.toLowerCase();
-    if (h === 'localhost' || h.endsWith('.localhost')) return true;
+    if (h === "localhost" || h.endsWith(".localhost")) return true;
     return net.isIP(h) ? isPrivateAddress(h) : false;
   } catch {
     return false;
   }
 }
 
-export type EndpointResolution =
-  | { ok: true; endpoint: string; usingCustomEndpoint: boolean }
-  | { ok: false; reason: "invalid_url" | "private_blocked"; url: string };
+async function isPrivateEndpoint(urlStr: string): Promise<boolean> {
+  if (isPrivateHostLiteral(urlStr)) return true;
+  try {
+    const h = new URL(urlStr).hostname.toLowerCase();
+    if (net.isIP(h)) return isPrivateAddress(h);
+    const results = await dns.promises.lookup(h, { all: true });
+    return results.some((r) => isPrivateAddress(r.address));
+  } catch {
+    return false;
+  }
+}
 
-// Resolusi endpoint: default provider, atau custom endpoint (nine_router) bila valid.
-// TIDAK PERNAH fallback diam-diam — custom endpoint yang ditolak mengembalikan ok:false.
+export type EndpointResolution =
+  | { ok: true; endpoint: string; isPrivate: boolean; usingCustomEndpoint: boolean }
+  | { ok: false; reason: "missing_endpoint" | "invalid_url" | "private_blocked"; url: string };
+
+// Resolusi endpoint universal OpenAI-compatible dengan auto-normalize Base URL + SSRF guard.
+// TIDAK PERNAH fallback diam-diam — endpoint yang ditolak mengembalikan ok:false.
 export async function resolveEndpoint(
   provider: AIProvider,
   customEndpoint: unknown,
 ): Promise<EndpointResolution> {
+  const rawServerEndpoint = process.env.AI_ENDPOINT?.trim() || "";
+  const serverDefaultEndpoint = rawServerEndpoint ? normalizeChatEndpoint(rawServerEndpoint) : null;
+  const hasCustom = typeof customEndpoint === "string" && customEndpoint.trim().length > 0;
+
+  if (hasCustom) {
+    const trimmed = customEndpoint.trim();
+    const normalized = normalizeChatEndpoint(trimmed);
+    if (!normalized) {
+      log("WARN", `Rejected custom endpoint (invalid URL or non-http protocol): ${trimmed}`);
+      return { ok: false, reason: "invalid_url", url: trimmed };
+    }
+
+    if (!(await assertPublicEndpoint(normalized))) {
+      log("WARN", `Rejected custom endpoint (SSRF guard, private/loopback address): ${normalized}`);
+      return { ok: false, reason: "private_blocked", url: normalized };
+    }
+
+    const isPrivate = await isPrivateEndpoint(normalized);
+    if (isPrivate) {
+      log("WARN", `Private/loopback endpoint allowed (non-production or ALLOW_PRIVATE_ENDPOINTS=true): ${normalized}`);
+    }
+
+    const defaultForCompare =
+      provider === "openai_compatible"
+        ? serverDefaultEndpoint
+        : (PROVIDER_MODELS[provider]?.endpoint ?? null);
+
+    return {
+      ok: true,
+      endpoint: normalized,
+      isPrivate,
+      usingCustomEndpoint: normalized !== defaultForCompare,
+    };
+  }
+
+  if (provider === "openai_compatible") {
+    if (!rawServerEndpoint) {
+      return { ok: false, reason: "missing_endpoint", url: "" };
+    }
+    if (!serverDefaultEndpoint) {
+      log("WARN", `Rejected AI_ENDPOINT env (invalid URL or non-http protocol): ${rawServerEndpoint}`);
+      return { ok: false, reason: "invalid_url", url: rawServerEndpoint };
+    }
+    if (!(await assertPublicEndpoint(serverDefaultEndpoint))) {
+      log("WARN", `Rejected AI_ENDPOINT env (SSRF guard, private/loopback address): ${serverDefaultEndpoint}`);
+      return { ok: false, reason: "private_blocked", url: serverDefaultEndpoint };
+    }
+    const isPrivate = await isPrivateEndpoint(serverDefaultEndpoint);
+    return {
+      ok: true,
+      endpoint: serverDefaultEndpoint,
+      isPrivate,
+      usingCustomEndpoint: false,
+    };
+  }
+
+  // Legacy provider alias fallback when customEndpoint is omitted.
   const providerConfig = PROVIDER_MODELS[provider] ?? PROVIDER_MODELS.deepseek;
-
-  if (provider !== "nine_router" || typeof customEndpoint !== "string" || !customEndpoint.trim()) {
-    return { ok: true, endpoint: providerConfig.endpoint, usingCustomEndpoint: false };
-  }
-
-  const trimmed = customEndpoint.trim();
-  let protocolOk = false;
-  try {
-    const parsed = new URL(trimmed);
-    protocolOk = parsed.protocol === "http:" || parsed.protocol === "https:";
-  } catch {
-    protocolOk = false;
-  }
-  if (!protocolOk) {
-    log('WARN', `Rejected custom endpoint (invalid URL or non-http protocol): ${trimmed}`);
-    return { ok: false, reason: "invalid_url", url: trimmed };
-  }
-
-  if (!(await assertPublicEndpoint(trimmed))) {
-    log('WARN', `Rejected custom endpoint (SSRF guard, private/loopback address): ${trimmed}`);
-    return { ok: false, reason: "private_blocked", url: trimmed };
-  }
-
-  if (isPrivateHostLiteral(trimmed)) {
-    log('WARN', `Private/loopback endpoint allowed (non-production or ALLOW_PRIVATE_ENDPOINTS=true): ${trimmed}`);
-  }
-
-  return { ok: true, endpoint: trimmed, usingCustomEndpoint: trimmed !== providerConfig.endpoint };
+  return {
+    ok: true,
+    endpoint: providerConfig.endpoint,
+    isPrivate: false,
+    usingCustomEndpoint: false,
+  };
 }
 
 export function endpointErrorMessage(
   res: Extract<EndpointResolution, { ok: false }>,
   language: "id" | "en",
 ): string {
-  if (res.reason === "invalid_url") {
-    return language === 'en'
-      ? `Custom endpoint rejected: ${res.url}. Must be a valid http:// or https:// URL.`
-      : `Endpoint kustom ditolak: ${res.url}. Harus berupa URL http:// atau https:// yang valid.`;
+  if (res.reason === "missing_endpoint") {
+    return language === "en"
+      ? "Endpoint URL is required. Configure your OpenAI-compatible Base URL in Settings."
+      : "URL Endpoint wajib diisi. Atur Base URL OpenAI-compatible Anda di Pengaturan.";
   }
-  return language === 'en'
-    ? `Custom endpoint rejected: ${res.url}. Private/loopback addresses are blocked in production. Set ALLOW_PRIVATE_ENDPOINTS=true to allow.`
-    : `Endpoint kustom ditolak: ${res.url}. Alamat privat/loopback diblokir di mode produksi. Set ALLOW_PRIVATE_ENDPOINTS=true untuk mengizinkan.`;
+  if (res.reason === "invalid_url") {
+    return language === "en"
+      ? `Endpoint rejected: ${res.url}. Must be a valid http:// or https:// URL.`
+      : `Endpoint ditolak: ${res.url}. Harus berupa URL http:// atau https:// yang valid.`;
+  }
+  return language === "en"
+    ? `Endpoint rejected: ${res.url}. Private/loopback addresses are blocked in production. Set ALLOW_PRIVATE_ENDPOINTS=true to allow.`
+    : `Endpoint ditolak: ${res.url}. Alamat privat/loopback diblokir di mode produksi. Set ALLOW_PRIVATE_ENDPOINTS=true untuk mengizinkan.`;
 }
 
-// Prioritas: cookie > .env (hanya jika allowFallback=true). Untuk custom endpoint
-// HANYA cookieKey milik user — jangan pernah forward server .env key ke endpoint pihak ketiga.
+// Prioritas: cookie > .env (hanya jika allowFallback=true dan bukan custom endpoint).
+// Untuk custom endpoint HANYA cookieKey milik user — jangan pernah forward server .env key
+// ke endpoint pihak ketiga. Untuk endpoint lokal yang diizinkan SSRF guard, API key opsional.
 export function resolveApiKey(
   provider: AIProvider,
   usingCustomEndpoint: boolean,
   cookieKey: string | undefined,
   allowFallback: boolean = allowServerKeyFallback(),
-): { apiKey: string | undefined; apiKeyEnvName: string } {
-  const providerConfig = PROVIDER_MODELS[provider] ?? PROVIDER_MODELS.deepseek;
-  const serverKey = process.env[providerConfig.apiKeyEnvName];
+  isPrivate: boolean = false,
+): { apiKey: string | undefined; optional: boolean; apiKeyEnvName: string } {
+  const apiKeyEnvName =
+    provider === "openai_compatible"
+      ? "AI_API_KEY"
+      : (PROVIDER_MODELS[provider]?.apiKeyEnvName ?? "AI_API_KEY");
+  const serverKey = process.env[apiKeyEnvName]?.trim() || undefined;
+  const trimmedCookie = typeof cookieKey === "string" && cookieKey.trim() ? cookieKey.trim() : undefined;
+  const optional = Boolean(isPrivate && allowPrivateEndpoints());
 
   let apiKey: string | undefined;
   if (usingCustomEndpoint) {
-    apiKey = cookieKey;
-  } else if (cookieKey) {
-    apiKey = cookieKey;
+    apiKey = trimmedCookie;
+  } else if (trimmedCookie) {
+    apiKey = trimmedCookie;
   } else if (allowFallback) {
     apiKey = serverKey;
   } else {
@@ -168,6 +227,7 @@ export function resolveApiKey(
 
   return {
     apiKey,
-    apiKeyEnvName: providerConfig.apiKeyEnvName,
+    optional,
+    apiKeyEnvName,
   };
 }

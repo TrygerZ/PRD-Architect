@@ -4,7 +4,7 @@ import { Header } from "./components/Header";
 import { WelcomeScreen } from "./components/WelcomeScreen";
 import { ChatInput } from "./components/ChatInput";
 import { BlueprintSheet } from "./components/BlueprintSheet";
-import { ProductType, UploadedFile, AIProvider, PRDMode } from "../shared/types";
+import { ProductType, UploadedFile, PRDMode } from "../shared/types";
 import { getChapterBlock, MAX_CUSTOM_BLOCKS } from "../shared/chapterBlocks";
 import type { PRDVersion } from "./types";
 import DOMPurify from "dompurify";
@@ -14,6 +14,7 @@ import { MAX_PERSISTED_VERSIONS } from "./utils/persistence";
 import { buildChapterOutline, areOutlineItemsEqual, type OutlineItem } from "./utils/outline";
 import { MODAL_SLIDE_UP, POPOVER_FADE } from "./utils/motion";
 import { WBS_SECTION_RE } from "./utils/wbsTable";
+import { extractWbs } from "./utils/wbs";
 import { buildPrintHtml, downloadMarkdown } from "./utils/printTemplate";
 import { useSettings } from "./hooks/useSettings";
 import { useTheme } from "./hooks/useTheme";
@@ -40,20 +41,13 @@ const WbsCanvas = lazy(() =>
   import("./components/WbsCanvas").then((m) => ({ default: m.WbsCanvas })),
 );
 
-const PROVIDER_LABELS: Record<AIProvider, string> = {
-  deepseek: "DeepSeek",
-  gemini: "Google Gemini",
-  opencode: "OpenCode Zen",
-  nine_router: "9Router Proxy",
-};
-
 const DRAFT_KEY = "PRD_DRAFT";
 const DRAFT_TTL_MS = 24 * 60 * 60 * 1000;
 
 export default function App() {
   const [isSettingsOpen, setIsSettingsOpen] = useState(false);
   const [customApiKey, setCustomApiKey] = useState("");
-  const { provider, model, customEndpoint, persistSettings } = useSettings();
+  const { provider, model, customEndpoint, maxTokens, providerLabel, persistSettings } = useSettings();
   const { theme, toggleTheme } = useTheme();
   const [productType, setProductType] = useState<ProductType>("Unknown");
   const [language, setLanguage] = useState<"id" | "en">("en");
@@ -159,6 +153,7 @@ export default function App() {
     provider,
     model,
     customEndpoint,
+    maxTokens,
     uploadedFiles,
     languageRef,
     prdModeRef,
@@ -323,7 +318,6 @@ export default function App() {
     [versions, activeVersionId],
   );
   const activeVersionLabel = activeVersionIndex >= 0 ? `v${activeVersionIndex + 1}` : undefined;
-  const providerLabel = PROVIDER_LABELS[provider];
 
   useEffect(() => {
     setActiveSectionId(undefined);
@@ -380,6 +374,49 @@ export default function App() {
     }
   }, [prdContent, productType, language, showToast]);
 
+  const hasWbs = useMemo(
+    () =>
+      prdContent.length > 0 &&
+      extractWbs(prdContent, activeVersion?.prdMode).root.children.length > 0,
+    [prdContent, activeVersion?.prdMode],
+  );
+
+  const handleExportWbsPng = useCallback(async () => {
+    if (!prdContent) return;
+    try {
+      const { exportWbsImage } = await import("./utils/export");
+      const res = await exportWbsImage(
+        prdContent,
+        productType,
+        language,
+        {
+          format: "png",
+          scale: 3,
+          theme: theme === "dark" ? "obsidian" : "titanium",
+          expandAll: true,
+          includeHeader: true,
+          versionLabel: activeVersionLabel,
+        },
+        activeVersion?.prdMode,
+      );
+      if (!res.ok) {
+        showToast(res.reason === "empty" ? t.wbs.exportEmpty : t.wbs.exportFailed);
+        return;
+      }
+      showToast(
+        res.clamped
+          ? t.wbs.exportClampedNote
+              .replace("{filename}", res.filename)
+              .replace("{w}", String(res.width))
+              .replace("{h}", String(res.height))
+          : t.wbs.exportSuccess.replace("{filename}", res.filename),
+      );
+    } catch (e) {
+      console.error("WBS PNG export failed:", e);
+      showToast(t.wbs.exportFailed);
+    }
+  }, [prdContent, productType, language, theme, activeVersionLabel, activeVersion?.prdMode, showToast, t]);
+
   const handleCopy = async () => {
     if (!prdContent) return;
     try {
@@ -428,9 +465,9 @@ export default function App() {
   // === Stable Callback References (P1 — useCallback) ===
   const handleOpenSettings = useCallback(() => setIsSettingsOpen(true), []);
   const handleSettingsClose = useCallback(() => setIsSettingsOpen(false), []);
-  const handleSettingsSave = useCallback((key: string, p: AIProvider, m: string, endpoint?: string) => {
+  const handleSettingsSave = useCallback((key: string, endpoint: string, m: string, tokens: number) => {
     setCustomApiKey(key);
-    persistSettings(p, m, endpoint);
+    persistSettings(endpoint, m, tokens);
   }, [persistSettings]);
   const handleToggleLanguage = useCallback(() => {
     setLanguage((lang) => {
@@ -578,6 +615,8 @@ export default function App() {
           onExportDocx={handleExportDocx}
           onExportPdf={handleExportPdf}
           onExportJson={handleExportJson}
+          onExportWbsPng={handleExportWbsPng}
+          hasWbs={hasWbs}
           onCopy={handleCopy}
           onPrint={handlePrint}
           hasData={prdContent.length > 0}
@@ -614,10 +653,13 @@ export default function App() {
                 <WbsCanvas
                   content={prdContent}
                   prdMode={activeVersion?.prdMode}
+                  productType={productType}
+                  versionLabel={activeVersionLabel}
                   language={language}
                   theme={theme}
                   onJumpToDocument={handleJumpToWbsChapter}
                   onAddWbsNote={handleAddWbsNote}
+                  onNotify={showToast}
                 />
               </Suspense>
             ) : (
@@ -823,9 +865,9 @@ export default function App() {
           onClose={handleSettingsClose}
           onSave={handleSettingsSave}
           language={language}
-          initialProvider={provider}
-          initialModel={model}
           initialEndpoint={customEndpoint}
+          initialModel={model}
+          initialMaxTokens={maxTokens}
         />
       </Suspense>
 

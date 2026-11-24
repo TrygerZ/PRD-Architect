@@ -113,4 +113,81 @@ describe("Header Convert Mode menu", () => {
     ) as HTMLButtonElement | undefined;
     expect(businessBtn?.disabled).toBe(true);
   });
+
+  it("shows WBS Diagram (.png) with HD badge in Export menu and guards when hasWbs is false", () => {
+    container = document.createElement("div");
+    document.body.appendChild(container);
+    root = createRoot(container);
+    const onExportWbsPng = vi.fn();
+
+    act(() => {
+      root?.render(
+        <Header
+          onOpenSettings={noop}
+          onExportMd={noop}
+          onExportDocx={noop}
+          onExportPdf={noop}
+          onExportJson={noop}
+          onExportWbsPng={onExportWbsPng}
+          hasWbs={true}
+          onCopy={noop}
+          onPrint={noop}
+          hasData={true}
+          language="en"
+          onToggleLanguage={noop}
+          theme="dark"
+          onToggleTheme={noop}
+          minimal={false}
+        />,
+      );
+    });
+
+    const exportTrigger = container.querySelector('button[aria-label="Export"]') as HTMLButtonElement | null;
+    act(() => {
+      exportTrigger?.click();
+    });
+
+    const wbsItem = Array.from(container.querySelectorAll('button[role="menuitem"]')).find((el) =>
+      el.textContent?.includes("WBS Diagram (.png)"),
+    ) as HTMLButtonElement | undefined;
+    expect(wbsItem).toBeTruthy();
+    expect(wbsItem?.textContent).toContain("HD");
+    expect(wbsItem?.disabled).toBe(false);
+
+    act(() => {
+      wbsItem?.click();
+    });
+    expect(onExportWbsPng).toHaveBeenCalledOnce();
+
+    // Re-render with hasWbs=false and verify item is disabled
+    act(() => {
+      root?.render(
+        <Header
+          onOpenSettings={noop}
+          onExportMd={noop}
+          onExportDocx={noop}
+          onExportPdf={noop}
+          onExportJson={noop}
+          onExportWbsPng={onExportWbsPng}
+          hasWbs={false}
+          onCopy={noop}
+          onPrint={noop}
+          hasData={true}
+          language="en"
+          onToggleLanguage={noop}
+          theme="dark"
+          onToggleTheme={noop}
+          minimal={false}
+        />,
+      );
+    });
+    const exportTrigger2 = container.querySelector('button[aria-label="Export"]') as HTMLButtonElement | null;
+    act(() => {
+      exportTrigger2?.click();
+    });
+    const disabledItem = Array.from(container.querySelectorAll('button[role="menuitem"]')).find((el) =>
+      el.textContent?.includes("WBS Diagram (.png)"),
+    ) as HTMLButtonElement | undefined;
+    expect(disabledItem?.disabled).toBe(true);
+  });
 });
