@@ -35,7 +35,7 @@ export const GAP = 20;
 /* ---------- Estimasi tinggi card (fallback layout pass pertama / tes) ---------- */
 // Nilai turun dari style WbsNodeCard di WbsCanvas.tsx (CARD_SIZES / TITLE_SIZES).
 // Per-depth: [padding vertikal (py), padding horizontal total (px), lebar card (w), font title (text)].
-const CARD_PROFILE = [
+export const CARD_PROFILE = [
   { padY: 20, padX: 32, width: 230, font: 15 }, // depth 0: min-w-[230px] px-4 py-2.5 text-[15px]
   { padY: 12, padX: 24, width: 200, font: 12.5 }, // depth 1: w-[200px] px-3 py-1.5 text-[12.5px]
   { padY: 12, padX: 24, width: 190, font: 12 }, // depth 2: w-[190px] px-3 py-1.5 text-[12px]
@@ -50,6 +50,53 @@ const BORDER_H = 2; // border 1px atas + bawah pada card
 const ROOT_LABEL_ROW = 19; // label "Root" text-[10px] (15px line) + mb-1 (4px)
 const CODE_ROW = 19; // baris code text-[10px] font-mono (15px) + mb-1 (4px)
 const CHILD_COUNT_ROW = 21; // mt-1.5 (6px) + text-[10px] font-mono (15px line)
+
+export function getCardWidth(depth: number): number {
+  const idx = Math.max(0, Math.min(depth, CARD_PROFILE.length - 1));
+  return CARD_PROFILE[idx].width;
+}
+
+/** Word-aware line wrapper matching CARD_PROFILE metrics (shared by SVG export). */
+export function wrapCardTitle(title: string, depth: number): string[] {
+  const idx = Math.max(0, Math.min(depth, CARD_PROFILE.length - 1));
+  const { padX, width, font } = CARD_PROFILE[idx];
+  const contentWidth = width - padX;
+  const maxChars = Math.max(4, Math.floor(contentWidth / (font * CHAR_W_FACTOR)));
+  const cleaned = title.trim().replace(/\s+/g, " ");
+  if (!cleaned) return [""];
+
+  const words = cleaned.split(" ");
+  const lines: string[] = [];
+  let current = "";
+
+  for (const word of words) {
+    if (word.length > maxChars) {
+      if (current) {
+        lines.push(current);
+        current = "";
+      }
+      for (let i = 0; i < word.length; i += maxChars) {
+        const slice = word.slice(i, i + maxChars);
+        if (slice.length === maxChars && i + maxChars < word.length) {
+          lines.push(slice);
+        } else {
+          current = slice;
+        }
+      }
+      continue;
+    }
+
+    const candidate = current ? `${current} ${word}` : word;
+    if (candidate.length <= maxChars) {
+      current = candidate;
+    } else {
+      if (current) lines.push(current);
+      current = word;
+    }
+  }
+  if (current) lines.push(current);
+  return lines.length > 0 ? lines : [cleaned];
+}
 
 /** Total descendant count — dipakai badge `+N` pada node collapsed. */
 function countDescendants(n: WbsNode): number {
