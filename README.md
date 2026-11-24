@@ -30,7 +30,7 @@
 
 ## Overview
 
-**PRD Architect** is a full-stack application designed to accelerate product planning from raw idea to structured specification. Given a product idea and optional reference files, it streams a structured Product Requirements Document (PRD), Technical Specification, MVP Brief, or Custom Blueprint with live Mermaid diagrams, an interactive WBS Canvas, version history, and multi-format exports.
+**PRD Architect** is a full-stack application designed to accelerate product planning from raw idea to structured specification. Given a product idea and optional reference files, it connects to any OpenAI-compatible AI provider or local proxy and streams a structured Product Requirements Document (PRD), Technical Specification, MVP Brief, or Custom Blueprint with live Mermaid diagrams, an interactive WBS Canvas with HD PNG/SVG image export, version history, and multi-format exports.
 
 It supports **four generation modes**:
 
@@ -51,16 +51,20 @@ It supports **four generation modes**:
 
 ![PRD Architect Custom PRD Workbench](assets/screenshots/custom-builder-dark.png)
 
-### AI Provider & Model Settings (BYOM & httpOnly Key Storage)
+### Universal OpenAI-Compatible AI Provider & Model Settings
 
-![PRD Architect AI Provider and Model Settings Modal](assets/screenshots/settings-dark.png)
+![PRD Architect Unified AI Provider and Model Settings Modal](assets/screenshots/settings-dark.png)
+
+### Interactive WBS Canvas & HD Image Export (PNG 2x/3x & Vector SVG)
+
+![PRD Architect WBS Canvas and HD Image Export Popover](assets/screenshots/wbs-export-dark.png)
 
 ## Features
 
 - **Four-Mode Generation Engine**: Switch cleanly between Simple (6 chapters), Business & Investor (12 chapters), Technical & AI Agent (9 chapters), and Custom PRD Builder (up to 20 chapters chosen from 29 modular blocks with drag-and-drop ordering).
 - **Obsidian Atelier Dual-Mode UI**: Focused, low-glare interface offering **Dark (Obsidian Hero)** and **Light (Anti-Glare Titanium, capped at matte `#F2F3F5` surfaces)** modes, self-hosted Inter and JetBrains Mono typography, and `motion` transitions that respect `prefers-reduced-motion`.
 - **Collapsible Sidebar & Live Chapter Outline**: Spring-animated navigation rail with live chapter tracking, streaming chapter pulse indicators, per-chapter comment badges, and version history switching.
-- **Universal OpenAI-Compatible AI Provider (BYOM)**: Connect any OpenAI-compatible AI provider, router, or local proxy through one unified endpoint configuration. Features Base URL auto-normalization, 8 quick-fill presets (**OpenAI**, **OpenRouter**, **DeepSeek**, **Google Gemini**, **Groq**, **Together**, **9Router / Proxy**, **Ollama Local**), server-proxied live model discovery (`POST /api/models`), optional API keys for allowed local endpoints, collapsible `Max Output Tokens`, live connection testing, and secure `httpOnly` cookie key storage.
+- **Universal OpenAI-Compatible AI Provider (BYOM)**: Connect any OpenAI-compatible AI provider, router, or local proxy through a single endpoint configuration. Includes Base URL auto-normalization with live `POST` target preview, 8 quick-fill preset chips (**OpenRouter**, **OpenAI**, **DeepSeek**, **Gemini**, **Groq**, **9Router**, **Ollama (Local)**, **Custom**), server-proxied live model discovery (`POST /api/models`), optional API keys for allowed local endpoints, collapsible `Advanced` output token control (`1,024`-`131,072` tokens), live `Test Connection`, automatic migration of legacy `localStorage` settings, SSRF + no-redirect protection, and secure `httpOnly` cookie key storage.
 - **Real-Time SSE Streaming, Auto-Continue & Reasoning Drawer**: Abortable, timeout-free SSE streaming suited for deep-reasoning models, with automatic multi-call continuation, SSE heartbeats, structural mid-output truncation detection, continuation seam repair, a one-click `Continue` fallback if a stream stops early, and a collapsible `ReasoningPanel` displaying live elapsed thinking time and stream progress.
 - **Dual-Theme Live Mermaid Diagrams**: Renders System Context (`graph`), Entity Relationships (`erDiagram` with automatic relationship-label and identifier sanitization), User Journeys (`journey`), Roadmaps (`gantt`), and Sequence Flows (`sequenceDiagram`) with automatic syntax sanitization, Dark/Light theme adaptation, and a toolbar for `Source`, `Copy`, and full-screen `Zoom`.
 - **Inline Chapter Notes, Sticky Revision CTA, Smart Revision Dock & Version Diff**: Attach targeted notes from any sticky chapter header (`Add note`), top inline editor, or sidebar quick-note entry, trigger multi-chapter revisions from the floating `SmartRevisionDock`, and inspect line-level diffs across versions.
@@ -77,7 +81,7 @@ Once a PRD has been generated, switch from **Document** to **WBS Canvas** in the
 **Interactions:**
 
 - **Zoom, Pan & Floating Toolbar**: Use the mouse wheel to zoom and drag to pan, navigate with the minimap, or use the floating bottom-left toolbar for zoom (`-` / `%` / `+`), `Fit view`, `Collapse all / Expand all`, `Export HD`, and live node count. Zoom is clamped (`0.3` minimum, `1.2` max initial fit) so layouts stay readable.
-- **HD Image Export (PNG & Vector SVG)**: Click `Export HD` in the WBS toolbar to open the compact export popover (or use **WBS Diagram (.png)** directly from the Header Export menu even while in Document view). Supports **PNG (`2x HD` / `3x Ultra HD`)** and **Vector SVG**, 4 themes (**Obsidian**, **Titanium**, **Print White**, **Transparent**), an **Expand all nodes** toggle, and a **Title & MoSCoW legend** header bar.
+- **HD Image Export (PNG & Vector SVG)**: Click `Export HD` in the WBS toolbar to open the compact export popover (or use **WBS Diagram (.png)** directly from the Header Export menu even while in Document view). Supports **PNG (`2x HD` / `3x Ultra HD`)** and true **Vector SVG**, 4 themes (**Obsidian**, **Titanium**, **Print White**, **Transparent**), an **Expand all nodes** toggle (expand or preserve collapsed `+N` branches), a **Title & MoSCoW legend** toggle, live output pixel dimension & node-count preview, and safe dimension/pixel clamping (`16,384px` edge / `64 MP` cap) for very large trees.
 - **Expandable Hierarchy**: The canvas opens expanded so the full breakdown is immediately scannable. Click the **chevron** on any parent node to collapse or expand its subtree (collapsed nodes display a `+N` badge), or toggle all modules at once from the toolbar.
 - **Path Highlighting & Slide-In Detail Panel**: Click (or press `Enter`/`Space` on) a node to highlight its ancestor-to-descendant path in Satin Champagne and open a `380px` spring slide-in `DetailPanel` with the node's breadcrumb, MoSCoW priority badge, clean per-feature detail snippet, sub-items, and quick `Open Document` / `Add note` actions.
 - **Close the detail panel**: Click the backdrop, click the close button, or press `Esc`.
@@ -98,11 +102,11 @@ Parse quality depends on how closely the model follows the formatting contract e
 
 ## Tech Stack
 
-- **Frontend**: React 19, Vite, Tailwind CSS v4, `motion`, `@dnd-kit`, `@xyflow/react`, Lucide React, React Markdown (`remark-gfm`), Mermaid.js, self-hosted Inter & JetBrains Mono (`@fontsource`)
-- **Export & Diff**: `docx`, `jspdf`, `jspdf-autotable`, `diff`
+- **Frontend**: React 19, Vite, Tailwind CSS v4, `motion`, `@dnd-kit`, `@xyflow/react`, Lucide React, React Markdown (`remark-gfm`), Mermaid.js, DOMPurify, self-hosted Inter & JetBrains Mono (`@fontsource`)
+- **Export & Diff**: `docx`, `jspdf`, `jspdf-autotable`, `diff`, deterministic WBS Vector SVG & High-DPI Canvas PNG renderer
 - **Persistence**: IndexedDB (`idb-keyval`) + `BroadcastChannel`
-- **Backend**: Node.js 22 (pinned in `.node-version`; `engines.node >= 18`), Express.js, Helmet, CORS, `express-rate-limit`, `cookie-parser`, Multer, `pdf-parse`, `mammoth`, `exceljs`
-- **Tooling & Testing**: TypeScript, esbuild, Vitest (`jsdom` + v8 coverage)
+- **Backend**: Node.js 22 (pinned in `.node-version`; `engines.node >= 18`), Express.js, Helmet, CORS, `express-rate-limit`, `cookie-parser`, Multer, `file-type`, `pdf-parse`, `mammoth`, `exceljs`
+- **Tooling & Testing**: TypeScript, esbuild, Vitest (`node` + `jsdom` + v8 coverage)
 - **AI Integration**: Native Fetch API for universal OpenAI-compatible SSE streaming and server-proxied live model discovery (`POST /api/models`) across any OpenAI-compatible provider, router, or local proxy, with SSRF protection and blocked HTTP 3xx redirects
 
 ## Getting Started
@@ -111,7 +115,7 @@ Parse quality depends on how closely the model follows the formatting contract e
 
 - Node.js 22 recommended (v18 or higher supported)
 - npm or pnpm
-- API key from any OpenAI-compatible AI provider or proxy (OpenAI, OpenRouter, DeepSeek, Google Gemini, Groq, Together, 9Router, etc.) - optional for allowed local LLM endpoints such as Ollama
+- API key from any OpenAI-compatible AI provider or proxy (OpenRouter, OpenAI, DeepSeek, Gemini, Groq, 9Router, or any custom endpoint) - optional for allowed local LLM endpoints such as Ollama
 
 ### Installation
 
@@ -130,7 +134,7 @@ Parse quality depends on how closely the model follows the formatting contract e
 
 ### Configuration
 
-Configure your OpenAI-compatible Base URL, model ID, and API key directly from the **Settings** modal in the app. Use the one-click preset chips to prefill popular providers (**OpenAI**, **OpenRouter**, **DeepSeek**, **Gemini**, **Groq**, **Together**, **9Router**, **Ollama**), click **Fetch Models** to discover available models via `POST /api/models`, and verify connectivity with **Test Connection**.
+Configure your OpenAI-compatible Base URL, model ID, API key, and optional max output tokens directly from the **Settings** modal in the app. Use the 8 quick-fill preset chips (**OpenRouter**, **OpenAI**, **DeepSeek**, **Gemini**, **Groq**, **9Router**, **Ollama (Local)**, **Custom**), click **Fetch Models** to load live models via `POST /api/models`, and verify connectivity with **Test Connection**.
 
 #### API Key Setup
 
@@ -138,7 +142,7 @@ Provide your endpoint and API key through one of two methods:
 
 **Method A: In-App UI** *(Recommended)*
 
-Open **Settings** inside the app, pick a preset or enter any OpenAI-compatible Base URL (automatically normalized to `/chat/completions`), enter or fetch your model ID, and paste your API key. The backend stores the key in a secure `httpOnly` cookie for subsequent API requests.
+Open **Settings** inside the app, pick a preset or enter any OpenAI-compatible Base URL (automatically normalized to `/chat/completions`), enter or fetch your model ID, and paste your API key (optional for local endpoints). The backend stores the key in a secure `httpOnly`, `SameSite=Strict` cookie for subsequent API requests.
 
 **Method B: Environment Variables (`.env`)** *(Optional server defaults for local/self-hosted dev)*
 
@@ -153,9 +157,23 @@ AI_MODEL=gpt-4o-mini
 # that intentionally share server-side API keys when clients omit their own key.
 ALLOW_SERVER_KEY_FALLBACK=false
 
+# Allow private/loopback endpoints (e.g. Ollama or local 9Router) in production.
+# Automatically enabled when NODE_ENV != production. Do NOT enable on public hosts.
+# ALLOW_PRIVATE_ENDPOINTS=true
+
 # Required in production (comma-separated origins for CORS)
 ALLOWED_ORIGINS=https://prd-architect.example.com
 ```
+
+Legacy provider keys (`DEEPSEEK_API_KEY`, `GEMINI_API_KEY`, `OPENCODE_API_KEY`, `NINE_ROUTER_API_KEY`) remain supported as optional fallbacks when `ALLOW_SERVER_KEY_FALLBACK=true` and a legacy provider alias is sent without a custom endpoint.
+
+#### Backend API Routes
+
+- `POST /api/generate-prd` - Streams PRD markdown via SSE with server-side auto-continue, seam repair, and heartbeats
+- `POST /api/models` - Server-proxied live model discovery (`GET <base>/models`) with SSRF and no-redirect guards
+- `POST /api/test-connection` - Verifies endpoint reachability, model availability, and latency
+- `POST /api/auth/set-key` & `POST /api/auth/clear-key` - Manages the `httpOnly` API key cookie
+- `POST /api/upload-files` - Extracts context text from uploaded PDF, DOCX, XLSX, CSV, Markdown, and image files
 
 ### Running the App
 
