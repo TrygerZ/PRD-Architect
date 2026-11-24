@@ -742,11 +742,25 @@ app.post("/api/generate-prd", async (req, res) => {
       const fetchOptions: RequestInit = {
         method: "POST",
         headers: fetchHeaders,
+        redirect: "manual",
         signal: abortController?.signal,
         body: JSON.stringify(buildFetchBody(messages)),
       };
 
       const response = await fetch(endpoint, fetchOptions);
+
+      if (response.type === "opaqueredirect" || (response.status >= 300 && response.status < 400)) {
+        log("WARN", `Upstream API blocked HTTP redirect (status ${response.status}) endpoint=${endpoint} model=${modelName}`);
+        throw markSafe(
+          new Error(
+            t(
+              "Endpoint attempted an HTTP redirect, which is blocked for security.",
+              "Endpoint mencoba melakukan redirect HTTP, yang diblokir demi keamanan.",
+              language,
+            ),
+          ),
+        );
+      }
 
       if (!response.ok) {
         // Wave 3 — Task 3.3: Use safe error messages map, log full details server-side only
@@ -1081,10 +1095,23 @@ app.post("/api/test-connection", async (req, res) => {
     const response = await fetch(endpoint, {
       method: "POST",
       headers: testHeaders,
+      redirect: "manual",
       signal: controller.signal,
       body: JSON.stringify({ model: modelName, messages: [{ role: "user", content: "ping" }], max_tokens: 8, stream: false }),
     });
     const latencyMs = Date.now() - startedAt;
+
+    if (response.type === "opaqueredirect" || (response.status >= 300 && response.status < 400)) {
+      log("WARN", `Test connection blocked HTTP redirect (status ${response.status}) endpoint=${endpoint} model=${modelName}`);
+      return res.json({
+        ok: false,
+        error: t(
+          "Endpoint attempted an HTTP redirect, which is blocked for security.",
+          "Endpoint mencoba melakukan redirect HTTP, yang diblokir demi keamanan.",
+          language,
+        ),
+      });
+    }
 
     if (!response.ok) {
       const safeMsg = safeErrorMessages[response.status] || GENERIC_UPSTREAM_ERROR;

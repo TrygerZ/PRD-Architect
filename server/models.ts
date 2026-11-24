@@ -108,8 +108,20 @@ export async function fetchUpstreamModels(args: {
     const response = await fetchImpl(modelsUrl, {
       method: "GET",
       headers,
+      redirect: "manual",
       signal: controller.signal,
     });
+
+    if (response.type === "opaqueredirect" || (response.status >= 300 && response.status < 400)) {
+      log("WARN", `Fetch models blocked HTTP redirect (status ${response.status}) url=${modelsUrl}`);
+      return {
+        ok: false,
+        error:
+          language === "en"
+            ? "Endpoint attempted an HTTP redirect, which is blocked for security."
+            : "Endpoint mencoba melakukan redirect HTTP, yang diblokir demi keamanan.",
+      };
+    }
 
     if (!response.ok) {
       const body = await readTruncatedBody(response);

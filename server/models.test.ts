@@ -153,4 +153,29 @@ describe("fetchUpstreamModels", () => {
       expect(resEn.error).not.toBe(resId.error);
     }
   });
+
+  it("blocks HTTP 3xx redirects with redirect: 'manual' to prevent SSRF redirect bypass", async () => {
+    let capturedRedirect: RequestRedirect | undefined;
+    const fakeFetch: typeof fetch = vi.fn(async (_url, init) => {
+      capturedRedirect = init?.redirect;
+      return new Response(null, {
+        status: 302,
+        headers: { Location: "http://127.0.0.1:9999/secret" },
+      });
+    });
+
+    const res = await fetchUpstreamModels({
+      modelsUrl: "https://attacker.example/v1/models",
+      apiKey: "dummy",
+      language: "en",
+      fetchImpl: fakeFetch,
+    });
+
+    expect(capturedRedirect).toBe("manual");
+    expect(res.ok).toBe(false);
+    if (!res.ok) {
+      expect(res.error).toMatch(/redirect/i);
+      expect(res.error).not.toContain("127.0.0.1");
+    }
+  });
 });
