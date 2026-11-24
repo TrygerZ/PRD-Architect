@@ -60,15 +60,15 @@ It supports **four generation modes**:
 - **Four-Mode Generation Engine**: Switch cleanly between Simple (6 chapters), Business & Investor (12 chapters), Technical & AI Agent (9 chapters), and Custom PRD Builder (up to 20 chapters chosen from 29 modular blocks with drag-and-drop ordering).
 - **Obsidian Atelier Dual-Mode UI**: Focused, low-glare interface offering **Dark (Obsidian Hero)** and **Light (Anti-Glare Titanium, capped at matte `#F2F3F5` surfaces)** modes, self-hosted Inter and JetBrains Mono typography, and `motion` transitions that respect `prefers-reduced-motion`.
 - **Collapsible Sidebar & Live Chapter Outline**: Spring-animated navigation rail with live chapter tracking, streaming chapter pulse indicators, per-chapter comment badges, and version history switching.
-- **Bring Your Own Model (BYOM)**: Switch between **DeepSeek** (`deepseek-v4-flash`, `deepseek-v4-pro`), **Google Gemini** (`gemini-2.5-flash`, `gemini-2.5-pro`), **OpenCode Zen** (5 free models: `deepseek-v4-flash-free`, `nemotron-3-ultra-free`, `mimo-v2.5-free`, `north-mini-code-free`, `big-pickle`), and **9Router / Custom OpenAI-Compatible Proxy**, complete with live connection testing.
+- **Universal OpenAI-Compatible AI Provider (BYOM)**: Connect any OpenAI-compatible AI provider, router, or local proxy through one unified endpoint configuration. Features Base URL auto-normalization, 8 quick-fill presets (**OpenAI**, **OpenRouter**, **DeepSeek**, **Google Gemini**, **Groq**, **Together**, **9Router / Proxy**, **Ollama Local**), server-proxied live model discovery (`POST /api/models`), optional API keys for allowed local endpoints, collapsible `Max Output Tokens`, live connection testing, and secure `httpOnly` cookie key storage.
 - **Real-Time SSE Streaming, Auto-Continue & Reasoning Drawer**: Abortable, timeout-free SSE streaming suited for deep-reasoning models, with automatic multi-call continuation, SSE heartbeats, structural mid-output truncation detection, continuation seam repair, a one-click `Continue` fallback if a stream stops early, and a collapsible `ReasoningPanel` displaying live elapsed thinking time and stream progress.
 - **Dual-Theme Live Mermaid Diagrams**: Renders System Context (`graph`), Entity Relationships (`erDiagram` with automatic relationship-label and identifier sanitization), User Journeys (`journey`), Roadmaps (`gantt`), and Sequence Flows (`sequenceDiagram`) with automatic syntax sanitization, Dark/Light theme adaptation, and a toolbar for `Source`, `Copy`, and full-screen `Zoom`.
 - **Inline Chapter Notes, Sticky Revision CTA, Smart Revision Dock & Version Diff**: Attach targeted notes from any sticky chapter header (`Add note`), top inline editor, or sidebar quick-note entry, trigger multi-chapter revisions from the floating `SmartRevisionDock`, and inspect line-level diffs across versions.
-- **Interactive WBS Canvas**: Visualize any generated PRD as a React Flow Work Breakdown Structure parsed straight from markdown, with MoSCoW priority badges, ancestor-to-descendant path highlighting, and a slide-in `DetailPanel`.
+- **Interactive WBS Canvas & HD Image Export**: Visualize any generated PRD as a React Flow Work Breakdown Structure parsed straight from markdown, with MoSCoW priority badges, ancestor-to-descendant path highlighting, a slide-in `DetailPanel`, and deterministic HD image export (PNG `2x HD` / `3x Ultra HD` and true Vector SVG across 4 themes).
 - **Reference File Context Upload**: Upload PDF, DOCX, XLSX, CSV, text/Markdown, and image files to ground generation in existing specifications and notes.
 - **Multi-Tab Local Persistence**: Autosaves versions and drafts to IndexedDB with `BroadcastChannel` cross-tab synchronization, schema validation, and storage quota alerts.
 - **Bilingual Support (EN / ID)**: Full interface copy, system prompts, and quick-prompt starters available in both English and Indonesian.
-- **Editorial Print Export Suite**: Copy Markdown to clipboard, export to Markdown (`.md`), Editorial Print Word (`.docx` with cover metadata, rasterized light-theme Mermaid diagrams, and native rowspan WBS tables), Editorial Print PDF (`.pdf` with embedded Unicode Inter and JetBrains Mono TTF fonts, FlateDecode stream and image compression, cover page, running headers/footers, dynamic column weighting, and smart page-break/orphan guards), structured JSON (`.json`), or print via a theme-independent paper layout, all using clean derived product filenames (`PRD_<ProductName>_*`).
+- **Editorial Print Export Suite**: Copy Markdown to clipboard, export to Markdown (`.md`), Editorial Print Word (`.docx` with cover metadata, rasterized light-theme Mermaid diagrams, and native rowspan WBS tables), Editorial Print PDF (`.pdf` with embedded Unicode Inter and JetBrains Mono TTF fonts, FlateDecode stream and image compression, cover page, running headers/footers, dynamic column weighting, and smart page-break/orphan guards), HD WBS Diagram images (`.png` / `.svg`), structured JSON (`.json`), or print via a theme-independent paper layout, all using clean derived product filenames (`PRD_<ProductName>_*`).
 
 ## WBS Canvas
 
@@ -76,7 +76,8 @@ Once a PRD has been generated, switch from **Document** to **WBS Canvas** in the
 
 **Interactions:**
 
-- **Zoom, Pan & Floating Toolbar**: Use the mouse wheel to zoom and drag to pan, navigate with the minimap, or use the floating bottom-left toolbar for zoom (`-` / `%` / `+`), `Fit view`, `Collapse all / Expand all`, and live node count. Zoom is clamped (`0.3` minimum, `1.2` max initial fit) so layouts stay readable.
+- **Zoom, Pan & Floating Toolbar**: Use the mouse wheel to zoom and drag to pan, navigate with the minimap, or use the floating bottom-left toolbar for zoom (`-` / `%` / `+`), `Fit view`, `Collapse all / Expand all`, `Export HD`, and live node count. Zoom is clamped (`0.3` minimum, `1.2` max initial fit) so layouts stay readable.
+- **HD Image Export (PNG & Vector SVG)**: Click `Export HD` in the WBS toolbar to open the compact export popover (or use **WBS Diagram (.png)** directly from the Header Export menu even while in Document view). Supports **PNG (`2x HD` / `3x Ultra HD`)** and **Vector SVG**, 4 themes (**Obsidian**, **Titanium**, **Print White**, **Transparent**), an **Expand all nodes** toggle, and a **Title & MoSCoW legend** header bar.
 - **Expandable Hierarchy**: The canvas opens expanded so the full breakdown is immediately scannable. Click the **chevron** on any parent node to collapse or expand its subtree (collapsed nodes display a `+N` badge), or toggle all modules at once from the toolbar.
 - **Path Highlighting & Slide-In Detail Panel**: Click (or press `Enter`/`Space` on) a node to highlight its ancestor-to-descendant path in Satin Champagne and open a `380px` spring slide-in `DetailPanel` with the node's breadcrumb, MoSCoW priority badge, clean per-feature detail snippet, sub-items, and quick `Open Document` / `Add note` actions.
 - **Close the detail panel**: Click the backdrop, click the close button, or press `Esc`.
@@ -102,7 +103,7 @@ Parse quality depends on how closely the model follows the formatting contract e
 - **Persistence**: IndexedDB (`idb-keyval`) + `BroadcastChannel`
 - **Backend**: Node.js 22 (pinned in `.node-version`; `engines.node >= 18`), Express.js, Helmet, CORS, `express-rate-limit`, `cookie-parser`, Multer, `pdf-parse`, `mammoth`, `exceljs`
 - **Tooling & Testing**: TypeScript, esbuild, Vitest (`jsdom` + v8 coverage)
-- **AI Integration**: Native Fetch API for OpenAI-compatible SSE streaming across **DeepSeek**, **Google Gemini**, **OpenCode Zen**, and **9Router / Custom Proxy**
+- **AI Integration**: Native Fetch API for universal OpenAI-compatible SSE streaming and server-proxied live model discovery (`POST /api/models`) across any OpenAI-compatible provider, router, or local proxy, with SSRF protection and blocked HTTP 3xx redirects
 
 ## Getting Started
 
@@ -110,7 +111,7 @@ Parse quality depends on how closely the model follows the formatting contract e
 
 - Node.js 22 recommended (v18 or higher supported)
 - npm or pnpm
-- API key from your preferred AI provider (DeepSeek, Google Gemini, 9Router, or OpenCode Zen free models)
+- API key from any OpenAI-compatible AI provider or proxy (OpenAI, OpenRouter, DeepSeek, Google Gemini, Groq, Together, 9Router, etc.) - optional for allowed local LLM endpoints such as Ollama
 
 ### Installation
 
@@ -129,21 +130,24 @@ Parse quality depends on how closely the model follows the formatting contract e
 
 ### Configuration
 
-You can configure the AI provider, model, and custom endpoint directly from the **Settings** modal in the app. Supported providers include **DeepSeek**, **Google Gemini**, **OpenCode Zen** (5 free models), and **9Router Proxy** (custom OpenAI-compatible URL and model name).
+Configure your OpenAI-compatible Base URL, model ID, and API key directly from the **Settings** modal in the app. Use the one-click preset chips to prefill popular providers (**OpenAI**, **OpenRouter**, **DeepSeek**, **Gemini**, **Groq**, **Together**, **9Router**, **Ollama**), click **Fetch Models** to discover available models via `POST /api/models`, and verify connectivity with **Test Connection**.
 
 #### API Key Setup
 
-Provide your API keys through one of two methods:
+Provide your endpoint and API key through one of two methods:
 
-**Method A: Environment Variables (`.env`)** *(Recommended for local dev)*
+**Method A: In-App UI** *(Recommended)*
+
+Open **Settings** inside the app, pick a preset or enter any OpenAI-compatible Base URL (automatically normalized to `/chat/completions`), enter or fetch your model ID, and paste your API key. The backend stores the key in a secure `httpOnly` cookie for subsequent API requests.
+
+**Method B: Environment Variables (`.env`)** *(Optional server defaults for local/self-hosted dev)*
 
 Copy `.env.example` to `.env` in the project root:
 
 ```env
-DEEPSEEK_API_KEY=your_deepseek_key
-GEMINI_API_KEY=your_gemini_key
-OPENCODE_API_KEY=your_opencode_key
-NINE_ROUTER_API_KEY=your_9router_key
+AI_ENDPOINT=https://api.openai.com/v1
+AI_API_KEY=your_api_key_here
+AI_MODEL=gpt-4o-mini
 
 # Keep false on public instances; set true only on trusted private/local installs
 # that intentionally share server-side API keys when clients omit their own key.
@@ -152,10 +156,6 @@ ALLOW_SERVER_KEY_FALLBACK=false
 # Required in production (comma-separated origins for CORS)
 ALLOWED_ORIGINS=https://prd-architect.example.com
 ```
-
-**Method B: In-App UI**
-
-Open **Settings** inside the app and paste your API key. The backend stores it in a secure `httpOnly` cookie for subsequent API requests, and you can verify connectivity immediately with **Test Connection**.
 
 ### Running the App
 
