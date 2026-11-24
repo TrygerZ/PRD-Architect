@@ -14,6 +14,7 @@ import { MAX_PERSISTED_VERSIONS } from "./utils/persistence";
 import { buildChapterOutline, areOutlineItemsEqual, type OutlineItem } from "./utils/outline";
 import { MODAL_SLIDE_UP, POPOVER_FADE } from "./utils/motion";
 import { WBS_SECTION_RE } from "./utils/wbsTable";
+import { extractWbs } from "./utils/wbs";
 import { buildPrintHtml, downloadMarkdown } from "./utils/printTemplate";
 import { useSettings } from "./hooks/useSettings";
 import { useTheme } from "./hooks/useTheme";
@@ -373,6 +374,49 @@ export default function App() {
     }
   }, [prdContent, productType, language, showToast]);
 
+  const hasWbs = useMemo(
+    () =>
+      prdContent.length > 0 &&
+      extractWbs(prdContent, activeVersion?.prdMode).root.children.length > 0,
+    [prdContent, activeVersion?.prdMode],
+  );
+
+  const handleExportWbsPng = useCallback(async () => {
+    if (!prdContent) return;
+    try {
+      const { exportWbsImage } = await import("./utils/export");
+      const res = await exportWbsImage(
+        prdContent,
+        productType,
+        language,
+        {
+          format: "png",
+          scale: 3,
+          theme: theme === "dark" ? "obsidian" : "titanium",
+          expandAll: true,
+          includeHeader: true,
+          versionLabel: activeVersionLabel,
+        },
+        activeVersion?.prdMode,
+      );
+      if (!res.ok) {
+        showToast(res.reason === "empty" ? t.wbs.exportEmpty : t.wbs.exportFailed);
+        return;
+      }
+      showToast(
+        res.clamped
+          ? t.wbs.exportClampedNote
+              .replace("{filename}", res.filename)
+              .replace("{w}", String(res.width))
+              .replace("{h}", String(res.height))
+          : t.wbs.exportSuccess.replace("{filename}", res.filename),
+      );
+    } catch (e) {
+      console.error("WBS PNG export failed:", e);
+      showToast(t.wbs.exportFailed);
+    }
+  }, [prdContent, productType, language, theme, activeVersionLabel, activeVersion?.prdMode, showToast, t]);
+
   const handleCopy = async () => {
     if (!prdContent) return;
     try {
@@ -571,6 +615,8 @@ export default function App() {
           onExportDocx={handleExportDocx}
           onExportPdf={handleExportPdf}
           onExportJson={handleExportJson}
+          onExportWbsPng={handleExportWbsPng}
+          hasWbs={hasWbs}
           onCopy={handleCopy}
           onPrint={handlePrint}
           hasData={prdContent.length > 0}
@@ -607,10 +653,13 @@ export default function App() {
                 <WbsCanvas
                   content={prdContent}
                   prdMode={activeVersion?.prdMode}
+                  productType={productType}
+                  versionLabel={activeVersionLabel}
                   language={language}
                   theme={theme}
                   onJumpToDocument={handleJumpToWbsChapter}
                   onAddWbsNote={handleAddWbsNote}
+                  onNotify={showToast}
                 />
               </Suspense>
             ) : (
