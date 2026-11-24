@@ -5,6 +5,7 @@ class NonRetryableError extends Error {}
 
 export interface GeneratePRDOptions {
   existingContent?: string;
+  maxTokens?: number;
   onContinuing?: (status: ContinuationStatus) => void;
   onTruncated?: (info: TruncationInfo) => void;
 }
@@ -52,6 +53,7 @@ export const generatePRD = async (
           prdMode,
           ...(customChapterIds && customChapterIds.length > 0 ? { customChapterIds } : {}),
           ...(options?.existingContent ? { existingContent: options.existingContent } : {}),
+          ...(options?.maxTokens ? { maxTokens: options.maxTokens } : {}),
         }),
         signal,
       });
