@@ -160,6 +160,31 @@ describe("buildWbsSvg", () => {
     expect(expandedRes!.svg).toContain("Hardware key");
     expect(expandedRes!.svg).toContain("verification");
   });
+
+  it("positions collapsed +N badge below title with zero overlap against Level 2 MoSCoW priority badge", () => {
+    // Collapse "f-1-1" (Dual-Sign Approval, Level 2 Must-have feature with 2 sub-features)
+    const res = buildWbsSvg(SAMPLE_PRD, "SaaS", "en", {
+      ...BASE_OPTS,
+      expandAll: false,
+      collapsedIds: new Set(["f-1-1"]),
+    });
+    expect(res).not.toBeNull();
+    const svg = res!.svg;
+
+    const prioMatch = svg.match(
+      /<rect[^>]*data-badge="priority"[^>]*x="([\d.]+)"[^>]*y="([\d.]+)"[^>]*width="([\d.]+)"[^>]*height="([\d.]+)"/,
+    );
+    const colMatch = svg.match(
+      /<rect[^>]*data-badge="collapsed"[^>]*x="([\d.]+)"[^>]*y="([\d.]+)"[^>]*width="([\d.]+)"[^>]*height="([\d.]+)"/,
+    );
+    expect(prioMatch).not.toBeNull();
+    expect(colMatch).not.toBeNull();
+
+    const prioBottom = Number(prioMatch![2]) + Number(prioMatch![4]);
+    const colTop = Number(colMatch![2]);
+    // Collapsed +2 badge must sit strictly below the priority badge (zero overlap)
+    expect(colTop).toBeGreaterThan(prioBottom + 8);
+  });
 });
 
 describe("exportWbsImage", () => {

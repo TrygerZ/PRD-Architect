@@ -265,12 +265,13 @@ function resolveCardHeight(
   let computed = padY + lines.length * lineH + 2;
   if (depth === 0) computed += 18;
   if (node.code || (depth === 2 && node.priority)) computed += 20;
-  if (!isCollapsed && node.children.length > 0) computed += 20;
+  // Reserve footer row for both expanded child count and collapsed +N pill (prevents overlap with title/priority).
+  if (node.children.length > 0) computed += 22;
   const est = estimateNodeHeight(
     node as Parameters<typeof estimateNodeHeight>[0],
     depth,
   );
-  const base = Math.max(measured ?? 0, computed, isCollapsed ? est - 21 : est);
+  const base = Math.max(measured ?? 0, computed, est);
   return Math.ceil(base);
 }
 
@@ -498,7 +499,7 @@ export function buildWbsSvg(
         const bx = cx + r.w - padX - bw;
         const by = cursorY - 10;
         parts.push(
-          `<rect x="${bx}" y="${by}" width="${bw}" height="15" rx="4" fill="${pInfo.tint}" stroke="${pInfo.color}" stroke-opacity="0.35" stroke-width="0.8" />`,
+          `<rect data-badge="priority" x="${bx}" y="${by}" width="${bw}" height="15" rx="4" fill="${pInfo.tint}" stroke="${pInfo.color}" stroke-opacity="0.35" stroke-width="0.8" />`,
         );
         parts.push(`<circle cx="${bx + 7}" cy="${by + 7.5}" r="2.3" fill="${pInfo.color}" />`);
         parts.push(
@@ -522,17 +523,17 @@ export function buildWbsSvg(
     parts.push(`</text>`);
     cursorY = titleStartY + (r.lines.length - 1) * lineHeight;
 
-    // Collapsed +N badge
+    // Collapsed +N badge placed in footer row below wrapped title (zero overlap with title or MoSCoW pill)
     if (r.isCollapsed && r.hiddenCount > 0) {
       const label = `+${r.hiddenCount}`;
-      const pillW = label.length * 6 + 12;
-      const px = cx + r.w - padX - pillW;
-      const py = cy + padTop;
+      const pillW = label.length * 6 + 14;
+      const px = cx + padX;
+      const py = Number((cursorY + 6).toFixed(1));
       parts.push(
-        `<rect x="${px}" y="${py}" width="${pillW}" height="16" rx="8" fill="${palette.badgeBg}" stroke="${palette.cardBorder}" stroke-width="0.8" />`,
+        `<rect data-badge="collapsed" x="${px}" y="${py}" width="${pillW}" height="16" rx="8" fill="${palette.badgeBg}" stroke="${palette.cardBorder}" stroke-width="0.8" />`,
       );
       parts.push(
-        `<text x="${px + pillW / 2}" y="${py + 11.2}" text-anchor="middle" font-family="${MONO_FONT}" font-size="9" font-weight="600" fill="${palette.champagne}">${label}</text>`,
+        `<text x="${(px + pillW / 2).toFixed(1)}" y="${(py + 11.2).toFixed(1)}" text-anchor="middle" font-family="${MONO_FONT}" font-size="9" font-weight="600" fill="${palette.champagne}">${label}</text>`,
       );
     }
 
