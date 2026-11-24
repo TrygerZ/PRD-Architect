@@ -28,6 +28,17 @@ export {
 export { exportDocx, buildDocxDocument } from "./exportDocx";
 export { exportPdf, buildPdfDocument } from "./exportPdf";
 export { normalizePdfText, woffToTtf } from "./pdfFonts";
+export {
+  buildWbsSvg,
+  computeRasterDimensions,
+  exportWbsImage,
+  type WbsExportFormat,
+  type WbsExportOptions,
+  type WbsExportOutcome,
+  type WbsExportScale,
+  type WbsExportTheme,
+  type WbsSvgResult,
+} from "./exportWbsImage";
 
 export function exportJson(content: string, productType: string): void {
   const sections: Section[] = getSections(content);
