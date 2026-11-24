@@ -85,6 +85,7 @@ export function ApiKeyModal({
   const modalRef = useRef<HTMLDivElement>(null);
   const isBackdropMouseDown = useRef(false);
   const closeTimerRef = useRef<ReturnType<typeof setTimeout> | undefined>(undefined);
+  const lastPersistedKeyRef = useRef<string | null>(null);
 
   const normalizedEndpoint = useMemo(() => normalizeChatEndpoint(endpoint), [endpoint]);
   const endpointInvalid = endpoint.trim().length > 0 && normalizedEndpoint === null;
@@ -116,6 +117,7 @@ export function ApiKeyModal({
     }
 
     setApiKey("");
+    lastPersistedKeyRef.current = null;
     setShowApiKey(false);
     setEndpoint(initialEndpoint);
     setModel(initialModel);
@@ -182,18 +184,20 @@ export function ApiKeyModal({
     if (preset.defaultModel) setModel(preset.defaultModel);
   };
 
-  // Menyimpan key yang baru diketik ke httpOnly cookie sebelum test / fetch / save.
+  // Menyimpan key yang baru diketik ke httpOnly cookie sekali per nilai agar tidak memicu authLimiter.
   const persistTypedKey = async () => {
-    if (!apiKey.trim()) return;
+    const trimmed = apiKey.trim();
+    if (!trimmed || trimmed === lastPersistedKeyRef.current) return;
     const res = await fetch("/api/auth/set-key", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ apiKey: apiKey.trim(), language }),
+      body: JSON.stringify({ apiKey: trimmed, language }),
     });
     if (!res.ok) {
       const errBody = (await res.json().catch(() => ({}))) as { error?: string };
       throw new Error(errBody.error || `Server error ${res.status}`);
     }
+    lastPersistedKeyRef.current = trimmed;
   };
 
   const validate = (): string | null => {
@@ -338,6 +342,7 @@ export function ApiKeyModal({
       console.error("Failed to clear API key:", err);
     }
     setApiKey("");
+    lastPersistedKeyRef.current = null;
     onSave("", endpoint.trim(), model.trim(), clampMaxTokens(maxTokens));
   };
 
@@ -486,9 +491,13 @@ export function ApiKeyModal({
                     {t.settings.modelLabel}
                   </label>
                   {modelsState === "success" && models.length > 0 && (
-                    <span className="text-[10.5px] font-mono font-medium text-[var(--oa-signal-sage)]">
+                    <button
+                      type="button"
+                      onClick={() => setPickerOpen((prev) => !prev)}
+                      className={`text-[10.5px] font-mono font-medium text-[var(--oa-signal-sage)] hover:underline cursor-pointer rounded px-1 ${FOCUS_RING}`}
+                    >
                       {t.settings.modelsLoaded.replace("{count}", String(models.length))}
-                    </span>
+                    </button>
                   )}
                 </div>
                 <div className="flex items-center gap-2">
